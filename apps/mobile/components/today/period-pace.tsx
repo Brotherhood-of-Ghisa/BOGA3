@@ -34,7 +34,7 @@ import {
   toPolyline,
   type PeriodChartGeometry,
 } from './progress-format';
-import { StepAround } from './step-arrows';
+import { STEP_ARROW_HEIGHT, StepAround } from './step-arrows';
 import { TonnageReferenceLayer } from './tonnage-reference-layer';
 import { REFERENCE_GAP, REFERENCE_HEIGHT } from './tonnage-references';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -200,9 +200,11 @@ export function PeriodPace({
         style={styles.figures}
         testID="today-progress-period-figures">
         <View style={[styles.column, styles.currentColumn]}>
-          <Text accessibilityLabel={formatWeekRange(period.window, dateFormat)} allowFontScaling={false} style={[text.label, tone.ink]} testID="today-progress-period-range">
-            {formatPeriodRange(period.window, dateFormat)}
-          </Text>
+          <View style={styles.rangeRow} testID="today-progress-period-range-row">
+            <Text accessibilityLabel={formatWeekRange(period.window, dateFormat)} allowFontScaling={false} style={[text.label, tone.ink]} testID="today-progress-period-range">
+              {formatPeriodRange(period.window, dateFormat)}
+            </Text>
+          </View>
           {/* One line whatever the day's label: the figure shrinks rather
               than wraps, so the card keeps its height as the selection moves. */}
           <View style={[styles.currentRow, metric === 'totalVolume' ? styles.tonnageRow : null]} testID="today-progress-period-working-sets">
@@ -222,28 +224,36 @@ export function PeriodPace({
           <View style={styles.versusRule} />
         </View>
         <View style={[styles.column, styles.comparedColumn]}>
-          {onShowCompared ? (
-            <StepAround
-              noun="period"
-              onNewer={canCompareNewer ? () => onShowCompared(period.compareBack - 1) : null}
-              onOlder={() => onShowCompared(period.compareBack + 1)}
-              testID="today-progress-period-compare">
-              {comparedRange}
-            </StepAround>
-          ) : (
-            comparedRange
-          )}
-          <View style={styles.previousRow}>
-            <Text allowFontScaling={false} style={text.figureLarge} testID="today-progress-period-previous-sets">
-              {formatPaceValue(figures.previousValue, metric)}
-              <Text allowFontScaling={false} style={text.meta}> {paceUnit(metric)}</Text>
-            </Text>
-            {/* The difference takes its direction's colour, like every other
-                change figure (`design-language.md` §6). */}
-            <Text allowFontScaling={false} testID="today-progress-period-difference"
-              style={[text.figureLarge, { color: changeToneColourIn(roles, delta.tone) }]}>
-              {delta.text}
-            </Text>
+          <View style={styles.rangeRow} testID="today-progress-period-previous-range-row">
+            {onShowCompared ? (
+              <StepAround
+                noun="period"
+                onNewer={canCompareNewer ? () => onShowCompared(period.compareBack - 1) : null}
+                onOlder={() => onShowCompared(period.compareBack + 1)}
+                testID="today-progress-period-compare">
+                {comparedRange}
+              </StepAround>
+            ) : (
+              comparedRange
+            )}
+          </View>
+          {/* A hero-sized strut gives this row the current figure's line, so
+              the two figures share a baseline across `vs`. */}
+          <View style={styles.previousLine} testID="today-progress-period-previous-line">
+            <Text accessibilityElementsHidden allowFontScaling={false} importantForAccessibility="no"
+              style={[text.figureHero, styles.strut]} testID="today-progress-period-previous-strut">{'\u200B'}</Text>
+            <View style={styles.previousRow}>
+              <Text allowFontScaling={false} style={text.figureLarge} testID="today-progress-period-previous-sets">
+                {formatPaceValue(figures.previousValue, metric)}
+                <Text allowFontScaling={false} style={text.meta}> {paceUnit(metric)}</Text>
+              </Text>
+              {/* The difference takes its direction's colour, like every other
+                  change figure (`design-language.md` §6). */}
+              <Text allowFontScaling={false} testID="today-progress-period-difference"
+                style={[text.figureLarge, { color: changeToneColourIn(roles, delta.tone) }]}>
+                {delta.text}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -288,17 +298,25 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'stretch',
     gap: uiSpace.sm,
   },
+  // Both columns stretch to one height: the ranges share the top line, the
+  // figures the bottom one.
   column: {
     gap: uiSpace.xs,
     justifyContent: 'space-between',
+  },
+  // The arrows' height on both sides, the range centred in it.
+  rangeRow: {
+    height: STEP_ARROW_HEIGHT,
+    justifyContent: 'center',
   },
   currentColumn: {
     flex: 1,
     minWidth: 0,
   },
+  // The day's label sits on the figure's baseline.
   currentRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
   },
   tonnageRow: { flexDirection: 'column', alignItems: 'flex-start' },
   currentFigure: {
@@ -321,11 +339,19 @@ const useStyles = makeStyles((roles) => ({
   },
   // The compared period's figure, the difference at the edge.
   previousRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.sm,
+  },
+  previousLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  strut: {
+    width: 0,
   },
   chart: {
     overflow: 'visible',
