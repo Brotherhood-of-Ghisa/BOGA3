@@ -405,6 +405,20 @@ describe('Today: the Progress card over real data', () => {
     // one (`design-language.md` §6).
     expect(text('today-progress-period-difference')).toHaveStyle({ color: roles.gain });
     expect(screen.queryByText(/pace/)).toBeNull();
+    // Across `vs` both ranges sit centred in the arrows' height, and the day
+    // label sits on the figure's baseline.
+    for (const id of ['today-progress-period-range-row', 'today-progress-period-previous-range-row']) {
+      expect(text(id)).toHaveStyle({ height: STEP_ARROW_HEIGHT, justifyContent: 'center' });
+    }
+    expect(text('today-progress-period-working-sets')).toHaveStyle({ flexDirection: 'row', alignItems: 'baseline' });
+    // The compared figure's line holds a hidden hero-sized strut, so both
+    // figures share a baseline.
+    const strut = screen.getByTestId('today-progress-period-previous-strut', { includeHiddenElements: true });
+    expect(strut).toHaveStyle({ fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl, width: 0 });
+    const line = text('today-progress-period-previous-line');
+    expect(line).toHaveStyle({ flexDirection: 'row', alignItems: 'baseline' });
+    expect(within(line).getByTestId('today-progress-period-previous-sets')).toBeTruthy();
+    expect(within(line).getByTestId('today-progress-period-previous-strut', { includeHiddenElements: true })).toBe(strut);
     // The spoken label carries the projection the chart draws (18 over 12 days, across 28: 42).
     expect(text('today-progress-chart')).toHaveProp(
       'accessibilityLabel',
