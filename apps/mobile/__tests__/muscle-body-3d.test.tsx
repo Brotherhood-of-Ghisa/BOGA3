@@ -8,6 +8,7 @@ import { compareProgressVolume } from '@/src/data/progress-comparisons';
 import { themePresets } from '@/components/ui/theme-presets';
 import { StatsScreenShell } from '../app/(tabs)/stats-history';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
+import { MuscleViewButton } from '@/components/stats/muscle-view-sheet';
 import { MUSCLE_BODY_MESH, type MuscleBodyMesh } from '@/components/stats/muscle-body-mesh';
 import { MUSCLE_MAP_REFERENCE } from '@/components/stats/muscle-map-reference';
 import {
@@ -375,7 +376,7 @@ describe('November face decoration', () => {
   it('uses the device calendar through restoration, while preserving rotation and controls', () => {
     jest.setSystemTime(new Date(2026, 10, 30, 23, 59, 59));
     const onSelect = jest.fn();
-    render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={[makeMuscle('chest', 'Chest', 8)]}
+    render(<MuscleBodyCard overlay="contour" metric="workingSetCount" muscles={[makeMuscle('chest', 'Chest', 8)]}
       selectedId="chest" onSelect={onSelect} />);
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
     expect(patchFrame().november).toBe(true);
@@ -408,31 +409,31 @@ describe('MuscleBodyCard', () => {
     const rows = [comparedMuscle('chest', 2, 8, 'workingSetCount'),
       comparedMuscle('biceps', 0, 8, 'workingSetCount'), comparedMuscle('quads', 8, 0, 'workingSetCount')];
     const props = { muscles: rows, metric: 'workingSetCount' as const, selectedId: null, onSelect: jest.fn() };
-    const view = render(<MuscleBodyCard defaultOverlay="contour" {...props} setTargets={SET_TARGETS} />);
+    const view = render(<MuscleBodyCard overlay="contour" {...props} setTargets={SET_TARGETS} />);
     fireEvent(screen.getByTestId('stats-muscle-body-viewport'), 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
     const fills = () => patchFrame().scores;
     const expectedFills = (chest: number | null, biceps: number | null, quads: number) =>
       new Map([['chest', chest], ['biceps', biceps], ['quads', quads]]);
     expect(fills()).toEqual(expectedFills(-.5, null, 1));
-    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...props} setTargets={{ ...SET_TARGETS, weeklyTarget: 4 }} />);
+    view.rerender(<MuscleBodyCard overlay="contour" {...props} setTargets={{ ...SET_TARGETS, weeklyTarget: 4 }} />);
     expect(fills()).toEqual(expectedFills(0, null, 1));
-    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...props} setTargets={{ weeklyTarget: 4, weeks: 4 }} />);
+    view.rerender(<MuscleBodyCard overlay="contour" {...props} setTargets={{ weeklyTarget: 4, weeks: 4 }} />);
     expect(fills()).toEqual(expectedFills(-.75, null, 0));
     const volumeProps = { ...props, metric: 'totalVolume' as const,
       muscles: [comparedMuscle('chest', 0, 1000), comparedMuscle('biceps', 500, 1000), comparedMuscle('quads', 1000, 1000)] };
-    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...volumeProps} setTargets={SET_TARGETS} />);
+    view.rerender(<MuscleBodyCard overlay="contour" {...volumeProps} setTargets={SET_TARGETS} />);
     expect(fills()).toEqual(expectedFills(null, -.5, 0));
     const volumeFills = fills();
-    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...volumeProps} setTargets={{ weeklyTarget: 100, weeks: 4 }} />);
+    view.rerender(<MuscleBodyCard overlay="contour" {...volumeProps} setTargets={{ weeklyTarget: 100, weeks: 4 }} />);
     expect(fills()).toEqual(volumeFills);
-    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...volumeProps} selectedId="chest" setTargets={SET_TARGETS} />);
+    view.rerender(<MuscleBodyCard overlay="contour" {...volumeProps} selectedId="chest" setTargets={SET_TARGETS} />);
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^0$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-previous')).toHaveTextContent(/^1000$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-change')).toHaveTextContent(/^−100%$/);
   });
 
   it('omits the legend and keeps the selected muscle’s signed comparison', () => {
-    render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={jest.fn()} />);
+    render(<MuscleBodyCard overlay="contour" metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={jest.fn()} />);
     expect(screen.queryByTestId('stats-muscle-body-legend')).toBeNull();
     expect(screen.queryByText('Decrease')).toBeNull();
     expect(screen.queryByText('Unchanged')).toBeNull();
@@ -449,7 +450,7 @@ describe('MuscleBodyCard', () => {
   it('switches orientation via Front/Back control and accessibility actions, and selects muscles via both touch hit-testing and accessible buttons', () => {
     const onSelect = jest.fn();
     const view = render(
-      <MuscleBodyCard defaultOverlay="contour"
+      <MuscleBodyCard overlay="contour"
         metric="workingSetCount"
         muscles={muscles}
         onSelect={onSelect}
@@ -514,7 +515,7 @@ describe('MuscleBodyCard', () => {
     expect(onSelect).toHaveBeenCalledWith('back_lats');
 
     view.rerender(
-      <MuscleBodyCard defaultOverlay="contour"
+      <MuscleBodyCard overlay="contour"
         metric="workingSetCount"
         muscles={muscles}
         onSelect={onSelect}
@@ -552,10 +553,13 @@ describe('MuscleBodyCard', () => {
 
   it('explains mesh geometry on demand without changing selection or rotation', () => {
     const onSelect = jest.fn();
-    render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={onSelect} />);
+    render(<>
+      <MuscleViewButton value="contour" onSelectOverlay={jest.fn()} />
+      <MuscleBodyCard overlay="contour" metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={onSelect} />
+    </>);
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
-    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    fireEvent.press(screen.getByTestId('stats-muscle-view'));
     fireEvent.press(screen.getByText('About the model'));
     expect(screen.getByText(/Wireframe lines are triangle edges/)).toBeTruthy();
     expect(screen.getByText(/spinal erectors use smoothed columns/)).toBeTruthy();
@@ -567,7 +571,7 @@ describe('MuscleBodyCard', () => {
   });
 
   it('retains figures and controls for geometry-free muscles', () => {
-    render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={[makeMuscle('custom', 'Custom', 3)]}
+    render(<MuscleBodyCard overlay="contour" metric="workingSetCount" muscles={[makeMuscle('custom', 'Custom', 3)]}
       selectedId="custom" onSelect={jest.fn()} />);
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Custom');
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent('3');
@@ -674,42 +678,6 @@ describe('MuscleBodyCard', () => {
     expect(unselected.contour).toBeFalsy();
   });
 
-  it('supports controlled overlay and onOverlayChange callback', () => {
-    const rows = [makeMuscle('chest', 'Chest', 8)];
-    const onOverlayChange = jest.fn();
-    const { rerender } = render(
-      <MuscleBodyCard
-        metric="workingSetCount"
-        muscles={rows}
-        onOverlayChange={onOverlayChange}
-        onSelect={jest.fn()}
-        overlay="contour"
-        selectedId="chest"
-      />
-    );
-
-    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
-    expect(screen.getByTestId('stats-muscle-body-material-contour').props.accessibilityState).toMatchObject({ checked: true });
-    expect(screen.getByTestId('stats-muscle-body-patches')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('stats-muscle-body-material-wireframe'));
-    expect(onOverlayChange).toHaveBeenCalledWith('wireframe');
-
-    rerender(
-      <MuscleBodyCard
-        metric="workingSetCount"
-        muscles={rows}
-        onOverlayChange={onOverlayChange}
-        onSelect={jest.fn()}
-        overlay="wireframe"
-        selectedId="chest"
-      />
-    );
-    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
-    expect(screen.getByTestId('stats-muscle-body-material-wireframe').props.accessibilityState).toMatchObject({ checked: true });
-    expect(screen.queryByTestId('stats-muscle-body-svg')).toBeNull();
-  });
-
   it('correctly occludes sloping faces and excludes hidden forearm edge at 48 degrees', () => {
     const scores = computeMuscleScores([makeMuscle('forearms_grip', 'Forearms', 8)], 'workingSetCount');
     const projected = projectMuscleBody({
@@ -778,14 +746,12 @@ describe('MuscleBodyCard', () => {
 
   it('toggles between wireframe and patches without losing the selection or back camera', () => {
     const rows = [makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)];
-    render(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} defaultOverlay="wireframe" />);
-
-    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
-    expect(screen.getByTestId('stats-muscle-body-material-wireframe').props.accessibilityState).toMatchObject({ checked: true });
+    const props = { metric: 'workingSetCount', muscles: rows, selectedId: 'chest', onSelect: jest.fn() } as const;
+    const { rerender } = render(<MuscleBodyCard {...props} overlay="wireframe" />);
     expect(screen.queryByTestId('stats-muscle-body-svg')).toBeNull();
     expect(screen.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('stats-muscle-body-material-contour'));
+    rerender(<MuscleBodyCard {...props} overlay="contour" />);
     expect(screen.getByTestId('stats-muscle-body-patches')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-body-wireframe')).toBeNull();
 
@@ -793,8 +759,7 @@ describe('MuscleBodyCard', () => {
     expect(patchFrame().selected.length).toBeGreaterThan(0);
     expect(patchFrame().camera.cos).toBeCloseTo(-1);
 
-    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
-    fireEvent.press(screen.getByTestId('stats-muscle-body-material-wireframe'));
+    rerender(<MuscleBodyCard {...props} overlay="wireframe" />);
     expect(screen.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
   });
 

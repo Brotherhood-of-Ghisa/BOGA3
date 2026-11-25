@@ -6,7 +6,7 @@ import { hasComparisonMetric, resolveComparisonLayout } from './comparison-colum
 import { StatsTable, statsTableStyles } from './stats-table';
 import { MuscleBodyCard } from './muscle-body-card';
 import type { MuscleSetTargets } from './muscle-body-projection';
-import type { MuscleViewControl } from './muscle-view-sheet';
+import type { MuscleView } from './muscle-view-sheet';
 import { HISTORY_VIEW_OPTIONS } from './history-view';
 import { ProgressTables, ProgressContributionRows, type ProgressTablesProps } from './progress-tables';
 
@@ -19,7 +19,7 @@ import type { TissueReloadMetrics } from '@/src/injuries/tissue-reload';
 
 type Props = ProgressTablesProps & {
   muscleLayout: ProgressMuscleLayout;
-  viewControl?: MuscleViewControl;
+  muscleView?: MuscleView;
   report?: MuscleReportAssignment;
   setTargets?: MuscleSetTargets;
   activeInjuries?: readonly InjuryView[];
@@ -34,7 +34,7 @@ export function ProgressMuscleView(props: Props) {
     metric,
     selectedId,
     muscleLayout,
-    viewControl,
+    muscleView,
     onSelect,
     onMuscleHistory,
     onExerciseHistory,
@@ -62,9 +62,7 @@ export function ProgressMuscleView(props: Props) {
         metric={metric}
         muscles={muscles}
         onSelect={onSelect}
-        onSelectList={viewControl && (() => viewControl.onSelect('list'))}
-        onOverlayChange={viewControl?.onSelect}
-        overlay={viewControl?.value === 'list' ? undefined : viewControl?.value}
+        overlay={muscleView === 'list' ? undefined : muscleView}
         report={report}
         selectedId={selectedId}
         setTargets={props.setTargets}

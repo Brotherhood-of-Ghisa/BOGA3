@@ -259,16 +259,14 @@ export type StatsScreenShellProps = {
   activeInjuries?: readonly InjuryView[];
 };
 
-// Muscle List gives search the full width, with its two sheet triggers below.
-// Exercise keeps its single search row, and 3D puts View in the model card.
+// Both Muscle layouts share the View and Filters row. List adds full-width search above it.
 function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup, query, onChangeQuery,
   gymId, gymOptions, onSelectGym, countSecondary = true, onChangeCountSecondary, defaultCountSecondary = true,
   countSecondaryVolume = true, onChangeCountSecondaryVolume, defaultCountSecondaryVolume = true, defaultGrouped = true,
-  muscleViewControl, showMuscleViewTrigger }: Pick<StatsScreenShellProps,
+  muscleViewControl }: Pick<StatsScreenShellProps,
   'viewMode' | 'gymId' | 'gymOptions' | 'onSelectGym' | 'countSecondary' | 'onChangeCountSecondary' | 'defaultCountSecondary'
   | 'countSecondaryVolume' | 'onChangeCountSecondaryVolume' | 'defaultCountSecondaryVolume' | 'defaultGrouped' | 'muscleViewControl'> & {
   tableVisible: boolean; grouped: boolean; onToggleGroup: () => void; query: string; onChangeQuery: (query: string) => void;
-  showMuscleViewTrigger: boolean;
 }) {
   const exercise = viewMode === 'exercise';
   const searchable = exercise || tableVisible;
@@ -286,8 +284,9 @@ function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup
   if (exercise) return <View style={styles.searchRow}><View style={styles.search}>{search}</View>{filters}</View>;
   return <View style={styles.muscleControls}>
     {tableVisible ? search : null}
-    <View style={[styles.searchRow, styles.filtersOnly, tableVisible ? styles.muscleListActions : null]}>
-      {muscleViewControl ? <MuscleViewButton {...muscleViewControl} showTrigger={showMuscleViewTrigger} /> : null}
+    <View style={[styles.searchRow, styles.muscleActions]} testID="stats-muscle-actions">
+      {muscleViewControl ? <MuscleViewButton value={muscleViewControl.value} onSelectOverlay={muscleViewControl.onSelect}
+        onSelectList={() => muscleViewControl.onSelect('list')} /> : null}
       {filters}
     </View>
   </View>;
@@ -490,7 +489,7 @@ export function StatsScreenShell({
         selection={selection} onShowSelected={() => { if (onOpenSelection && selection.selected) openHistory(
           onOpenSelection, selection.selected.map(item => item.id), selectionLaunchTarget.current); }}
         search={{ viewMode, tableVisible, grouped: grouped[viewMode],
-          muscleViewControl, showMuscleViewTrigger: tableVisible || !summary,
+          muscleViewControl,
           onToggleGroup: () => setGrouped(current => ({ ...current, [viewMode]: !current[viewMode] })),
           query: viewMode === 'exercise' ? searchQuery : muscleSearch,
           onChangeQuery: viewMode === 'exercise' ? onSearchQueryChange : setMuscleSearch,
@@ -507,7 +506,7 @@ export function StatsScreenShell({
           onToggleExercise={selection.toggle}
           emptyBody={exerciseEmptyBody(exerciseListItems, exerciseMetric)}
           sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} /> : null : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={effectiveContributionId} muscleLayout={muscleLayout}
-          viewControl={muscleViewControl}
+          muscleView={muscleViewControl?.value}
           report={muscleReport}
           setTargets={muscleTargets && { ...muscleTargets, weeks: period === 'this-week' ? 1 : targetWindowWeeks }}
           grouped={grouped.muscle} searchQuery={muscleSearch}
@@ -780,8 +779,7 @@ const styles = StyleSheet.create({
   filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   search: { flex: 1, minWidth: 0 },
-  filtersOnly: { justifyContent: 'flex-end' },
-  muscleListActions: { minHeight: uiGeometry.tapTarget },
+  muscleActions: { justifyContent: 'flex-end', minHeight: uiGeometry.tapTarget },
   // The page's last row clears the display's rounded corner above the tab bar,
   // which otherwise clips it: one more step of the spacing scale than the
   // gutter `ScreenScroll` already applies.

@@ -646,7 +646,7 @@ describe('Muscle body injury overlay', () => {
       render(
         <MuscleBodyCard
           activeInjuries={injuries}
-          defaultOverlay="contour"
+          overlay="contour"
           metric="workingSetCount"
           muscles={muscles}
           onSelect={onSelect}
@@ -679,7 +679,7 @@ describe('Muscle body injury overlay', () => {
       render(
         <MuscleBodyCard
           activeInjuries={injuries}
-          defaultOverlay="contour"
+          overlay="contour"
           metric="workingSetCount"
           muscles={muscles}
           onSelect={jest.fn()}
@@ -711,7 +711,7 @@ describe('Muscle body injury overlay', () => {
       const { unmount } = render(
         <MuscleBodyCard
           activeInjuries={[monitoringInjury, acuteInjury]}
-          defaultOverlay="contour"
+          overlay="contour"
           metric="workingSetCount"
           muscles={muscles}
           onSelect={jest.fn()}
@@ -733,7 +733,7 @@ describe('Muscle body injury overlay', () => {
       render(
         <MuscleBodyCard
           activeInjuries={[acuteInjury, monitoringInjury]}
-          defaultOverlay="contour"
+          overlay="contour"
           metric="workingSetCount"
           muscles={muscles}
           onSelect={jest.fn()}
@@ -778,7 +778,7 @@ describe('Muscle body injury overlay', () => {
               side: 'left',
             },
           ]}
-          defaultOverlay="contour"
+          overlay="contour"
           metric="workingSetCount"
           muscles={muscles}
           onSelect={onSelect}
@@ -819,7 +819,7 @@ describe('Muscle body injury overlay', () => {
       render(
         <MuscleBodyCard
           activeInjuries={[rightQuadInjury, chestInjury]}
-          defaultOverlay="wireframe"
+          overlay="wireframe"
           metric="workingSetCount"
           muscles={muscles}
           onSelect={jest.fn()}

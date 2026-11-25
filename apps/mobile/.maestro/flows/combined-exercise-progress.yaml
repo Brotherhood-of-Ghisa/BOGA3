@@ -238,22 +238,25 @@ appId: com.dinoderek.mobile
 - tapOn: { id: "stats-muscle-selection-cancel" }
 - assertVisible: { id: "stats-muscle-search-input" }
 
-# The List and 3D triggers sit in different places. Prove both open their
-# native sheet and that choosing List again restores the regular list controls.
+# The same toolbar trigger opens the native sheet in List and 3D. Returning
+# to List restores the search field and keeps the two toolbar chips available.
 - runFlow:
     when: { platform: iOS }
     commands:
-      - tapOn: { id: "stats-muscle-list-view" }
+      - tapOn: { id: "stats-muscle-view" }
       - tapOn: { id: "stats-muscle-body-material-wireframe" }
       - extendedWaitUntil:
           visible: { id: "stats-muscle-body-wireframe" }
           timeout: 15000
       - assertNotVisible: { id: "stats-muscle-selection-controls" }
+      - assertVisible: { id: "stats-filters" }
       - takeScreenshot: "19-muscle-wireframe-from-list"
-      - tapOn: { id: "stats-muscle-body-view" }
+      - tapOn: { id: "stats-muscle-view" }
       - tapOn: { id: "stats-muscle-view-list" }
       - extendedWaitUntil:
           visible: { id: "stats-muscle-search-input" }
           timeout: 15000
-      - assertVisible: { id: "stats-muscle-list-view" }
+      - assertVisible: { id: "stats-muscle-view" }
+      - assertVisible: { id: "stats-filters" }
       - assertNotVisible: { id: "stats-muscle-selection-controls" }
+      - takeScreenshot: "20-muscle-list-from-wireframe"

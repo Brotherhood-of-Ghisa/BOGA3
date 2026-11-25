@@ -129,3 +129,13 @@ it('keeps the standalone contributor heading geometry in the table foundation', 
     flexDirection: 'row', alignItems: 'center', gap: uiSpace.md, padding: uiSpace.md,
   });
 });
+
+it('keeps the standalone model materials and help available in the gallery', () => {
+  render(<TableGallery initialSample="single" />);
+  fireEvent.press(screen.getByRole('button', { name: 'Muscle view options' }));
+  const sheet = within(screen.getByTestId('stats-muscle-body-view-sheet'));
+  expect(sheet.queryByText('List')).toBeNull();
+  expect(sheet.getByText('About the model')).toBeTruthy();
+  fireEvent.press(sheet.getByText('Patches'));
+  expect(screen.getByTestId('stats-muscle-body-patches')).toBeTruthy();
+});
