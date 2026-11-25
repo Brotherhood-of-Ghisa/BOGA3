@@ -50,7 +50,8 @@ it('defaults to native wireframe, preserves rotation and focus, and updates the 
 
 it('keeps Retry accessible outside the adjustable viewport and preserves the picker and patch toggle after GL failure', () => {
   createRenderer.mockImplementation(() => { throw new Error('native context failure'); });
-  const view = renderWithTheme(<MuscleBodyCard muscles={muscles} metric="workingSetCount" selectedId="brachialis" onSelect={jest.fn()} />);
+  const props = { muscles, metric: 'workingSetCount', selectedId: 'brachialis', onSelect: jest.fn() } as const;
+  const view = renderWithTheme(<MuscleBodyCard {...props} />);
   fireEvent(view.getByTestId('stats-muscle-body-wireframe'), 'contextCreate', recordingGL().context);
   expect(view.getByTestId('stats-muscle-wireframe-error')).toBeTruthy();
   const retry = view.getByTestId('stats-muscle-wireframe-retry');
@@ -60,10 +61,13 @@ it('keeps Retry accessible outside the adjustable viewport and preserves the pic
   expect(view.getByTestId('stats-muscle-body-framing-body')).not.toBeDisabled();
   fireEvent.press(retry);
   expect(view.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
-  fireEvent.press(view.getByTestId('stats-muscle-body-view'));
-  fireEvent.press(view.getByTestId('stats-muscle-body-material-contour'));
+  fireEvent(view.getByTestId('stats-muscle-body-wireframe'), 'contextCreate', recordingGL().context);
+  expect(view.getByTestId('stats-muscle-wireframe-error')).toBeTruthy();
+  view.rerender(<MuscleBodyCard {...props} overlay="contour" />);
   expect(view.getByTestId('stats-muscle-body-patches')).toBeTruthy();
   expect(view.getByTestId('stats-muscle-body-picker-trigger')).toBeTruthy();
+  view.rerender(<MuscleBodyCard {...props} />);
+  expect(view.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
 });
 
 it('keeps the selected coarse geometry, focused camera, native context and hit testing when switching to patches', () => {
@@ -77,8 +81,7 @@ it('keeps the selected coarse geometry, focused camera, native context and hit t
   for (let step = 0; step < 3; step++) fireEvent(viewport, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
   act(() => { jest.advanceTimersByTime(20); });
   const before = renderer.draw.mock.calls.at(-1)![0];
-  fireEvent.press(view.getByTestId('stats-muscle-body-view'));
-  fireEvent.press(view.getByTestId('stats-muscle-body-material-contour'));
+  view.rerender(<MuscleBodyCard muscles={muscles} metric="workingSetCount" selectedId="brachialis" onSelect={onSelect} overlay="contour" />);
   act(() => { jest.advanceTimersByTime(20); });
   const after = renderer.draw.mock.calls.at(-1)![0];
   expect(after.overlay).toBe('contour'); expect(after.selected).toBe(before.selected); expect(after.camera).toBe(before.camera);
@@ -134,12 +137,6 @@ it.each([320, 375, 402])('keeps a wrapping muscle strip separate from explicit v
     expect(view.getByTestId('stats-muscle-body-framing-focus')).toHaveTextContent('Focus');
     expect(view.queryByTestId('stats-muscle-body-next')).toBeNull();
     expect(view.queryByTestId('stats-muscle-body-prev')).toBeNull();
-    fireEvent.press(view.getByTestId('stats-muscle-body-view'));
-    expect(view.getByTestId('stats-muscle-body-material-wireframe').props.accessibilityState).toMatchObject({ checked: true });
-    fireEvent.press(view.getByTestId('stats-muscle-body-material-contour'));
-    expect(view.getByTestId('stats-muscle-body-patches')).toBeTruthy();
-    fireEvent.press(view.getByTestId('stats-muscle-body-view'));
-    fireEvent.press(view.getByTestId('stats-muscle-body-material-wireframe'));
     expect(view.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
   } finally { act(() => Dimensions.set({ window: original })); }
 });

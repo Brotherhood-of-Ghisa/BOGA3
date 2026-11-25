@@ -3,7 +3,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import {
-  ActionButton,
   Card,
   FigureText,
   Icon,
@@ -47,7 +46,6 @@ import {
 import { MuscleBodyCanvas } from './muscle-body-canvas';
 import type { WireframeFrame } from './muscle-wireframe-renderer';
 import { hitWireframe, selectMuscleMeshes, wireframeCamera } from './muscle-wireframe-scene';
-import { MuscleViewSheet } from './muscle-view-sheet';
 
 type Props = {
   readonly muscles: readonly ProgressMuscleComparison[];
@@ -57,10 +55,7 @@ type Props = {
   /** The user's muscle setup, so merged entries shade and select together and untracked ones stay neutral. */
   readonly report?: MuscleReportAssignment;
   readonly setTargets?: MuscleSetTargets;
-  readonly defaultOverlay?: MuscleOverlayStyle;
   readonly overlay?: MuscleOverlayStyle;
-  readonly onOverlayChange?: (next: MuscleOverlayStyle) => void;
-  readonly onSelectList?: () => void;
   readonly activeInjuries?: readonly (ActiveInjuryOverlay | InjuryView)[];
   readonly comparisonLayout?: ComparisonLayout;
 };
@@ -106,11 +101,10 @@ type HeaderProps = {
   readonly onPrev: () => void;
   readonly onNext: () => void;
   readonly onOpenPicker: () => void;
-  readonly onOpenView: () => void;
 };
 
 function MuscleBodyHeader({ orientation, onOrientationChange, focus, focusAvailable, onFocusChange,
-  selectedMuscle, onPrev, onNext, onOpenPicker, onOpenView }: HeaderProps) {
+  selectedMuscle, onPrev, onNext, onOpenPicker }: HeaderProps) {
   const text = useUiText();
   const roles = useUiRoles();
   const swipe = Gesture.Pan().runOnJS(true)
@@ -142,8 +136,6 @@ function MuscleBodyHeader({ orientation, onOrientationChange, focus, focusAvaila
           <Icon name="chevron-down" size="sm" />
         </Pressable>
       </GestureDetector>
-      <ActionButton accessibilityLabel="Model view options" label="View" onPress={onOpenView}
-        size="compact" variant="text" testID="stats-muscle-body-view" />
     </View>
     <View style={styles.toolbar}>
       <SegmentedControl accessibilityLabel="Body orientation" density="compact" layout="inline"
@@ -443,8 +435,8 @@ const toActiveInjuryOverlays = (
  * contrasting triangle edges over body and selected anatomy. Filled patches share the coarse anatomy,
  * camera, focus and hit testing; switching view changes only its material.
  * The separate muscle strip pages horizontally or opens the metric-aware picker.
- * View opens the shared layout, material and help choices. The toolbar owns orientation and framing. The footer
- * shares its comparison layout and content insets with the Exercises table.
+ * The card controls orientation and framing. The footer shares its comparison layout
+ * and content insets with the Exercises table.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
 export function MuscleBodyCard({
@@ -454,10 +446,7 @@ export function MuscleBodyCard({
   onSelect,
   report,
   setTargets,
-  defaultOverlay = 'wireframe',
-  overlay: controlledOverlay,
-  onOverlayChange,
-  onSelectList,
+  overlay = 'wireframe',
   activeInjuries,
   comparisonLayout,
 }: Props) {
@@ -468,16 +457,9 @@ export function MuscleBodyCard({
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
   const [dragOffsetDeg, setDragOffsetDeg] = useState(0);
-  const [internalOverlay, setInternalOverlay] = useState<MuscleOverlayStyle>(defaultOverlay);
-  const [canvasFailed, setCanvasFailed] = useState(false);
-
-  const overlay = controlledOverlay ?? internalOverlay;
-
-  const handleOverlayChange = (next: MuscleOverlayStyle) => {
-    setCanvasFailed(false);
-    setInternalOverlay(next);
-    onOverlayChange?.(next);
-  };
+  const [failedOverlay, setFailedOverlay] = useState<MuscleOverlayStyle | null>(null);
+  const canvasFailed = failedOverlay === overlay;
+  if (failedOverlay !== null && !canvasFailed) setFailedOverlay(null);
 
   const [focus, setFocus] = useState(false);
   // Leave room for Progress controls, comparison and the tab bar on compact phones.
@@ -530,7 +512,6 @@ export function MuscleBodyCard({
   );
 
   const [sheetVisible, setSheetVisible] = useState(false);
-  const [viewVisible, setViewVisible] = useState(false);
   const layout = comparisonLayout ?? resolveComparisonLayout(windowWidth, selectedMuscle ? [selectedMuscle] : [],
     metric, false, { compact: true });
 
@@ -602,7 +583,6 @@ export function MuscleBodyCard({
             setDragOffsetDeg(0);
             setBaseAngleDeg(next === 'front' ? 0 : 180);
           }}
-          onOpenView={() => setViewVisible(true)}
           focus={focus}
           focusAvailable={!canvasFailed && selectedMeshes.length > 0}
           onFocusChange={setFocus}
@@ -618,11 +598,11 @@ export function MuscleBodyCard({
             setDragOffsetDeg(0);
             setBaseAngleDeg(current => normaliseBodyAngle(current + delta));
           }}
-          onCanvasError={() => setCanvasFailed(true)}
+          onCanvasError={() => setFailedOverlay(overlay)}
           onLayoutWidth={nextWidth => {
             if (nextWidth !== measuredWidth) setMeasuredWidth(nextWidth);
           }}
-          onRetry={() => setCanvasFailed(false)}
+          onRetry={() => setFailedOverlay(null)}
           onSelectMuscle={selectWithAutoOrientation}
           orientation={orientation}
           projected={projected}
@@ -645,8 +625,6 @@ export function MuscleBodyCard({
         onSelect={onSelect}
         selectedId={selectedId}
       />
-      <MuscleViewSheet visible={viewVisible} onDismiss={() => setViewVisible(false)}
-        value={overlay} onSelectOverlay={handleOverlayChange} onSelectList={onSelectList} />
       <MusclePickerSheet
         metric={metric}
         muscles={muscles}

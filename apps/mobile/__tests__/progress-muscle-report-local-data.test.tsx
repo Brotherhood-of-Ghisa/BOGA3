@@ -193,11 +193,11 @@ describe('Progress muscle list under Broad', () => {
     expect(screen.getByTestId('stats-contributions')).toBeTruthy();
     expect(muscleBlocks()).toEqual(['cm_quads']);
 
-    fireEvent.press(screen.getByTestId('stats-muscle-list-view'));
+    fireEvent.press(screen.getByTestId('stats-muscle-view'));
     fireEvent.press(screen.getByTestId('stats-muscle-body-material-wireframe'));
     await screen.findByTestId('stats-muscle-body-wireframe');
     expect(screen.queryByTestId('stats-muscle-selection-controls')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    fireEvent.press(screen.getByTestId('stats-muscle-view'));
     fireEvent.press(screen.getByTestId('stats-muscle-view-list'));
     expect(await screen.findByTestId('stats-muscle-search-input')).toHaveDisplayValue('Quads');
     expect(screen.getByTestId('stats-contributions')).toBeTruthy();

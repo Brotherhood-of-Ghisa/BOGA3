@@ -75,7 +75,7 @@ appId: com.dinoderek.mobile
 - assertVisible: { id: "stats-muscle-body-selected", text: "Pectoralis" }
 - assertVisible: { id: "stats-muscle-body-viewport", text: ".*view, 0 degrees" }
 # Nested native sheets must return to View without changing the selected data.
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - assertVisible: { id: "stats-muscle-body-view-sheet" }
 - tapOn: "About the model"
 - assertVisible: "Wireframe lines are triangle edges.*"
@@ -103,13 +103,13 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-selected", text: "Quads" }
 - takeScreenshot: "occlusion-01-quads-wireframe-front"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-contour" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-02-quads-patches-front"
 - tapOn: { id: "stats-muscle-body-angle-back" }
 - takeScreenshot: "occlusion-03-quads-patches-back"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-wireframe" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-04-quads-wireframe-back"
@@ -122,13 +122,13 @@ appId: com.dinoderek.mobile
     id: "stats-muscle-body-viewport"
     text: ".*view, 1[234][0-9] degrees"
 - waitForAnimationToEnd
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-contour" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-patches" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-06-quads-patches-oblique"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-wireframe" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-wireframe" }
@@ -147,15 +147,15 @@ appId: com.dinoderek.mobile
 - assertVisible: { id: "stats-muscle-body-selected", text: "Brachialis" }
 - takeScreenshot: "wireframe-02-brachialis"
 # Deep anatomy must remain partially visible under the biceps, in both materials.
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-contour" }
 - waitForAnimationToEnd
 - takeScreenshot: "layers-02-brachialis-patches-front"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-wireframe" }
 - waitForAnimationToEnd
 - tapOn: { id: "stats-muscle-body-framing-focus" }
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-contour" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-patches" }
@@ -171,13 +171,13 @@ appId: com.dinoderek.mobile
     text: ".*view, (8[0-9]|9[0-9]) degrees"
 - waitForAnimationToEnd
 # Cycle materials at a settled pose so native GL presentation catches up before capture.
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-wireframe" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-wireframe" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-08-focused-arm-wireframe-far"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-contour" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-patches" }
@@ -198,13 +198,13 @@ appId: com.dinoderek.mobile
     id: "stats-muscle-body-viewport"
     text: ".*view, (26[0-9]|27[0-9]|280) degrees"
 - waitForAnimationToEnd
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-wireframe" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-wireframe" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-09-focused-arm-wireframe-near"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-contour" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-patches" }
@@ -215,7 +215,7 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "patches-02-brachialis-back"
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }
 - tapOn: { id: "stats-muscle-body-angle-front" }
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-wireframe" }
 - waitForAnimationToEnd
 - tapOn: { id: "stats-muscle-body-framing-body" }
@@ -229,12 +229,12 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd
 - tapOn: { id: "stats-muscle-body-framing-focus" }
 - takeScreenshot: "wireframe-03-forearm-hand-focus"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-contour" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-patches" }
 - takeScreenshot: "patches-03-forearm-hand-focus"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-wireframe" }
 - waitForAnimationToEnd
 - tapOn: { id: "stats-muscle-body-picker-trigger" }
@@ -246,12 +246,12 @@ appId: com.dinoderek.mobile
 - tapOn: { id: "stats-muscle-picker-row-spinal_erectors" }
 - waitForAnimationToEnd
 - takeScreenshot: "wireframe-04-spinal-focus"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-contour" }
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-patches" }
 - takeScreenshot: "patches-04-spinal-focus"
-- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-view" }
 - tapOn: { id: "stats-muscle-body-material-wireframe" }
 - waitForAnimationToEnd
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }

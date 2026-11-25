@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { type ComponentProps, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Notice, ScreenScroll, SegmentedControl, StatePanel, SwitchRow, ToggleChip, uiSpace } from '@/components/ui';
+import { Notice, ScreenScroll, SegmentedControl, StatePanel, SwitchRow, ToggleChip, uiGeometry, uiSpace } from '@/components/ui';
 import { ProgressTables, nextMuscleSortMode, type MuscleSortMode, type ProgressTableMetric } from '@/components/stats/progress-tables';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
+import { MuscleViewButton } from '@/components/stats/muscle-view-sheet';
+import type { MuscleOverlayStyle } from '@/components/stats/muscle-body-projection';
 import { CompactRowComparison } from './compact-row-fixtures';
 import { tableGalleryMuscles } from './table-fixtures';
 
@@ -39,8 +41,19 @@ export function TableGallery({ initialSample, initialState, initialLong = false,
       action={{ label: 'Retry', testID: 'table-gallery-retry', onPress: () => { setState('ready'); setAction('Retry'); } }} />
     : state === 'loading' ? <StatePanel fill={false} kind="loading" body="Loading progress…" testID="table-gallery-loading" />
     : sample === 'rows' ? <CompactRowComparison onAction={setAction} />
-    : sample === 'single' ? <ProgressMuscleView {...props} muscleLayout="3d" /> : <ProgressTables {...props} />}
+    : sample === 'single' ? <SingleMuscleExample {...props} /> : <ProgressTables {...props} />}
     {action ? <Notice live message={action} testID="table-gallery-action" /> : null}
   </ScreenScroll>;
 }
-const styles = StyleSheet.create({ controls: { flexDirection: 'row', gap: uiSpace.sm } });
+function SingleMuscleExample(props: Omit<ComponentProps<typeof ProgressMuscleView>, 'muscleLayout' | 'muscleView'>) {
+  const [overlay, setOverlay] = useState<MuscleOverlayStyle>('wireframe');
+  return <>
+    <View style={styles.modelActions}><MuscleViewButton value={overlay} onSelectOverlay={setOverlay} /></View>
+    <ProgressMuscleView {...props} muscleLayout="3d" muscleView={overlay} />
+  </>;
+}
+
+const styles = StyleSheet.create({
+  controls: { flexDirection: 'row', gap: uiSpace.sm },
+  modelActions: { alignSelf: 'flex-end', justifyContent: 'center', minHeight: uiGeometry.tapTarget },
+});

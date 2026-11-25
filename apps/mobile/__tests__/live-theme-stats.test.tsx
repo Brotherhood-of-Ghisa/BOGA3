@@ -9,6 +9,7 @@ import { StyleSheet, type TextStyle } from 'react-native';
 
 import { ComparisonValues } from '@/components/stats/comparison-columns';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
+import { MuscleViewButton } from '@/components/stats/muscle-view-sheet';
 import { ProgressFilters } from '@/components/stats/progress-filters';
 import { ProgressTables } from '@/components/stats/progress-tables';
 import { WeekSetList } from '@/components/stats/week-set-list';
@@ -76,14 +77,15 @@ describe('live theme: Progress', () => {
     expect(style(screen.getByText('Gym')).color).toBe(after.inkMuted);
   });
 
-  it('repaints the empty week list and the muscle body card header', async () => {
+  it('repaints the empty week list, muscle body card header and View sheet', async () => {
     renderWithTheme(<>
       <WeekSetList groups={[]} loading={false} error={null} onOpenSession={jest.fn()} testID="week" />
+      <MuscleViewButton value="wireframe" onSelectOverlay={jest.fn()} />
       <MuscleBodyCard metric="workingSetCount" muscles={[lats]} selectedId="back_lats" onSelect={jest.fn()} />
     </>);
     expect(style(screen.getByTestId('week-empty')).color).toBe(before.inkMuted);
     expect(style(screen.getByTestId('stats-muscle-body-selected')).color).toBe(before.ink);
-    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    fireEvent.press(screen.getByTestId('stats-muscle-view'));
     expect(screen.getByTestId('stats-muscle-body-view-sheet')).toHaveStyle({ backgroundColor: before.surface });
     await switchTheme(SLATE_DARK);
     expect(style(screen.getByTestId('week-empty')).color).toBe(after.inkMuted);
