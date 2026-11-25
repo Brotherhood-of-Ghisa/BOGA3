@@ -536,7 +536,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     const effort = options.gymId === undefined ? allEffort : aggregateSelectedMuscleDailyEffort(inputInGym(input, options.gymId), options);
     return {
       daily: aggregateSelectedMuscleDailyEffortMetrics(effort),
-      weekly: aggregateSelectedMuscleWeeklyEffort(effort),
+      weekly: aggregateSelectedMuscleWeeklyEffort(effort, options.muscleGroupIds.length > 1),
       gyms: exerciseHistoryGymOptions(input.sessions.filter(session => contributingSessions.has(session.id))),
     };
   },

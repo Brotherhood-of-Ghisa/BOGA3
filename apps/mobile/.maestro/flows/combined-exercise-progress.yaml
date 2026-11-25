@@ -5,7 +5,8 @@ appId: com.dinoderek.mobile
 # survives Back, and names/all three charts/chronological History open normally.
 # A long current name wraps, and every primary/secondary muscle stays reachable
 # in the bounded Options body (scroll to the last link and back to History).
-# On iOS, dragging moves the legend and week details temporarily hide it.
+# On iOS, both expanded Timelines show their legend, which can be dragged
+# and temporarily hides while the native chart shows the week's details.
 # Why device: responder cancellation/release, native stack restoration, viewport
 # clipping, rotation, sheet reachability and gesture hit-testing require the native runtime.
 # Muscle List also proves hold release, Back restoration and View switching.
@@ -225,6 +226,40 @@ appId: com.dinoderek.mobile
 - runFlow:
     when: { platform: iOS }
     commands:
+      - tapOn: { id: "stats-muscle-history-view-chip-timeline" }
+      - runFlow:
+          when:
+            visible: "Effort metric: Sets.*"
+          commands:
+            - tapOn: { id: "stats-muscle-history-metric-chip" }
+      - tapOn: { id: "stats-muscle-history-timeline-expand" }
+      - setOrientation: LANDSCAPE_LEFT
+      - extendedWaitUntil:
+          visible: { id: "stats-muscle-history-timeline-legend-move" }
+          timeout: 10000
+      - assertVisible: "Quads"
+      - assertVisible: "Glute Max"
+      - waitForAnimationToEnd
+      - takeScreenshot: "17a-muscle-landscape-stacks"
+      - swipe:
+          from: { id: "stats-muscle-history-timeline-legend-move" }
+          direction: RIGHT
+          duration: 600
+      - assertNotVisible: { id: "stats-muscle-history-timeline-details" }
+      - takeScreenshot: "17b-muscle-moved-legend"
+      - tapOn: { id: "stats-muscle-history-timeline-plot" }
+      - assertVisible: { id: "stats-muscle-history-timeline-details-close" }
+      - assertNotVisible: { id: "stats-muscle-history-timeline-legend-move" }
+      - takeScreenshot: "17c-muscle-week-details"
+      - tapOn: { id: "stats-muscle-history-timeline-details-close" }
+      - assertVisible: { id: "stats-muscle-history-timeline-legend-move" }
+      - takeScreenshot: "17d-muscle-restored-legend"
+      - tapOn: { id: "stats-muscle-history-timeline-collapse" }
+      - setOrientation: PORTRAIT
+      - extendedWaitUntil:
+          visible: { id: "stats-muscle-history-timeline-expand" }
+          timeout: 10000
+      - assertNotVisible: { id: "stats-muscle-history-timeline-legend-move" }
       - tapOn: { id: "BackButton" }
 - runFlow:
     when: { platform: Android }

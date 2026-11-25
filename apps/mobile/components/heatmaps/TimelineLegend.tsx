@@ -5,12 +5,12 @@ import Animated from 'react-native-reanimated';
 import { Card, FigureText, Icon, uiGeometry, uiHairline, uiSpace, useUiRoles, useUiText } from '@/components/ui';
 import { contrastRatio } from '@/components/ui/lch';
 
-import type { TimelineExercise } from './timeline';
+import type { TimelineStack } from './timeline';
 import { overlayMoveActions, useTimelineOverlayPosition, type TimelineOverlayArea } from './use-timeline-overlay-position';
 
-export function TimelineExerciseLegend({ area, exercises, fills, hidden, testID }: {
+export function TimelineLegend({ area, stack, fills, hidden, testID }: {
   area: TimelineOverlayArea;
-  exercises: readonly TimelineExercise[];
+  stack: TimelineStack;
   fills: readonly string[];
   hidden: boolean;
   testID: string;
@@ -26,7 +26,7 @@ export function TimelineExerciseLegend({ area, exercises, fills, hidden, testID 
       style={[styles.window, { width: area.width, maxHeight: area.height }, animatedStyle]}>
       <Card style={styles.card} testID={testID}>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.entries}>
-          {exercises.map(({ id, name }, index) => (
+          {stack.items.map(({ id, name }, index) => (
             <View key={id} style={styles.entry}>
               <View testID={`${testID}-swatch-${id}`} style={[styles.swatch, { backgroundColor: fills[index] },
                 contrastRatio(fills[index], surface) < 3 && uiHairline(roles, { tone: 'ink' })]} />
@@ -35,7 +35,7 @@ export function TimelineExerciseLegend({ area, exercises, fills, hidden, testID 
           ))}
         </ScrollView>
         <GestureDetector gesture={pan}>
-          <View accessible accessibilityLabel="Move exercise legend" accessibilityRole="adjustable"
+          <View accessible accessibilityLabel={`Move ${stack.kind} legend`} accessibilityRole="adjustable"
             accessibilityActions={overlayMoveActions} onAccessibilityAction={event => move(event.nativeEvent.actionName)}
             style={styles.handle} testID={`${testID}-move`}>
             <Icon name="move-window" colorRole="inkMuted" size="sm" />

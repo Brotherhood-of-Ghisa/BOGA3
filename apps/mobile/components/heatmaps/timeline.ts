@@ -6,19 +6,22 @@ import { formatCalendarWeek, formatCalendarWeekHeading } from '@/src/utils/local
 // Week values are the week's sum for Volume and Sets, its best for 1RM and Top
 // weight; a rest week gets no column.
 
-import type { CalendarHeatmapMetric, SelectedExerciseWeeklyEffort } from '@/src/data';
+import type { CalendarHeatmapMetric, SelectedMuscleWeeklyEffort } from '@/src/data';
 
-import { getMetricValue } from './heatmap-metric';
 import type { WeekCell } from './heatmapData';
 import { timelineOverviewSpan, type TimelineWindow } from './timeline-window';
 
 export type TimelineWeekState = 'training' | 'rest' | 'unavailable';
 
-export type TimelineExercise = {
+type TimelineStackMetrics = Pick<SelectedMuscleWeeklyEffort, 'totalVolume' | 'workingSetCount'>;
+
+export type TimelineContributor = {
   id: string;
   name: string;
-  weeks: ReadonlyMap<string, SelectedExerciseWeeklyEffort>;
+  weeks: ReadonlyMap<string, TimelineStackMetrics>;
 };
+
+export type TimelineStack = { kind: 'exercise' | 'muscle'; items: readonly TimelineContributor[] };
 
 export interface TimelineWeek {
   weekStartDateKey: string;
@@ -115,13 +118,12 @@ export const timelineTicks = (values: number[], integer: boolean): number[] => {
 };
 
 /** The weekly series (sums for Volume/Sets, best-of for 1RM/Top weight) as the timeline plots it. */
-export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapMetric, exercises?: readonly TimelineExercise[]): TimelineSeries {
+export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapMetric, contributors?: readonly TimelineContributor[]): TimelineSeries {
   const weeks = weekly.map(toTimelineWeek);
-  if (exercises) for (const week of weeks) {
-    week.contributions = exercises.map(exercise => {
-      const entry = exercise.weeks.get(week.weekStartDateKey);
-      return entry && getMetricValue(entry, metric);
-    });
+  if (contributors && (metric === 'totalVolume' || metric === 'workingSetCount')) {
+    for (const week of weeks) {
+      week.contributions = contributors.map(item => item.weeks.get(week.weekStartDateKey)?.[metric]);
+    }
   }
   const values = weeks.flatMap(week => week.value === null ? [] : [week.value]);
   return { weeks, ticks: timelineTicks(values, metric === 'workingSetCount'), months: timelineMonths(weeks) };

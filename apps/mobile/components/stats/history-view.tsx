@@ -11,7 +11,7 @@ import {
   DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData,
   type BuildHeatmapDataOptions, type DayCell, type FocusedTimelineWeek,
 } from '@/components/heatmaps';
-import type { TimelineExercise } from '@/components/heatmaps/timeline';
+import type { TimelineStack } from '@/components/heatmaps/timeline';
 import { TimelineDetailsWindow } from '@/components/stats/timeline-details-window';
 import { WeekSetList, type WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useWeekSets, type WeekSetsTarget } from '@/components/stats/week-sets';
@@ -92,7 +92,7 @@ export type TimelineLinks = {
   weekSetsTarget: WeekSetsTarget;
   onOpenSession: (sessionId: string) => void;
   exerciseLink?: WeekSetExerciseLink;
-  exerciseSeries?: readonly TimelineExercise[];
+  stack?: TimelineStack;
 };
 
 type TimelineDisplay = { expanded: boolean; onToggle: () => void };
@@ -236,7 +236,7 @@ function HistoryHeatmap({
   const timelineChart = (
     <TimelineHeatmap
       data={data}
-      exerciseSeries={timeline.exerciseSeries}
+      stack={timeline.stack}
       metric={metric}
       selectedWeekKey={selectedWeekKey}
       onSelectWeek={setSelection}

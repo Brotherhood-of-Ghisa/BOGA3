@@ -507,6 +507,8 @@ export const aggregateSelectedMuscleDailyEffort = (
 
 export type CalendarHeatmapMetric = 'totalVolume' | 'workingSetCount' | 'estimatedRM1' | 'highestWeight';
 
+type MuscleWeekShare = { workingSetCount: number; totalVolume: number | null };
+
 export type SelectedMuscleWeeklyEffort = {
   weekStartDateKey: string;
   monthKey: string;
@@ -517,6 +519,8 @@ export type SelectedMuscleWeeklyEffort = {
   hasWorkingSets?: boolean;
   estimatedRM1: number | null;
   highestWeight: number | null;
+  /** Additive shares of the combined week, for the expanded Timeline. */
+  muscleShares?: ReadonlyMap<string, MuscleWeekShare>;
 };
 
 /**
@@ -613,12 +617,35 @@ const startOfMondayWeek = (date: Date): Date => {
   return new Date(date.getTime() - mondayOffset * 24 * 60 * 60 * 1000);
 };
 
+function splitMuscleWeek(contributions: MuscleSetContribution[], strongestBySet: ReadonlyMap<string, number>) {
+  const shares = new Map<string, MuscleWeekShare & { hasRepetitionSets: boolean }>();
+  const strongestMusclesBySet = new Map<string, Set<string>>();
+  for (const row of contributions) {
+    const share = shares.get(row.muscleGroupId) ?? { workingSetCount: 0, totalVolume: 0, hasRepetitionSets: false };
+    shares.set(row.muscleGroupId, share);
+    accumulateContributionVolume(share, row);
+    if (!row.working || row.roleWeight !== strongestBySet.get(row.setIdentity)) continue;
+    const muscles = strongestMusclesBySet.get(row.setIdentity) ?? new Set<string>();
+    muscles.add(row.muscleGroupId);
+    strongestMusclesBySet.set(row.setIdentity, muscles);
+  }
+
+  // Tied muscles split the single eligible credit so the stacked height stays the combined count.
+  for (const [setId, muscles] of strongestMusclesBySet) {
+    const credit = strongestBySet.get(setId)! / muscles.size;
+    for (const id of muscles) shares.get(id)!.workingSetCount += credit;
+  }
+  return shares;
+}
+
 export const aggregateSelectedMuscleWeeklyEffort = (
-  dailyEffort: SelectedMuscleDailyEffort[]
+  dailyEffort: SelectedMuscleDailyEffort[],
+  includeMuscleShares = false,
 ): SelectedMuscleWeeklyEffort[] => {
   type WeekAccumulator = EffortMetricAccumulator & {
     weekStartDateKey: string;
     monthKey: string;
+    contributions?: MuscleSetContribution[];
   };
 
   const weekMap = new Map<string, WeekAccumulator>();
@@ -629,14 +656,16 @@ export const aggregateSelectedMuscleWeeklyEffort = (
     const weekStartDateKey = formatUtcDateKey(weekStart);
     const monthKey = `${weekStart.getUTCFullYear().toString().padStart(4, '0')}-${(weekStart.getUTCMonth() + 1).toString().padStart(2, '0')}`;
 
-    const acc = weekMap.get(weekStartDateKey) ?? {
+    const acc: WeekAccumulator = weekMap.get(weekStartDateKey) ?? {
       weekStartDateKey,
       monthKey,
       ...createEffortMetricAccumulator(),
+      contributions: includeMuscleShares ? [] : undefined,
     };
 
     for (const contribution of day.contributions) {
       accumulateContributionMetrics(acc, contribution);
+      acc.contributions?.push(contribution);
     }
 
     weekMap.set(weekStartDateKey, acc);
@@ -667,6 +696,7 @@ export const aggregateSelectedMuscleWeeklyEffort = (
       workingSetCount: week.workingSetCount,
       estimatedRM1: week.bestRM1,
       highestWeight: week.highestWeight,
+      ...(week.contributions && { muscleShares: splitMuscleWeek(week.contributions, week.setCounter.roleWeightBySet) }),
     });
   }
 
