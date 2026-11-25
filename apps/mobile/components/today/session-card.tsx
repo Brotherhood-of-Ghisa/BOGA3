@@ -97,9 +97,18 @@ function SummaryLine({ session }: { session: LatestSessionSummary }) {
   );
 }
 
+// The page arrows overhang the heading's line by this much either side, so a
+// table that pages keeps the heading, and the card, the height of one that does not.
+const PAGE_ARROW_OVERHANG = (STEP_ARROW_HEIGHT - uiTypography.lineHeight.xxs) / 2;
+
 // The page arrows reach up into the gap above the table and down through the
 // header's padding, never into the summary line or the first row.
-const PAGE_ARROW_SLOP = { top: uiSpace.lg, bottom: uiSpace.xs, left: uiSpace.xs / 2, right: uiSpace.xs / 2 };
+const PAGE_ARROW_SLOP = {
+  top: uiSpace.lg - PAGE_ARROW_OVERHANG,
+  bottom: uiSpace.xs - PAGE_ARROW_OVERHANG,
+  left: uiSpace.xs / 2,
+  right: uiSpace.xs / 2,
+};
 
 /**
  * The rows' scroller: whether there is more than it shows, and a page step up
@@ -288,13 +297,11 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.sm,
   },
-  // The pair's gap keeps their side reaches apart. They overhang the
-  // heading's line, so a table that pages keeps the heading, and the card,
-  // the height of one that does not.
+  // The pair's gap keeps their side reaches apart.
   pageArrows: {
     flexDirection: 'row',
     gap: uiSpace.xs,
-    marginVertical: -(STEP_ARROW_HEIGHT - uiTypography.lineHeight.xxs) / 2,
+    marginVertical: -PAGE_ARROW_OVERHANG,
   },
   fillTable: {
     flexShrink: 1,

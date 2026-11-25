@@ -734,8 +734,11 @@ describe('Today: the today-progress harness fixture', () => {
     // More exercises than the card shows without scrolling.
     expect(rowText('today-latest-session-exercise-5')).toHaveTextContent('Barbell Bent Over Row370.0 × 581.6');
     // The arrows overhang the heading's 14pt line, so paging never makes the heading or the card taller.
-    expect(rowText('today-latest-session-rows-arrows')).toHaveStyle({ marginVertical: -(STEP_ARROW_HEIGHT - 14) / 2 });
+    const overhang = (STEP_ARROW_HEIGHT - uiTypography.lineHeight.xxs) / 2;
+    expect(rowText('today-latest-session-rows-arrows')).toHaveStyle({ marginVertical: -overhang });
     expect(rowText('today-latest-session-rows-up')).toHaveStyle({ height: STEP_ARROW_HEIGHT });
+    // Their reach gives up the overhang: still the 16pt gap above and 4pt padding below, no further.
+    expect(rowText('today-latest-session-rows-up').props.hitSlop).toMatchObject({ top: 16 - overhang, bottom: 4 - overhang });
     // The arrows beside the heading page the rows; the scroller's own events say where it is.
     const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(() => {});
     const scrolled = (y: number) => fireEvent.scroll(rowText('today-latest-session-rows'), { nativeEvent: { contentOffset: { x: 0, y } } });
