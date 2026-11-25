@@ -21,7 +21,7 @@ import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-s
 import { formatClockTime, formatCompactDate, formatLocalDateTime } from '@/src/utils/local-time';
 
 import { formatBestSet, todaySessionAccessibilityLabel } from './progress-format';
-import { StepArrow, StepAround } from './step-arrows';
+import { STEP_ARROW_HEIGHT, StepArrow, StepAround } from './step-arrows';
 
 export type TodaySessionCardProps = {
   session: LatestSessionSummary;
@@ -153,7 +153,7 @@ function ExerciseTable({ lines, onOpen }: { lines: SessionExerciseLine[]; onOpen
         <View style={[styles.nameCell, styles.nameHeading]}>
           <Text allowFontScaling={false} style={label}>Exercise</Text>
           {overflows ? (
-            <View style={styles.pageArrows}>
+            <View style={styles.pageArrows} testID="today-latest-session-rows-arrows">
               <StepArrow direction="up" hitSlop={PAGE_ARROW_SLOP} label="Earlier exercises" onPress={onUp} testID="today-latest-session-rows-up" />
               <StepArrow direction="down" hitSlop={PAGE_ARROW_SLOP} label="Later exercises" onPress={onDown} testID="today-latest-session-rows-down" />
             </View>
@@ -288,10 +288,13 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.sm,
   },
-  // The pair's gap keeps their side reaches apart.
+  // The pair's gap keeps their side reaches apart. They overhang the
+  // heading's line, so a table that pages keeps the heading, and the card,
+  // the height of one that does not.
   pageArrows: {
     flexDirection: 'row',
     gap: uiSpace.xs,
+    marginVertical: -(STEP_ARROW_HEIGHT - uiTypography.lineHeight.xxs) / 2,
   },
   fillTable: {
     flexShrink: 1,

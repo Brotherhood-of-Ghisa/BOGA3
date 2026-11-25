@@ -733,6 +733,9 @@ describe('Today: the today-progress harness fixture', () => {
     expect(text('today-latest-session-figures')).toHaveTextContent('6 exercises · 18 sets · 3 PRs @ Canal Street Gym');
     // More exercises than the card shows without scrolling.
     expect(rowText('today-latest-session-exercise-5')).toHaveTextContent('Barbell Bent Over Row370.0 × 581.6');
+    // The arrows overhang the heading's 14pt line, so paging never makes the heading or the card taller.
+    expect(rowText('today-latest-session-rows-arrows')).toHaveStyle({ marginVertical: -(STEP_ARROW_HEIGHT - 14) / 2 });
+    expect(rowText('today-latest-session-rows-up')).toHaveStyle({ height: STEP_ARROW_HEIGHT });
     // The arrows beside the heading page the rows; the scroller's own events say where it is.
     const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(() => {});
     const scrolled = (y: number) => fireEvent.scroll(rowText('today-latest-session-rows'), { nativeEvent: { contentOffset: { x: 0, y } } });
