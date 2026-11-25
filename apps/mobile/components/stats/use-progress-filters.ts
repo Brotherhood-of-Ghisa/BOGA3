@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import type { ProgressBreakdown, ProgressExerciseMetric, ProgressMetric, ProgressPeriod } from '@/src/preferences/model';
+import type { MuscleView } from './muscle-view-sheet';
 
 export type { ProgressPeriod } from '@/src/preferences/model';
 
@@ -14,6 +15,7 @@ export type ProgressFilters = {
   breakdown: ProgressBreakdown;
   period: ProgressPeriod;
   metric: ProgressMetric;
+  muscleView: MuscleView;
   /** The Exercise table's metric, which may be one the Muscle table cannot show. */
   exerciseMetric: ProgressExerciseMetric;
   /** Secondary work in muscle figures ([[muscle.secondary-filter]]). */
@@ -22,6 +24,7 @@ export type ProgressFilters = {
   selectBreakdown: (next: ProgressBreakdown) => void;
   selectPeriod: (next: ProgressPeriod) => void;
   selectMetric: (next: ProgressMetric) => void;
+  selectMuscleView: (next: MuscleView) => void;
   selectExerciseMetric: (next: ProgressExerciseMetric) => void;
   selectCountSecondary: (next: boolean) => void;
   selectCountSecondaryVolume: (next: boolean) => void;
@@ -30,6 +33,7 @@ export type ProgressFilters = {
 type Choices = {
   breakdown?: ProgressBreakdown; period?: ProgressPeriod; metric?: ProgressMetric;
   exerciseMetric?: ProgressExerciseMetric; countSecondary?: boolean; countSecondaryVolume?: boolean;
+  muscleView?: MuscleView;
 };
 type Defaults = Required<Choices>;
 
@@ -67,6 +71,7 @@ export function useProgressFilters(params: ProgressFilterParams): ProgressFilter
     breakdown: values.progressBreakdown, period: values.progressPeriod, metric: values.progressMetric,
     exerciseMetric: values.progressExerciseMetric, countSecondary: values.progressCountSecondary,
     countSecondaryVolume: !values.muscleVolumePrimaryOnly,
+    muscleView: values.progressMuscleLayout === 'list' ? 'list' : 'wireframe',
   };
   const link = { breakdown: firstParam(params.breakdown), period: firstParam(params.period) };
   const [entered, setEntered] = useState(link);
@@ -91,12 +96,14 @@ export function useProgressFilters(params: ProgressFilterParams): ProgressFilter
     breakdown: chosen.breakdown ?? entry.breakdown ?? defaults.breakdown,
     period: chosen.period ?? entry.period ?? defaults.period,
     metric: chosen.metric ?? defaults.metric,
+    muscleView: chosen.muscleView ?? defaults.muscleView,
     exerciseMetric: chosen.exerciseMetric ?? defaults.exerciseMetric,
     countSecondary: chosen.countSecondary ?? defaults.countSecondary,
     countSecondaryVolume: chosen.countSecondaryVolume ?? defaults.countSecondaryVolume,
     selectBreakdown: breakdown => choose({ breakdown }),
     selectPeriod: period => choose({ period }),
     selectMetric: metric => choose({ metric }),
+    selectMuscleView: muscleView => choose({ muscleView }),
     selectExerciseMetric: exerciseMetric => choose({ exerciseMetric }),
     selectCountSecondary: countSecondary => choose({ countSecondary }),
     selectCountSecondaryVolume: countSecondaryVolume => choose({ countSecondaryVolume }),
