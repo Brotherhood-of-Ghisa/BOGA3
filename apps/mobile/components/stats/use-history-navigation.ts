@@ -18,7 +18,8 @@ export function useHistoryNavigation(subject: HistorySubject | null, metric: Cal
   const openPeriod = useCallback((period: { day: string } | { week: string }) => {
     if (!subject) return;
     const scope = subject.kind === 'muscle'
-      ? { muscleGroupId: subject.id, gymId: subject.gymId, countSecondary: subject.countSecondary,
+      ? { ...(subject.ids ? { muscleGroupIds: subject.ids } : { muscleGroupId: subject.id }),
+        gymId: subject.gymId, countSecondary: subject.countSecondary,
         countSecondaryVolume: subject.countSecondaryVolume }
       : { ...(subject.kind === 'exercises' ? { exerciseDefinitionIds: subject.ids } : { exerciseDefinitionId: subject.id }), gymId: subject.gymId };
     router.push(historyDetailHref(scope, period, metric));

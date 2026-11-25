@@ -1,6 +1,6 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { lockAsync, OrientationLock } from 'expo-screen-orientation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ComponentProps } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseSessionEntrySheet } from '@/components/session-recorder/exercise-session-entry-sheet';
@@ -13,10 +13,10 @@ import {
 } from '@/components/stats/history-view';
 import type { WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { HistoryPeriodDetail } from '@/components/stats/history-period-detail';
-import { setPeriodBounds, type SetPeriod, type WeekSetsTarget } from '@/components/stats/week-sets';
+import { historySetsTarget, setPeriodBounds, type SetPeriod } from '@/components/stats/week-sets';
 import { parseHistoryJump } from '@/components/session-list/history-jump';
 import { useHistoryNavigation } from '@/components/stats/use-history-navigation';
-import { useHistory, type HistorySubject } from '@/components/stats/use-history';
+import { historyMuscleIds, historySubjectId, useHistory, type HistorySubject } from '@/components/stats/use-history';
 import { GymPicker, type GymPickerSheetProps } from '@/components/gyms/gym-picker';
 import { HistoryTitle, type HistoryTitleMuscle } from '@/components/stats/history-title';
 import { SecondarySetsChip } from '@/components/stats/secondary-sets-chip';
@@ -26,29 +26,21 @@ import {
 } from '@/components/ui';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import type { CalendarHeatmapMetric } from '@/src/data';
-import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { muscleWeeklyTarget } from '@/src/preferences/muscle-targets';
+import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
 import {
   PROGRESS_HISTORY_METRIC_PARAMS, PROGRESS_HISTORY_PRIMARY_ONLY_PARAM, exerciseHistoryHref, progressHistoryHref, rmCurveHref,
 } from '@/src/navigation/routes';
 import { reportedExercisesMuscles, reportedMuscleName } from '@/src/exercise-catalog/reported-muscles';
-import { parseExerciseSelection } from '@/src/utils/exercise-selection';
-import type { SelectedExercise } from '@/components/stats/exercise-selection';
+import { parseProgressSelection } from '@/src/utils/progress-selection';
 import { EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 
-// One exercise, 2–5 selected exercises, or one muscle, pushed from Progress. The subject is
-// the page's native title (on a muscle, a button that switches to another of
-// the user's muscles), and the view selector, metric chip, gym and, on a
-// muscle, the secondary-set chip sit in one row above the chart. The header's ⋮ holds the Timeline's focused week's sets
-// and exercise history/muscles; RM curve and Add to session remain single-only.
-// Combined selections expose additive metrics and a tappable names title. The
-// params carry ids, never names: the page resolves names from the
-// exercise catalogue cache, which also decides the unavailable state
-// (`navigation-contract.md`: a bad id renders in route).
-
+// An exercise, muscle, or 2–5 of either, identified by IDs from Progress.
+// Combined selections show their names in the title sheet and open Sets or
+// Volume. The catalogue decides when the whole scope is unavailable.
 /** The route's declared title, kept until the subject's name resolves. */
 export const PROGRESS_HISTORY_TITLE = 'History';
 
@@ -66,25 +58,37 @@ export const resolveHistorySubject = (params: {
   exerciseDefinitionId?: string | string[];
   exerciseDefinitionIds?: string | string[];
   muscleGroupId?: string | string[];
+  muscleGroupIds?: string | string[];
   gymId?: string | string[];
   secondary?: string | string[];
   secondaryVolume?: string | string[];
 }): HistorySubject | null => {
   const exerciseDefinitionId = firstRouteParam(params.exerciseDefinitionId);
-  const exerciseDefinitionIds = parseExerciseSelection(params.exerciseDefinitionIds);
   const muscleGroupId = firstRouteParam(params.muscleGroupId);
-  if (Number(Boolean(exerciseDefinitionId)) + Number(params.exerciseDefinitionIds !== undefined) + Number(Boolean(muscleGroupId)) !== 1) return null;
+  const scopes = [exerciseDefinitionId, params.exerciseDefinitionIds, muscleGroupId, params.muscleGroupIds];
+  if (scopes.filter(scope => scope != null).length !== 1) return null;
   const gymId = decodeGymRouteParam(firstRouteParam(params.gymId));
   const scope = gymId === undefined ? {} : { gymId };
-  if (params.exerciseDefinitionIds !== undefined) return exerciseDefinitionIds ? { kind: 'exercises', ids: exerciseDefinitionIds, ...scope } : null;
   if (exerciseDefinitionId) return { kind: 'exercise', id: exerciseDefinitionId, ...scope };
-  const primaryOnly = firstRouteParam(params.secondary) === PROGRESS_HISTORY_PRIMARY_ONLY_PARAM;
-  const secondaryShown = firstRouteParam(params.secondary) === 'shown';
-  const volume = firstRouteParam(params.secondaryVolume);
-  if (muscleGroupId) return { kind: 'muscle', id: muscleGroupId, ...scope,
-    ...(primaryOnly || secondaryShown ? { countSecondary: secondaryShown } : {}),
-    ...(volume === PROGRESS_HISTORY_PRIMARY_ONLY_PARAM || volume === 'shown' ? { countSecondaryVolume: volume === 'shown' } : {}) };
-  return null;
+  if (params.exerciseDefinitionIds !== undefined) {
+    const ids = parseProgressSelection(params.exerciseDefinitionIds);
+    return ids ? { kind: 'exercises', ids, ...scope } : null;
+  }
+  const ids = parseProgressSelection(params.muscleGroupIds);
+  const muscleScope = muscleGroupId ? { id: muscleGroupId } : ids ? { ids } : null;
+  if (!muscleScope) return null;
+  const countSecondary = parseSecondary(params.secondary);
+  const countSecondaryVolume = parseSecondary(params.secondaryVolume);
+  return { kind: 'muscle', ...muscleScope, ...scope,
+    ...(countSecondary === undefined ? {} : { countSecondary }),
+    ...(countSecondaryVolume === undefined ? {} : { countSecondaryVolume }) };
+};
+
+const parseSecondary = (value: string | string[] | undefined): boolean | undefined => {
+  const param = firstRouteParam(value);
+  if (param === 'shown') return true;
+  if (param === PROGRESS_HISTORY_PRIMARY_ONLY_PARAM) return false;
+  return undefined;
 };
 
 /** The route's subject with this visit's gym and independent metric choices over it. */
@@ -146,7 +150,7 @@ const invalidDetailPeriod = (subject: HistorySubject | null, period: SetPeriod |
 
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
-function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, entryExercise, detailPeriod, selectedExercises, landscape = false }: {
+function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, entryExercise, detailPeriod, selection, landscape = false }: {
   title: string;
   /** A muscle page's title switches between the user's muscles. */
   titleSwitch?: { muscles: readonly HistoryTitleMuscle[]; currentId: string; onChoose: (muscleGroupId: string) => void };
@@ -158,7 +162,7 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
   onOpenCurve?: () => void;
   entryExercise?: { id: string; name: string; deletedAt: Date | null } | null;
   detailPeriod?: SetPeriod | null;
-  selectedExercises?: readonly SelectedExercise[];
+  selection?: ComponentProps<typeof HistoryTitle>['selection'];
   landscape?: boolean;
 }) {
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -185,7 +189,7 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
           headerShown: !landscape,
           gestureEnabled: !landscape,
           orientation: landscape ? 'landscape' : 'portrait',
-          headerTitle: () => <HistoryTitle title={title} exercises={selectedExercises} {...titleSwitch} />,
+          headerTitle: () => <HistoryTitle title={title} selection={selection} {...titleSwitch} />,
           // Named either way — options are merged across renders, so leaving
           // the key out would keep the last button on screen.
           headerRight: hasOptions ? () => (
@@ -286,10 +290,21 @@ function useHistorySubjectCatalog(subject: HistorySubject | null) {
   // A muscle is the user's muscle ([[muscle.report-groups]]): an entry merged
   // into another, or one they do not track, has no history page of its own.
   const muscleSetup = catalog.muscleSetup ?? EMPTY_MUSCLE_SETUP;
-  const name = subject?.kind === 'muscle'
-    ? reportedMuscleName(muscleSetup, catalog.muscleGroupsById, subject.id)
-    : subject?.kind === 'exercises' ? catalog.status === 'ready' && selectedExercises.length !== subject.ids.length
-      ? null : `${subject.ids.length} exercises` : exercise?.name ?? null;
+  const selectedMuscles = useMemo(() => subject?.kind === 'muscle' && subject.ids
+    ? subject.ids.flatMap(id => {
+      const muscle = Object.hasOwn(muscleSetup.musclesById, id) ? muscleSetup.musclesById[id] : undefined;
+      return muscle ? [{ id, name: muscle.displayName }] : [];
+    }) : [], [muscleSetup, subject]);
+  const selection = subject?.ids && (subject.kind === 'muscle'
+    ? { kind: 'muscle' as const, items: selectedMuscles }
+    : { kind: 'exercise' as const, items: selectedExercises });
+  let name = exercise?.name ?? null;
+  if (selection && subject.ids) {
+    const count = subject.ids.length;
+    name = catalog.status === 'ready' && selection.items.length !== count ? null : `${count} ${selection.kind}s`;
+  } else if (subject?.kind === 'muscle' && subject.id) {
+    name = reportedMuscleName(muscleSetup, catalog.muscleGroupsById, subject.id);
+  }
   // The muscles the ⋮ links to: an exercise's counted muscles as the user sees
   // them, which the catalogue can name. A muscle's own page links to none.
   const muscleLinks = useMemo(
@@ -299,16 +314,8 @@ function useHistorySubjectCatalog(subject: HistorySubject | null) {
     }),
     [catalog, exercise, selectedExercises, muscleSetup]
   );
-  return { catalog, muscleSetup, exercise, selectedExercises, name, muscleLinks };
+  return { catalog, muscleSetup, exercise, selection, name, muscleLinks };
 }
-
-const timelineTarget = (subject: HistorySubject, metric: MuscleHistoryMetric): WeekSetsTarget => {
-  const { gymId } = subject;
-  if (subject.kind === 'muscle') return { muscleGroupIds: [subject.id], gymId,
-    countSecondary: subject.countSecondary, countSecondaryVolume: subject.countSecondaryVolume, metric };
-  if (subject.kind === 'exercises') return { exerciseDefinitionIds: subject.ids, gymId };
-  return { exerciseDefinitionId: subject.id, gymId };
-};
 
 /** Single-only destinations stay absent from a combined workload's menu. */
 const exerciseHistoryActions = (subject: HistorySubject, exercise: { id: string; deletedAt: Date | null } | null, router: ReturnType<typeof useRouter>) => {
@@ -318,6 +325,20 @@ const exerciseHistoryActions = (subject: HistorySubject, exercise: { id: string;
     onOpenCurve: exercise && !exercise.deletedAt ? () => router.push(rmCurveHref(exercise.id)) : undefined,
   };
 };
+
+function HistoryScopeState({ unavailable, loadError }: { unavailable: boolean; loadError: string | null }) {
+  return <Screen testID="progress-history-screen">
+    {/* Stack options merge across renders, including after a scope disappears. */}
+    <Stack.Screen options={{ headerRight: undefined, headerTitle: undefined, headerShown: true, gestureEnabled: true,
+      orientation: 'portrait', title: PROGRESS_HISTORY_TITLE }} />
+    {unavailable ? <StatePanel body="Open it again from Progress." testID="progress-history-unavailable"
+      title="This history isn't available" /> : loadError
+      ? <StatePanel kind="error" title="Could not load history" action={{
+        label: 'Retry', onPress: () => void ensureExerciseCatalogLoaded(), testID: 'progress-history-names-retry',
+      }} />
+      : <StatePanel body="Loading history…" kind="loading" testID="progress-history-names-loading" />}
+  </Screen>;
+}
 
 export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, initialView, todayDateKey, detailPeriod }: ProgressHistoryScreenProps) {
   const { values, pending, accountRevision, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
@@ -344,11 +365,11 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   const gymId = subject?.gymId;
   const shownMetric = subject?.kind === 'muscle' || subject?.kind === 'exercises' ? muscleMetric : metric;
 
-  const { catalog, muscleSetup, exercise, selectedExercises, name, muscleLinks } = useHistorySubjectCatalog(subject);
+  const { catalog, muscleSetup, exercise, selection, name, muscleLinks } = useHistorySubjectCatalog(subject);
   // A muscle page's title switches in place to another of the user's muscles,
   // keeping this visit's metric, gym and secondary-set choices.
   const titleSwitch = useMemo(
-    () => subject?.kind === 'muscle' ? {
+    () => subject?.kind === 'muscle' && subject.id ? {
       muscles: muscleSetup.muscles,
       currentId: subject.id,
       onChoose: (muscleGroupId: string) => router.setParams({ muscleGroupId }),
@@ -357,13 +378,18 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   );
   // Stable, so the muscle window is not rebuilt on every render of the page.
   const muscleTargets = useMemo(
-    () => subject?.kind === 'muscle' ? { muscleIds: [subject.id],
-      weeklyTarget: muscleWeeklyTarget(values, subject.id) } : undefined,
+    () => subject?.kind === 'muscle' ? {
+      muscleIds: historyMuscleIds(subject),
+      weeklyTarget: values.weeklyWorkingSetTarget,
+      weeklyTargets: effectiveMuscleTargetOverrides(values),
+    } : undefined,
     [subject, values]
   );
   const unavailable = !subject || (catalog.status === 'ready' && name === null)
     || invalidDetailPeriod(subject, detailPeriod, values.historyLookbackWeeks);
-  const canExpandTimeline = !unavailable && detailPeriod === undefined && view === 'timeline' && Platform.OS !== 'web';
+  const resolvingSelection = subject?.kind === 'muscle' && subject.ids !== undefined
+    && selection?.items.length !== subject.ids.length && catalog.status !== 'ready';
+  const canExpandTimeline = !unavailable && !resolvingSelection && detailPeriod === undefined && view === 'timeline' && Platform.OS !== 'web';
   const landscape = canExpandTimeline && landscapeRequested;
   useFocusEffect(useCallback(() => {
     if (!landscape) return;
@@ -377,7 +403,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     };
   }, [landscape]));
   // A subject that no longer exists is never read for.
-  const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
+  const history = useHistory(unavailable || resolvingSelection ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
   const { openDay, openWeek, openSession } = useHistoryNavigation(subject, shownMetric, accountRevision);
   // A muscle's week list links each card's exercise to its own history, on
   // the metric shown here; one the catalogue no longer holds has no page.
@@ -396,21 +422,8 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     isProgressMetric(metric) ? metric : undefined
   ));
 
-  if (unavailable) {
-    return (
-      <Screen testID="progress-history-screen">
-        {/* Both keys are named: options merge across renders, so a subject that
-            disappears from the catalogue while its page is open would otherwise
-            keep its name and a live options button over this panel. */}
-        <Stack.Screen options={{ headerRight: undefined, headerTitle: undefined, headerShown: true, gestureEnabled: true,
-          orientation: 'portrait', title: PROGRESS_HISTORY_TITLE }} />
-        <StatePanel
-          body="Open it again from Progress."
-          testID="progress-history-unavailable"
-          title="This history isn't available"
-        />
-      </Screen>
-    );
+  if (unavailable || resolvingSelection) {
+    return <HistoryScopeState unavailable={unavailable} loadError={catalog.lastError} />;
   }
 
   const gym: HistoryGymChoice = {
@@ -443,7 +456,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     view,
     weeklyEffort: history.weekly,
     timeline: {
-      weekSetsTarget: timelineTarget(subject, muscleMetric),
+      weekSetsTarget: historySetsTarget(subject, muscleMetric),
       onOpenSession: openSession,
       exerciseLink,
     },
@@ -456,7 +469,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         landscape={landscape}
         muscles={muscleLinks}
         {...exerciseHistoryActions(subject, exercise, router)}
-        selectedExercises={subject.kind === 'exercises' ? selectedExercises : undefined}
+        selection={selection}
         onOpenMuscle={openMuscle}
         onOpenWeek={openWeek}
         title={name ?? PROGRESS_HISTORY_TITLE}
@@ -495,6 +508,7 @@ export default function ProgressHistoryRoute() {
     exerciseDefinitionId?: string | string[];
     exerciseDefinitionIds?: string | string[];
     muscleGroupId?: string | string[];
+    muscleGroupIds?: string | string[];
     metric?: string | string[];
     view?: string | string[];
     gymId?: string | string[];
@@ -515,7 +529,7 @@ export default function ProgressHistoryRoute() {
   const countingKey = subject?.kind === 'muscle' ? `${subject.countSecondary}:${subject.countSecondaryVolume}` : '';
   return <ProgressHistoryScreen initialMetric={metric} initialView={view}
     detailPeriod={detailPeriod}
-    key={`${subject?.kind}:${subject?.kind === 'exercises' ? JSON.stringify(subject.ids) : subject?.id}:${metric}:${view}:${gym}:${countingKey}:${detailPeriod?.weekKey}:${detailPeriod?.dayKey}`}
+    key={`${subject?.kind}:${historySubjectId(subject)}:${metric}:${view}:${gym}:${countingKey}:${detailPeriod?.weekKey}:${detailPeriod?.dayKey}`}
     subject={subject} />;
 }
 

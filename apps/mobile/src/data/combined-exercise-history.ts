@@ -1,4 +1,4 @@
-import { exerciseScopeIds } from '@/src/utils/exercise-selection';
+import { exerciseScopeIds } from '@/src/utils/progress-selection';
 import {
   compareExerciseHistoryOrder, loadExercisePerformanceHistory,
   type ExerciseHistorySummary, type LoadExercisePerformanceHistoryOptions,

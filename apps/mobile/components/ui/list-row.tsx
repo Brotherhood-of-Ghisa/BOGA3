@@ -11,11 +11,11 @@ export type ListRowTone = 'default' | 'danger';
 export type ListRowContentAction = {
   onPress: () => void;
   accessibilityLabel: string;
-  accessibilityRole?: 'button' | 'link';
+  accessibilityRole?: 'button' | 'link' | 'checkbox';
   accessibilityValue?: AccessibilityValue;
   testID?: string;
   ref?: Ref<ViewInstance>;
-};
+} & Pick<PressableProps, 'onLongPress' | 'accessibilityActions' | 'onAccessibilityAction' | 'accessibilityState'>;
 
 type ListRowBaseProps = {
   // The row's text. Pass `children` instead for composed content (a set row's

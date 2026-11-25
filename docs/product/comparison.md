@@ -87,15 +87,14 @@ middle-to-weak losses; displayed −100% neutral while scaling losses. Filters
 may rescale Volume; rotation/selection cannot. Unchanged middle;
 empty/unavailable neutral; `new`/overflow strongest, outside extrema.
 Strong darkens in light mode, lightens in dark, except a Custom chosen ramp.
-Both views use opaque effort fills and a separate selection colour, attenuated
-through covering layers.
-Wireframe adds contrasting triangle edges over the fills and selected anatomy.
-Both keep the selected comparison; no legend.
+Both views use opaque effort fills and selection colour attenuated through
+layers. Wireframe outlines triangles and selected anatomy. Both retain the
+comparison and omit legends.
 
-History legends precede charts: muscle Sets `% of target`, capped at the
-effective weekly target; others `% of max` over History look-back, daily Grid
-values, weekly Sets/Volume sums or weekly strength bests. Empty/all-zero samples
-stay neutral.
+History legends precede charts. Muscle Sets uses `% of target`, averaging
+capped attainment across every selected muscle. Other metrics use `% of max`
+over History look-back: daily Grid values, weekly sums or strength bests.
+Empty/all-zero samples stay neutral.
 
 Why: Sets show goal attainment; Volume shows period change; history shows training intensity.
 Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;

@@ -3,7 +3,7 @@ import type { Href } from 'expo-router';
 import type { HeatmapView } from '@/src/preferences/model';
 import type { CalendarHeatmapMetric } from '@/src/data/muscle-analytics';
 import { encodeGymRouteParam } from '@/src/utils/gym-scope-route';
-import { exerciseScopeIds, type ExerciseReadScope } from '@/src/utils/exercise-selection';
+import { exerciseScopeIds, normalizeProgressSelection, type ExerciseReadScope } from '@/src/utils/progress-selection';
 
 export const SIGN_IN_ROUTE = '/sign-in';
 export const EXERCISE_LINK_ROUTE = '/exercise-link';
@@ -77,7 +77,7 @@ export const exerciseEditHref = ({ exerciseDefinitionId, request }: { exerciseDe
 export const THEME_CUSTOM_ROUTE = '/theme-custom';
 export const themeCustomHref = (part: string): Href => `${THEME_CUSTOM_ROUTE}?part=${encodeURIComponent(part)}` as Href;
 
-/** One muscle's or one exercise's effort history, pushed from Progress. */
+/** Effort history for one subject or a selection, pushed from Progress. */
 export const PROGRESS_HISTORY_ROUTE = '/progress-history';
 
 /** Session-by-session exercise history, carrying Progress's selected gym. */
@@ -106,24 +106,31 @@ export const PROGRESS_HISTORY_METRIC_PARAMS: Record<CalendarHeatmapMetric, strin
 /** `?secondary=` on a muscle's history: Progress counted primary work only ([[muscle.secondary-filter]]). */
 export const PROGRESS_HISTORY_PRIMARY_ONLY_PARAM = 'hidden';
 
-/**
- * Either subject may open on a gym: `gymId` is three-state
- * (`src/utils/gym-scope-route.ts`), and unset — every gym — sends no param.
- * A muscle may open counting primary work only; counting secondary sends none.
- */
+type MuscleHistoryScope = (
+  | { muscleGroupId: string; muscleGroupIds?: never }
+  | { muscleGroupId?: never; muscleGroupIds: readonly string[] }
+) & { countSecondary?: boolean; countSecondaryVolume?: boolean };
+
+const muscleScopeParam = (scope: MuscleHistoryScope): string => {
+  if (scope.muscleGroupIds === undefined) return `muscleGroupId=${encodeURIComponent(scope.muscleGroupId)}`;
+  const ids = normalizeProgressSelection(scope.muscleGroupIds);
+  if (!ids) throw new Error('Choose between 2 and 5 muscles.');
+  return `muscleGroupIds=${encodeURIComponent(JSON.stringify(ids))}`;
+};
+
+/** The subject may carry a three-state gym and either of the muscle effort filters. */
 export const progressHistoryHref = (
-  subject: ({ muscleGroupId: string; countSecondary?: boolean; countSecondaryVolume?: boolean } | ExerciseReadScope) & { gymId?: string | null },
+  subject: (MuscleHistoryScope | ExerciseReadScope) & { gymId?: string | null },
   metric?: CalendarHeatmapMetric,
   view?: HeatmapView
 ): Href => {
-  const id = 'muscleGroupId' in subject
-    ? `muscleGroupId=${encodeURIComponent(subject.muscleGroupId)}`
-    : exerciseScopeParam(subject);
+  const muscle = 'muscleGroupId' in subject || 'muscleGroupIds' in subject;
+  const id = muscle ? muscleScopeParam(subject) : exerciseScopeParam(subject);
   const gym = encodeGymRouteParam(subject.gymId);
   const carried = metric ? `&metric=${PROGRESS_HISTORY_METRIC_PARAMS[metric]}` : '';
-  const secondary = 'muscleGroupId' in subject && subject.countSecondary !== undefined
+  const secondary = muscle && subject.countSecondary !== undefined
     ? `&secondary=${subject.countSecondary ? 'shown' : PROGRESS_HISTORY_PRIMARY_ONLY_PARAM}` : '';
-  const volume = 'muscleGroupId' in subject && subject.countSecondaryVolume !== undefined
+  const volume = muscle && subject.countSecondaryVolume !== undefined
     ? `&secondaryVolume=${subject.countSecondaryVolume ? 'shown' : PROGRESS_HISTORY_PRIMARY_ONLY_PARAM}` : '';
   return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}${secondary}${volume}${view ? `&view=${view}` : ''}` as Href;
 };

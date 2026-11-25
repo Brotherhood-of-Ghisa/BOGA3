@@ -117,6 +117,7 @@ export const statsTableStyles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.md, padding: uiSpace.md },
   // The name takes whatever the figure columns leave, and wraps.
   nameCell: { flex: 1, minWidth: 0 },
+  selectionName: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.md },
   headerCell: { minHeight: uiGeometry.tapTarget, flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   headerCellNumeric: { justifyContent: 'flex-end' },
   // A row's name and a figure cell: layout only, after the `bodyStrong` and

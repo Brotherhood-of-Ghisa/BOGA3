@@ -6,20 +6,21 @@ import {
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { encodeGymRouteParam, type GymScopeOption } from '@/src/utils/gym-scope-route';
 
-/**
- * One exercise, a bounded selection, or a muscle at a three-state gym scope.
- * A muscle's `countSecondary: false` counts its primary work only.
- */
-export type HistorySubject =
-  | { kind: 'exercise'; id: string; gymId?: string | null }
-  | { kind: 'exercises'; ids: readonly string[]; gymId?: string | null }
-  | { kind: 'muscle'; id: string; gymId?: string | null; countSecondary?: boolean; countSecondaryVolume?: boolean };
+/** Muscle scopes use reported IDs and independent Sets and Volume effort filters. */
+type MuscleHistorySubject = (
+  | { id: string; ids?: never }
+  | { id?: never; ids: string[] }
+) & { kind: 'muscle'; gymId?: string | null; countSecondary?: boolean; countSecondaryVolume?: boolean };
 
-const historySubjectId = (subject: HistorySubject | null): string | null => {
-  if (subject?.kind === 'exercises') return JSON.stringify(subject.ids);
-  const id = subject?.id.trim();
-  return id ? id : null;
-};
+export type HistorySubject =
+  | { kind: 'exercise'; id: string; ids?: never; gymId?: string | null }
+  | { kind: 'exercises'; id?: never; ids: readonly string[]; gymId?: string | null }
+  | MuscleHistorySubject;
+
+export const historySubjectId = (subject: HistorySubject | null): string | null =>
+  subject?.ids ? JSON.stringify(subject.ids) : subject?.id?.trim() || null;
+
+export const historyMuscleIds = (subject: MuscleHistorySubject): string[] => subject.ids ?? [subject.id.trim()];
 
 const NO_GYMS: GymScopeOption[] = [];
 
@@ -28,7 +29,7 @@ const loadHistory = async (subject: HistorySubject, id: string, weeks: number) =
   const now = new Date();
   const bounds = { ...historyWeekBounds(weeks, now), now };
   if (subject.kind === 'muscle') {
-    return computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id], ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }),
+    return computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: historyMuscleIds(subject), ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }),
       countSecondary: subject.countSecondary, countSecondaryVolume: subject.countSecondaryVolume });
   }
   const scope = { ...bounds, ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }) };

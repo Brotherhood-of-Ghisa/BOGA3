@@ -12,7 +12,7 @@ import type { CalendarHeatmapMetric } from '@/src/data';
 import { EXERCISE_HISTORY_METRIC_OPTIONS, MUSCLE_HISTORY_METRIC_OPTIONS } from './history-view';
 import type { HistorySubject } from './use-history';
 import { WeekSetList, type WeekSetExerciseLink } from './week-set-list';
-import { usePeriodSets, type SetPeriod } from './week-sets';
+import { historySetsTarget, usePeriodSets, type SetPeriod } from './week-sets';
 
 // The day/week drill-down reuses Timeline's exercise cards. Each card opens
 // its workout; its progress action opens the exercise. Muscle detail limits rows
@@ -39,12 +39,8 @@ export function HistoryPeriodDetail({ subject, period, metric, onSelectMetric, f
     visited.current = true;
   }, []));
   const muscleMetric = metric === 'totalVolume' ? 'totalVolume' as const : 'workingSetCount' as const;
-  const target = subject.kind === 'muscle'
-    ? { muscleGroupIds: [subject.id], gymId: subject.gymId, countSecondary: subject.countSecondary,
-      countSecondaryVolume: subject.countSecondaryVolume, metric: muscleMetric }
-    : { ...(subject.kind === 'exercises' ? { exerciseDefinitionIds: subject.ids } : { exerciseDefinitionId: subject.id }), gymId: subject.gymId };
-  const sets = usePeriodSets({ ...target, includeInProgress: true },
-  period, refresh + revision, accountRevision, lookbackWeeks);
+  const sets = usePeriodSets({ ...historySetsTarget(subject, muscleMetric), includeInProgress: true },
+    period, refresh + revision, accountRevision, lookbackWeeks);
   // A focus refresh must not shrink the scroll content before Back settles.
   const groups = sets.sameScope ? sets.groups : [];
   const volume = groups.reduce<number | null>((sum, group) => addFiniteVolume(sum, group.contribution ? group.contribution.volume : 0), 0);
