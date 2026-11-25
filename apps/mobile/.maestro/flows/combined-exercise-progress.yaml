@@ -1,16 +1,18 @@
 appId: com.dinoderek.mobile
 ---
-# Combined exercise progress, infra-free and independently reset.
+# Combined Progress for exercises and muscles, infra-free and independently reset.
 # Proves: native dragging cancels hold, hold release never navigates, selection
 # survives Back, and names/all three charts/chronological History open normally.
 # A long current name wraps, and every primary/secondary muscle stays reachable
 # in the bounded Options body (scroll to the last link and back to History).
 # On iOS, dragging moves the legend and week details temporarily hide it.
 # Why device: responder cancellation/release, native stack restoration, viewport
-# clipping, rotation and gesture hit-testing require the native runtime.
+# clipping, rotation, sheet reachability and gesture hit-testing require the native runtime.
+# Muscle List also proves hold release, Back restoration and View switching.
 # Jest counterparts: __tests__/combined-exercise-progress-local-data.test.tsx,
 # __tests__/combined-exercise-history.test.ts, __tests__/exercise-selection.test.ts,
-# and __tests__/timeline-history-chart.test.tsx.
+# __tests__/timeline-history-chart.test.tsx, __tests__/stats-screen-local-data.test.tsx,
+# __tests__/progress-muscle-report-local-data.test.tsx and __tests__/progress-history-local-data.test.tsx.
 # Run alone for focused small/normal checks; both platform data-smoke suites
 # retain this same flow so their aggregate gates continue to cover it.
 # Seed recently performed exercises, including a long current name. Catalogue is a distinct landing
@@ -148,6 +150,10 @@ appId: com.dinoderek.mobile
     element: { id: "progress-history-muscle-triceps" }
     direction: DOWN
 - takeScreenshot: "12d-combined-last-muscle"
+# On compact screens the sheet header can cover a row Maestro already sees.
+- swipe:
+    start: "50%,42%"
+    end: "50%,87%"
 - scrollUntilVisible:
     element: { id: "progress-history-exercise-history" }
     direction: UP
@@ -175,3 +181,79 @@ appId: com.dinoderek.mobile
 - tapOn: { id: "stats-exercise-selection-cancel" }
 - assertVisible: { id: "stats-search-input" }
 - assertNotVisible: { id: "stats-exercise-selection-controls" }
+
+# Preferences outlive a data reset. Set List before testing its name target.
+- openLink: "boga3://settings-progress"
+- scrollUntilVisible:
+    element: { id: "settings-muscle-view-list" }
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "settings-muscle-view-list" }
+- openLink: "boga3://progress?breakdown=muscle"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-table" }
+    timeout: 15000
+- scrollUntilVisible:
+    element: { id: "stats-muscle-history-quads" }
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: "14-muscle-browsing"
+- longPressOn: { id: "stats-muscle-history-quads" }
+- assertVisible: { id: "stats-muscle-selection-count", text: ".*1.*" }
+- assertVisible: { id: "stats-muscle-selection-show", enabled: false }
+- assertNotVisible: { id: "stats-muscle-history-view-chip-row" }
+- takeScreenshot: "15-one-muscle-selected"
+- scrollUntilVisible:
+    element: { id: "stats-muscle-history-glutes_max" }
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "stats-muscle-history-glutes_max" }
+- assertVisible: { id: "stats-muscle-selection-count", text: ".*2.*" }
+- takeScreenshot: "16-two-muscles-selected"
+- tapOn: { id: "stats-muscle-selection-show" }
+- extendedWaitUntil:
+    visible: { id: "progress-history-title-text", text: "2 muscles" }
+    timeout: 15000
+- tapOn: { id: "progress-history-title" }
+- assertVisible: { id: "selected-muscle-quads" }
+- assertVisible: { id: "selected-muscle-glutes_max" }
+- takeScreenshot: "17-selected-muscle-names"
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "selected-muscles-sheet" }
+    timeout: 10000
+- runFlow:
+    when: { platform: iOS }
+    commands:
+      - tapOn: { id: "BackButton" }
+- runFlow:
+    when: { platform: Android }
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-selection-count", text: ".*2.*" }
+    timeout: 10000
+- assertVisible: { id: "stats-muscle-history-glutes_max" }
+- takeScreenshot: "18-muscle-selection-after-back"
+- tapOn: { id: "stats-muscle-selection-cancel" }
+- assertVisible: { id: "stats-muscle-search-input" }
+
+# The List and 3D triggers sit in different places. Prove both open their
+# native sheet and that choosing List again restores the regular list controls.
+- runFlow:
+    when: { platform: iOS }
+    commands:
+      - tapOn: { id: "stats-muscle-list-view" }
+      - tapOn: { id: "stats-muscle-body-material-wireframe" }
+      - extendedWaitUntil:
+          visible: { id: "stats-muscle-body-wireframe" }
+          timeout: 15000
+      - assertNotVisible: { id: "stats-muscle-selection-controls" }
+      - takeScreenshot: "19-muscle-wireframe-from-list"
+      - tapOn: { id: "stats-muscle-body-view" }
+      - tapOn: { id: "stats-muscle-view-list" }
+      - extendedWaitUntil:
+          visible: { id: "stats-muscle-search-input" }
+          timeout: 15000
+      - assertVisible: { id: "stats-muscle-list-view" }
+      - assertNotVisible: { id: "stats-muscle-selection-controls" }

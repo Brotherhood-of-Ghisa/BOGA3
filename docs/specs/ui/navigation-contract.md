@@ -83,7 +83,7 @@ one access level. Screens never redirect to gate themselves:
 | --- | --- | --- |
 | `/progress`, `/stats-history` | `period=7` | This week; absent or any other value uses the configured window |
 | | `breakdown=exercise` | opens exercise browsing; anything else opens muscles |
-| `/progress-history` | `exerciseDefinitionId` \| `exerciseDefinitionIds` \| `muscleGroupId` | one scope; plural: JSON array of 2–5 catalogue ids. Invalid/ambiguous/missing targets render unavailable |
+| `/progress-history` | `exerciseDefinitionId` \| `exerciseDefinitionIds` \| `muscleGroupId` \| `muscleGroupIds` | one scope; plural: JSON arrays (2–5 IDs). Invalid/ambiguous scopes render unavailable |
 | | `secondary`, `secondaryVolume` | muscle Sets/Volume: `shown`/`hidden` overrides defaults; otherwise inherits. Re-entry distinguishes three states |
 | | `metric=volume\|sets\|1rm\|weight` | combined: Sets/Volume; unsupported/invalid opens on Volume |
 | | `view=timeline\|daily\|weekly` | entry override only; absent/invalid uses the saved view. Selector changes still save |
@@ -147,9 +147,9 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress-history` (exercise scope) | `/exercise-history` | ⋮ `History` preserves ids/gym; plural opens chronological labelled cards without combined bests |
 | `/exercise-catalog` | `/exercise-history?exerciseDefinitionId=<id>` | exercise actions `History` (`exerciseHistoryHref`, `push`), no pre-applied filters |
-| `/progress`, `/stats-history` | `/progress-history` | Muscle/Exercise uses saved view; 3D uses chosen view; contributors use Timeline. Hold/accessibility selects 2–5 exercises; Show progress carries ids/metric/gym. Back restores state/scroll/focus |
+| `/progress`, `/stats-history` | `/progress-history` | Lists use saved view; 3D passes its view; contributors use Timeline. Hold/accessibility selects 2–5 muscles or exercises. Show progress carries the scope. Back restores state/scroll/focus |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
-| `/progress-history` | `/progress-history?muscleGroupId=…`, `?exerciseDefinitionId=…`, with `day` or `week` | Day/week → set cards (`historyDetailHref`), with metric/gym; Back restores chart |
+| `/progress-history` | `/progress-history` with `day` or `week` | `historyDetailHref` preserves scope/filters. Plural scopes encode JSON (`muscleGroupIds`, `exerciseDefinitionIds`). Back restores chart |
 | `/progress-history` | `/train`, `/completed-session/<id>` | Set card → its workout; active → Train, completed → full session. Muscle card progress action carries metric/gym |
 | `/progress-history` | `/rm-curve?exerciseDefinitionId=<id>` | live exercise Options → RM curve (`rmCurveHref`, `push`); chart scope stays local |
 | `/rm-curve` | originating History, else `/progress` | Back pops unchanged History metric/week/scroll; without history, replaces to Progress. Workout drafts stay untouched |

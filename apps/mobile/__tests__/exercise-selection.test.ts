@@ -1,25 +1,25 @@
-import { exerciseScopeIds, normalizeExerciseSelection, parseExerciseSelection } from '@/src/utils/exercise-selection';
+import { exerciseScopeIds, normalizeProgressSelection, parseProgressSelection } from '@/src/utils/progress-selection';
 import { exerciseHistoryHref, historyDetailHref, progressHistoryHref } from '@/src/navigation/routes';
 import { NO_GYM_ROUTE_PARAM } from '@/src/utils/gym-scope-route';
 import { reportedExercisesMuscles } from '@/src/exercise-catalog/reported-muscles';
 
 describe('visit-local exercise selection', () => {
   it('keeps distinct identities, trims them and bounds the selection', () => {
-    expect(normalizeExerciseSelection([' a ', 'b', 'a'])).toEqual(['a', 'b']);
-    expect(normalizeExerciseSelection(['a', 'b', 'c', 'd', 'e'])).toHaveLength(5);
-    expect(normalizeExerciseSelection(['a', 'b', 'c', 'd', 'e', 'f'])).toBeNull();
-    expect(normalizeExerciseSelection(['a', 'a'])).toBeNull();
+    expect(normalizeProgressSelection([' a ', 'b', 'a'])).toEqual(['a', 'b']);
+    expect(normalizeProgressSelection(['a', 'b', 'c', 'd', 'e'])).toHaveLength(5);
+    expect(normalizeProgressSelection(['a', 'b', 'c', 'd', 'e', 'f'])).toBeNull();
+    expect(normalizeProgressSelection(['a', 'a'])).toBeNull();
   });
 
   it.each([null, {}, 'a,b', [], ['a'], ['a', ''], ['a', 1]])('rejects malformed selection %j', value => {
-    expect(normalizeExerciseSelection(value)).toBeNull();
+    expect(normalizeProgressSelection(value)).toBeNull();
   });
 
   it('rejects malformed or ambiguous encoded arrays', () => {
-    expect(parseExerciseSelection(undefined)).toBeNull();
-    expect(parseExerciseSelection('broken')).toBeNull();
-    expect(parseExerciseSelection(['["a","b"]', '["c","d"]'])).toBeNull();
-    expect(parseExerciseSelection(['["a","b"]'])).toEqual(['a', 'b']);
+    expect(parseProgressSelection(undefined)).toBeNull();
+    expect(parseProgressSelection('broken')).toBeNull();
+    expect(parseProgressSelection(['["a","b"]', '["c","d"]'])).toBeNull();
+    expect(parseProgressSelection(['["a","b"]'])).toEqual(['a', 'b']);
     expect(exerciseScopeIds({ exerciseDefinitionId: 'a' })).toEqual(['a']);
     expect(() => exerciseScopeIds({ exerciseDefinitionIds: ['a'] })).toThrow('Choose between 2 and 5 exercises.');
   });
@@ -28,7 +28,7 @@ describe('visit-local exercise selection', () => {
     const ids = ['a,&?', 'b:[]'];
     const progress = String(progressHistoryHref({ exerciseDefinitionIds: ids, gymId: null }, 'workingSetCount', 'weekly'));
     const params = new URLSearchParams(progress.split('?')[1]);
-    expect(parseExerciseSelection(params.get('exerciseDefinitionIds')!)).toEqual(ids);
+    expect(parseProgressSelection(params.get('exerciseDefinitionIds')!)).toEqual(ids);
     expect(params.get('metric')).toBe('sets');
     expect(params.get('view')).toBe('weekly');
     expect(params.get('gymId')).toBe(NO_GYM_ROUTE_PARAM);

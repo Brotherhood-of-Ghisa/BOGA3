@@ -65,7 +65,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { lockAsync, OrientationLock } from 'expo-screen-orientation';
-import ProgressHistoryRoute from '../app/progress-history';
+import ProgressHistoryRoute, { resolveHistorySubject } from '../app/progress-history';
 import type { CalendarMonth } from '@/components/heatmaps/daily-calendar';
 import * as exerciseAnalytics from '@/src/data/exercise-analytics';
 import { loadExerciseSessionFacts } from '@/src/data/exercise-session-facts';
@@ -932,6 +932,64 @@ describe('Muscle day/week details over real data', () => {
     expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref({ exerciseDefinitionId: SQUAT, gymId: null }, 'workingSetCount'));
   });
 
+  describe('Combined muscle history', () => {
+    beforeEach(() => {
+      // Exercise the overlap of two primary muscles and one secondary muscle on the same set.
+      localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'primary' WHERE exercise_definition_id = ? AND muscle_group_id = 'glutes_max'").run(SQUAT);
+    });
+
+    it('carries the combined scope through every chart and averages capped targets separately from the set count', async () => {
+      jest.setSystemTime(new Date(2026, 9, 4, 12));
+      act(() => updatePreferences({ heatmapView: 'daily', muscleTargetMode: 'per-muscle', weeklyWorkingSetTarget: 10,
+        muscleTargetOverrides: { quads: 1, glutes_max: 4, adductors: 2 } }));
+      const muscleGroupIds = ['quads', 'glutes_max', 'adductors', 'back_lats'];
+      const day = '2026-10-02';
+      const week = '2026-09-28';
+      const scope = { muscleGroupIds, gymId: null, countSecondary: true, countSecondaryVolume: false };
+      await openHistory({ muscleGroupIds: JSON.stringify(muscleGroupIds), metric: 'sets', gymId: 'no-gym', secondary: 'shown', secondaryVolume: 'hidden' });
+      const tile = await screen.findByTestId(`stats-muscle-history-heatmap-cell-${day}`);
+      expect(screen.getByTestId('progress-history-title-text')).toHaveTextContent('4 muscles');
+      expect(tile.props.accessibilityLabel).toMatch(/Sets 2.*50% of weekly muscle target, averaged across muscles/i);
+      fireEvent.press(tile);
+      expect(mockPush).toHaveBeenLastCalledWith(historyDetailHref(scope, { day }, 'workingSetCount'));
+      fireEvent.press(screen.getByTestId('progress-history-title'));
+      expect(screen.getByTestId('selected-muscle-quads')).toHaveTextContent('Quads');
+      expect(screen.getByTestId('selected-muscle-back_lats')).toHaveTextContent('Lats');
+      act(() => screen.UNSAFE_getAllByType(Sheet).find(sheet => sheet.props.testID === 'selected-muscles-sheet')!.props.onDismiss());
+
+      await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
+      const bar = await screen.findByTestId(`stats-muscle-history-heatmap-cell-${week}`);
+      expect(bar.props.accessibilityLabel).toMatch(/Sets 4.*75% of weekly muscle target, averaged across muscles/i);
+      fireEvent.press(bar);
+      expect(mockPush).toHaveBeenLastCalledWith(historyDetailHref(scope, { week }, 'workingSetCount'));
+
+      await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-timeline')); });
+      await screen.findByTestId('stats-muscle-history-week-sets-card-detail-one-squat');
+      fireEvent.press(screen.getByTestId('progress-history-options-button'));
+      fireEvent.press(screen.getByTestId('progress-history-view-sessions'));
+      expect(mockPush).toHaveBeenLastCalledWith(historyDetailHref(scope, { week }, 'workingSetCount'));
+    });
+
+    it.each<{ period: Record<string, string>; count: number }>([
+      { period: { day: '2026-10-02' }, count: 2 }, { period: { week: '2026-09-28' }, count: 4 },
+    ])('shows each overlapping set once and sums its allocated Volume for %j', async ({ period, count }) => {
+      const muscleGroupIds = ['quads', 'glutes_max', 'adductors'];
+      await openHistory({ muscleGroupIds: JSON.stringify(muscleGroupIds), metric: 'sets', secondary: 'shown',
+        secondaryVolume: 'hidden', gymId: 'no-gym', ...period });
+      await screen.findByTestId(detailCardId('detail-one'));
+      expect(detailRows('detail-one')).toHaveLength(2);
+      expect(screen.getByTestId('muscle-period-detail-total')).toHaveProp('accessibilityLabel', `${count} Sets`);
+      expect(screen.queryByText('Barbell Bench Press')).toBeNull();
+
+      await act(async () => { fireEvent.press(screen.getByTestId('muscle-period-detail-metric')); });
+      await screen.findByLabelText(`${count * 200} Volume`);
+      expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
+      fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
+      await screen.findByLabelText(`${count * 250} Volume`);
+      expect(detailRows('detail-one')).toHaveLength(2);
+    });
+  });
+
   it('keeps single-session calendar days scoped, and carries all filters for day and week tiles', async () => {
     jest.setSystemTime(new Date(2026, 9, 4, 12));
     act(() => updatePreferences({ heatmapView: 'daily' }));
@@ -1035,6 +1093,19 @@ describe('Muscle day/week details over real data', () => {
   });
 });
 
+
+it('accepts only one valid history scope with two to five distinct selected muscle IDs', () => {
+  const muscleGroupIds = JSON.stringify(['cm_back', 'other,custom']);
+  for (const raw of ['broken', '["a","a"]', '["a","b","c","d","e","f"]']) {
+    expect(resolveHistorySubject({ muscleGroupIds: raw })).toBeNull();
+  }
+  expect(resolveHistorySubject({ muscleGroupIds: [muscleGroupIds, muscleGroupIds] })).toBeNull();
+  expect(resolveHistorySubject({ muscleGroupIds, muscleGroupId: 'quads' })).toBeNull();
+  expect(resolveHistorySubject({ muscleGroupIds, exerciseDefinitionIds: '["a","b"]' })).toBeNull();
+  expect(resolveHistorySubject({ muscleGroupIds, gymId: 'no-gym', secondary: 'hidden', secondaryVolume: 'shown' }))
+    .toEqual({ kind: 'muscle', ids: ['cm_back', 'other,custom'], gymId: null, countSecondary: false, countSecondaryVolume: true });
+  expect(() => progressHistoryHref({ muscleGroupIds: ['only'] })).toThrow('Choose between 2 and 5 muscles.');
+});
 
 it('offers quick entry for an exercise after the history options dismiss', async () => {
   await loadMaestroFixture('exercise-block-history');

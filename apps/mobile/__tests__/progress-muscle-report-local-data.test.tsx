@@ -11,7 +11,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -45,9 +45,11 @@ import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-his
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
+import { progressHistoryHref } from '@/src/navigation/routes';
 import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
 import { computeMuscleScores } from '@/components/stats/muscle-body-projection';
 import { BODY_WIRE_INSTANCES, hitWireframe, projectWireframePoint, wireframeCamera } from '@/components/stats/muscle-wireframe-scene';
+import { Sheet } from '@/components/ui/sheet';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { chooseBroadLocally } from './helpers/broad-muscle-report';
 import { closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
@@ -149,6 +151,74 @@ describe('Progress muscle list under Broad', () => {
     await waitFor(() => expect(muscleBlocks().length).toBe(25));
     expect(muscleBlocks()).toContain('serratus_anterior');
     expect(familyHeaders('stats-family-header-')).toEqual(['Chest', 'Shoulders', 'Back', 'Arms', 'Core', 'Legs', 'Lower Legs']);
+  });
+
+  it('selects reported muscles from a one-result search and restores browsing on Cancel', async () => {
+    await choose('broad');
+    act(() => updatePreferences({ progressMetric: 'workingSetCount', muscleVolumePrimaryOnly: true }));
+    await renderProgress('muscle');
+    const quads = await screen.findByTestId('stats-muscle-history-cm_quads');
+    const quadsName = within(quads).getByText('Quads');
+    const scope = { countSecondary: true, countSecondaryVolume: false };
+    fireEvent.press(quads);
+    expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref({ muscleGroupId: 'cm_quads', ...scope }, 'workingSetCount'));
+    mockPush.mockClear();
+
+    const search = screen.getByTestId('stats-muscle-search-input');
+    fireEvent.changeText(search, 'Quads');
+    expect(muscleBlocks()).toEqual(['cm_quads']);
+    fireEvent.press(screen.getByTestId('stats-muscle-select-cm_quads'));
+    expect(screen.getByTestId('stats-contributions')).toBeTruthy();
+
+    fireEvent(quads, 'longPress');
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(screen.getByTestId('stats-muscle-selection-show')).toBeDisabled();
+    const selectedQuads = screen.getByRole('checkbox', { name: 'Quads', checked: true });
+    expect(within(selectedQuads).getByText('Quads')).toBe(quadsName);
+    expect(screen.queryByTestId('stats-contributions')).toBeNull();
+    const back = screen.getByRole('checkbox', { name: 'Back', checked: false });
+    fireEvent.press(within(back).getByTestId('stats-muscle-check-cm_back', { includeHiddenElements: true }));
+    expect(screen.getByRole('checkbox', { name: 'Back', checked: true })).toBeTruthy();
+    fireEvent.press(screen.getByTestId('stats-muscle-selection-show'));
+    expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref(
+      { muscleGroupIds: ['cm_quads', 'cm_back'], ...scope }, 'workingSetCount',
+    ));
+
+    fireEvent.press(screen.getByTestId('stats-muscle-selection-count'));
+    expect(screen.getByTestId('selected-muscle-cm_quads')).toHaveTextContent('Quads');
+    expect(screen.getByTestId('selected-muscle-cm_back')).toHaveTextContent('Back');
+    act(() => screen.UNSAFE_getAllByType(Sheet).find(sheet => sheet.props.testID === 'selected-muscles-sheet')!.props.onDismiss());
+    fireEvent.press(screen.getByTestId('stats-muscle-selection-cancel'));
+    expect(screen.getByTestId('stats-muscle-search-input')).toHaveDisplayValue('Quads');
+    expect(screen.getByTestId('stats-contributions')).toBeTruthy();
+    expect(muscleBlocks()).toEqual(['cm_quads']);
+
+    fireEvent.press(screen.getByTestId('stats-muscle-list-view'));
+    fireEvent.press(screen.getByTestId('stats-muscle-body-material-wireframe'));
+    await screen.findByTestId('stats-muscle-body-wireframe');
+    expect(screen.queryByTestId('stats-muscle-selection-controls')).toBeNull();
+    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    fireEvent.press(screen.getByTestId('stats-muscle-view-list'));
+    expect(await screen.findByTestId('stats-muscle-search-input')).toHaveDisplayValue('Quads');
+    expect(screen.getByTestId('stats-contributions')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-selection-controls')).toBeNull();
+  });
+
+  it('offers accessible selection and recovers from the five-muscle limit', async () => {
+    await choose('broad');
+    await renderProgress('muscle');
+    const [first, ...rest] = TRACKED_BROAD.slice(0, 6).map(id => `stats-muscle-history-${id}`);
+    fireEvent(await screen.findByTestId(first), 'accessibilityAction', { nativeEvent: { actionName: 'selectMuscle' } });
+    for (const row of rest) fireEvent.press(screen.getByTestId(row));
+    expect(screen.getByTestId('stats-muscle-selection-count')).toHaveTextContent('5 selected');
+    expect(screen.getByTestId('stats-muscle-selection-limit')).toHaveTextContent('Choose up to 5 muscles.');
+    fireEvent.press(screen.getByTestId(first));
+    fireEvent.press(screen.getByTestId(rest[4]));
+    expect(screen.getByTestId('stats-muscle-selection-count')).toHaveTextContent('5 selected');
+    expect(screen.queryByTestId('stats-muscle-selection-limit')).toBeNull();
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    await screen.findByTestId('stats-search-input');
+    expect(screen.queryByTestId('stats-exercise-selection-controls')).toBeNull();
   });
 
   it('shades the 3D body with the ten muscles only', async () => {
@@ -314,6 +384,17 @@ describe('Muscle history under Broad', () => {
       await waitFor(() => expect(screen.getByTestId('progress-history-unavailable')).toBeTruthy());
       expect(read).not.toHaveBeenCalled();
     });
+
+  it.each(['quads', 'calves', 'missing'])('invalidates the whole selection with unreported %s', async id => {
+    await choose('broad');
+    const readDetail = jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffort');
+    const read = jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort');
+    await open({ muscleGroupIds: JSON.stringify(['cm_quads', id]), week: '2026-09-28' });
+    expect(await screen.findByTestId('progress-history-unavailable')).toBeTruthy();
+    expect(screen.queryByTestId('muscle-period-detail')).toBeNull();
+    expect(read).not.toHaveBeenCalled();
+    expect(readDetail).not.toHaveBeenCalled();
+  });
 
   it('links an exercise to the muscles the user has, once each', async () => {
     await choose('broad');

@@ -3,16 +3,15 @@
 ### muscle.set-count · definition · accepted
 
 Each Primary muscle gets one working set; each Secondary gets ½ when included
-([[muscle.secondary-filter]]). A reported muscle counts each physical set once
-at its strongest role. Recovery family totals sum unrounded eligible child
-muscle counts for each day and the week; other family figures deduplicate.
-Neither sum is a physical-session total.
+([[muscle.secondary-filter]]). A reported muscle or a Progress selection counts
+each physical set once at its strongest eligible role. Recovery family totals
+sum eligible child counts before rounding; other family figures deduplicate. Neither is a physical-session total.
 
 Volume shares its base equally among Primaries, plus a shared ½ pool among
 included Secondaries. Allocation precedes filtering and combining; hidden
-entries never redistribute shares. Combined muscles sum surviving Volume, including
-mixed roles. Absent pools remain unused. Stabilizers and stored weights add
-nothing. Exercise figures are unchanged.
+entries never redistribute shares. Combined muscles and Progress selections sum
+surviving Volume across roles. Absent pools remain unused. Stabilizers and
+stored weights add nothing. Exercise figures are unchanged.
 
 Figures and spoken labels show at most one decimal. Today and Progress draw
 whole sets, rounded down (`½`, `<1` below one); a change is the difference of

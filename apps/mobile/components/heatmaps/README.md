@@ -47,12 +47,8 @@ raw entered kg, and every exercise uses the same labels.
 finite) instead of treating it as zero.
 Single-exercise history also carries all-time session-fact PR counts into the selected
 metric's cells; muscle and combined-exercise history carry none.
-Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
-against effective targets ([[muscle.weekly-targets]]), capped before group averaging and including
-zero muscles. Daily and weekly cells use that same target, independent of look-back;
-the legend then reads `% of target`, `0%` to `100%`, and accessible labels
-report each cell's share. Displayed metrics and
-eligibility retain their existing rules.
+Muscle Sets colours use `workingSetCountsByMuscle` and effective weekly
+targets ([[muscle.weekly-targets]]) under [[comparison.colour-scale]].
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths and references cover [[comparison.history-window]] and
 need the history minimum (to change it, load
@@ -115,13 +111,13 @@ The history page's view selector (`Timeline` | `Grid` | `Weekly`, icons) is
 the sole view choice, and it writes the saved `heatmapView` preference
 (`timeline`, `daily`, `weekly`): Settings has no such row. Missing or invalid
 choices use Daily; a valid saved choice survives restart and account
-switching. The Timeline's week list is read only while that view shows. Progress history targets
-one muscle ID, one exercise definition, or 2–5 selected definitions. Combined
-exercise history uses each definition's private calculation context and one gym
-scope, with Sets and Volume as its metrics. The expanded Timeline breaks the summed Sets/Volume columns down by
-exercise ([[comparison.colour-scale]]). The legend uses the week-details drag
-handle and move actions. Tapping a column opens the full week's sets and hides
-the legend until the window closes.
+switching. Timeline reads its week list while visible. Progress history takes
+one or 2–5 reported muscle IDs or exercise definition IDs. Combined exercise
+history uses each definition's private calculation context and one gym scope,
+with Sets and Volume. The expanded Timeline stacks by exercise
+([[comparison.colour-scale]]). The legend uses the week-details drag handle
+and move actions. Tapping a column opens the full week's sets and hides the
+legend until the window closes.
 Numeric `weeks` controls query/grid coverage under [[comparison.history-window]];
 short windows have no implicit 52-week minimum.
 

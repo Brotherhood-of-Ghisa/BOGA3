@@ -48,7 +48,7 @@ import { GymPickerButton, GymPickerSheet } from '@/components/gyms/gym-picker';
 import { decodeGymRouteParam, gymScopeLabel } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
-import { parseExerciseSelection } from '@/src/utils/exercise-selection';
+import { parseProgressSelection } from '@/src/utils/progress-selection';
 import { HistoryTitle } from '@/components/stats/history-title';
 import { historyBlockRecord } from '@/src/session-recorder/exercise-history-view';
 import {
@@ -462,7 +462,7 @@ function ExerciseHistoryRouteContent() {
   const { values: { targetWindowWeeks, historyLookbackWeeks }, accountRevision } = useAccountLocalPreferenceState();
 
   const exerciseDefinitionId = coerceRouteParam(params.exerciseDefinitionId);
-  const selection = parseExerciseSelection(params.exerciseDefinitionIds);
+  const selection = parseProgressSelection(params.exerciseDefinitionIds);
   const selectionKey = !exerciseDefinitionId && selection ? JSON.stringify(selection) : '';
   const invalidSelection = params.exerciseDefinitionIds !== undefined && !selectionKey;
   const initialTagDefinitionId = coerceRouteParam(params.tagDefinitionId);
@@ -525,7 +525,7 @@ function ExerciseHistoryRouteContent() {
           tagDefinitionId: nextTagDefinitionId,
           ...(nextGymId === undefined ? {} : { gymId: nextGymId }),
         };
-        const next = selectionKey ? await loadCombinedExerciseHistory({ ...shared, exerciseDefinitionIds: parseExerciseSelection(selectionKey)! })
+        const next = selectionKey ? await loadCombinedExerciseHistory({ ...shared, exerciseDefinitionIds: parseProgressSelection(selectionKey)! })
           : await loadExercisePerformanceHistory({ ...shared, exerciseDefinitionId: exerciseDefinitionId! });
         if (generation !== readGeneration.current) return;
         if (next === null) {
@@ -564,14 +564,14 @@ function ExerciseHistoryRouteContent() {
 
   const singleSummary = summary && 'exerciseDefinitionId' in summary ? summary : null;
   const combinedSummary = summary && 'exerciseDefinitionIds' in summary ? summary : null;
-  const title = singleSummary?.exerciseName ?? (selectionKey ? `${parseExerciseSelection(selectionKey)!.length} exercises` : 'Exercise History');
+  const title = singleSummary?.exerciseName ?? (selectionKey ? `${parseProgressSelection(selectionKey)!.length} exercises` : 'Exercise History');
 
   return (
     <>
       <Stack.Screen
         options={{
           title,
-          headerTitle: combinedSummary ? () => <HistoryTitle title={title} exercises={combinedSummary.exercises} /> : undefined,
+          headerTitle: combinedSummary ? () => <HistoryTitle title={title} selection={{ kind: 'exercise', items: combinedSummary.exercises }} /> : undefined,
           headerBackVisible: false,
           // The native back item can stop dispatching on iOS 26.4 after
           // reaching this screen from an active session (as on Body weight).

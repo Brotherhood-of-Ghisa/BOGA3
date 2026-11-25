@@ -1,6 +1,6 @@
 import { Fragment, useRef, type ComponentRef } from 'react';
 import { View, useWindowDimensions } from 'react-native';
-import { StatePanel, makeStyles, uiBorder } from '@/components/ui';
+import { Icon, StatePanel, makeStyles, uiBorder } from '@/components/ui';
 import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import {
@@ -12,6 +12,7 @@ import { StatsTable, StatsTableRow, StatsTableName, StatsTableDisclosure, StatsT
 
 import { EXERCISE_LIST_FAMILY_ORDER } from '@/src/exercise-catalog/list-model';
 import { exerciseSearchTextMatches, normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
+import type { SelectedProgressItem } from './progress-selection';
 
 // The figure the table shows, and the filter Progress remembers for it. A
 // muscle has no 1RM, so the Muscle table offers Progress's two metrics only.
@@ -22,6 +23,11 @@ export type ProgressTablesProps = {
   grouped?: boolean; searchQuery?: string; sortMode?: MuscleSortMode;
   onSort?: (header: MuscleSortHeader) => void;
   onSelect: (id: string) => void;
+  selection?: {
+    items: readonly SelectedProgressItem[] | null;
+    onBegin: (item: SelectedProgressItem, target: ComponentRef<typeof View> | null) => void;
+    onToggle: (item: SelectedProgressItem) => void;
+  };
   onMuscleHistory: (row: ProgressMuscleComparison, target: ComponentRef<typeof View> | number | null, view?: HeatmapView) => void;
   onExerciseHistory: (row: ProgressExerciseComparison, target: ComponentRef<typeof View> | null) => void;
 };
@@ -87,15 +93,17 @@ export const sortProgressMuscles = (muscles: ProgressMuscleComparison[], mode: M
 // history and contribution disclosure kept as separate 44pt targets.
 export function ProgressTables(props: ProgressTablesProps) {
   const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory,
-    grouped = true, searchQuery = '', sortMode = 'now-desc', onSort } = props;
+    grouped = true, searchQuery = '', sortMode = 'now-desc', onSort, selection } = props;
   const styles = useStyles();
-  const words = normalizeExerciseSearchWords(searchQuery);
+  const selecting = selection?.items != null;
+  // Selection needs the full list, even when a search leaves just one match.
+  const words = normalizeExerciseSearchWords(selecting ? '' : searchQuery);
   // Counted over all the user's muscles, so a search does not take a header away.
   const familyCounts = countFamilyMuscles(muscles.map(row => row.familyName));
   const rows = sortProgressMuscles(muscles.filter(row => exerciseSearchTextMatches(words,
     `${row.displayName} ${row.familyName}`.toLowerCase())), sortMode, metric, grouped, familyCounts);
   const { width } = useWindowDimensions();
-  const selected = rows.find(row => row.muscleGroupId === selectedId);
+  const selected = selecting ? undefined : rows.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
   const activeSort = sortMode.slice(0, sortMode.lastIndexOf('-')) as 'name' | ComparisonColumnKey;
   const layout = resolveComparisonLayout(width, [...rows, ...exercises], metric, true, { compact: true, activeSort });
@@ -109,13 +117,13 @@ export function ProgressTables(props: ProgressTablesProps) {
       {grouped && familyHasHeader(row.familyName, familyCounts) && (index === 0 || rows[index - 1].familyName !== row.familyName) ?
         <StatsTableFamily compact name={row.familyName} testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`} /> : null}
       <View testID={`stats-muscle-block-${row.muscleGroupId}`}>
-        <MuscleRow row={row} metric={metric} layout={layout} selected={row.muscleGroupId === selectedId}
-          onSelect={onSelect} onHistory={onMuscleHistory} />
-        {row.muscleGroupId === selectedId && selected ? <View
+        <MuscleRow row={row} metric={metric} layout={layout} expanded={row === selected}
+          onSelect={onSelect} onHistory={onMuscleHistory} selection={selection} />
+        {row === selected ? <View
           testID="stats-contributions" style={styles.contributions}>
           <ProgressContributionRows header={false} muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
         </View> : null}
-        {row.muscleGroupId === selectedId ? <View pointerEvents="none" style={styles.selected} /> : null}
+        {row === selected ? <View pointerEvents="none" style={styles.selected} /> : null}
       </View>
     </Fragment>)}
   </StatsTable></View>;
@@ -167,22 +175,37 @@ function Headers({ name, layout, metric, testID, axis }: {
     name={<StatsTableHeaderLabel label={name} />} />;
 }
 
-function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
-  row: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout; selected: boolean;
+function MuscleRow({ row, metric, layout, expanded, onSelect, onHistory, selection }: {
+  row: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout; expanded: boolean;
   onSelect: ProgressTablesProps['onSelect']; onHistory: ProgressTablesProps['onMuscleHistory'];
+  selection: ProgressTablesProps['selection'];
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
-  const prefix = `stats-muscle-row-${row.muscleGroupId}`;
+  const item = { id: row.muscleGroupId, name: row.displayName };
+  const prefix = `stats-muscle-row-${item.id}`;
   const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} compact speak={!layout.stacked} />;
-  return <StatsTableRow testID={prefix} meta={layout.stacked ? undefined : values}
-    contentAction={{ ref: name, accessibilityRole: 'link',
-      accessibilityLabel: `Open ${row.displayName} history`,
+  const selecting = selection?.items != null;
+  const checked = selection?.items?.some(selected => selected.id === item.id) ?? false;
+  const begin = () => selection?.onBegin(item, name.current);
+  const label = <StatsTableName name={item.name} selected={expanded || checked} />;
+  return <StatsTableRow testID={prefix} meta={layout.stacked ? undefined : values} selected={checked}
+    trailing={selecting ? null : <StatsTableDisclosure expanded={expanded}
+      accessibilityLabel={`${expanded ? 'Hide' : 'Show'} ${item.name} contributions`}
+      onPress={() => onSelect(item.id)} testID={`stats-muscle-select-${item.id}`} />}
+    contentAction={{ ref: name, accessibilityRole: selecting ? 'checkbox' : 'link',
+      accessibilityLabel: selecting ? item.name : `Open ${item.name} history`,
+      accessibilityState: selecting ? { checked } : undefined,
       accessibilityValue: layout.stacked ? { text: comparisonValuesLabel(row, metric) } : undefined,
-      onPress: () => onHistory(row, name.current), testID: `stats-muscle-history-${row.muscleGroupId}` }}
-    trailing={<StatsTableDisclosure expanded={selected}
-      accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
-      onPress={() => onSelect(row.muscleGroupId)} testID={`stats-muscle-select-${row.muscleGroupId}`} />}>
-    <StatsTableName name={row.displayName} selected={selected} />
+      onPress: () => selecting ? selection.onToggle(item) : onHistory(row, name.current),
+      onLongPress: selection ? begin : undefined,
+      accessibilityActions: selection ? [{ name: 'selectMuscle', label: 'Select for combined progress' }] : undefined,
+      onAccessibilityAction: selection ? event => { if (event.nativeEvent.actionName === 'selectMuscle') begin(); } : undefined,
+      testID: `stats-muscle-history-${item.id}` }}>
+    {/* Keep the name mounted through the native long press and its release. */}
+    <View style={statsTableStyles.selectionName}>
+      {selecting ? <Icon colorRole="ink" name={checked ? 'set-done' : 'set-current'} size="sm" testID={`stats-muscle-check-${item.id}`} /> : null}
+      <View style={statsTableStyles.nameCell}>{label}</View>
+    </View>
     {layout.stacked ? values : null}
   </StatsTableRow>;
 }

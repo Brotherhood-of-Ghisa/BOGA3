@@ -1,6 +1,6 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { formatShortDate } from '@/src/utils/local-time';
-import type { ExerciseDateFormat } from '@/src/preferences/model';
+import type { ExerciseDateFormat, ProgressMetric } from '@/src/preferences/model';
 // The sets of one history week for the Timeline's week list
 // the blocks to list, each drawn with View
 // Session's card for it (`loadCompletedSessionCards`).
@@ -25,7 +25,8 @@ import { inProgressSessionDate } from '@/src/data/in-progress-session';
 import { loadActiveSessionId } from '@/src/session-entry';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { encodeGymRouteParam, NO_GYM_LABEL } from '@/src/utils/gym-scope-route';
-import { exerciseScopeIds, type ExerciseReadScope } from '@/src/utils/exercise-selection';
+import { exerciseScopeIds, type ExerciseReadScope } from '@/src/utils/progress-selection';
+import { historyMuscleIds, type HistorySubject } from './use-history';
 import { compareExerciseHistoryOrder } from '@/src/data/exercise-history';
 
 export type WeekSetGroup = {
@@ -64,6 +65,14 @@ export type WeekBlock = {
 export type WeekSetsTarget = (ExerciseReadScope | { muscleGroupIds: string[]; countSecondary?: boolean;
   countSecondaryVolume?: boolean; metric?: 'workingSetCount' | 'totalVolume' })
   & { gymId?: string | null; includeInProgress?: boolean };
+
+export const historySetsTarget = (subject: HistorySubject, metric: ProgressMetric): WeekSetsTarget => {
+  const { gymId } = subject;
+  if (subject.kind === 'muscle') return { muscleGroupIds: historyMuscleIds(subject), gymId,
+    countSecondary: subject.countSecondary, countSecondaryVolume: subject.countSecondaryVolume, metric };
+  if (subject.kind === 'exercises') return { exerciseDefinitionIds: subject.ids, gymId };
+  return { exerciseDefinitionId: subject.id, gymId };
+};
 
 export const formatWeekDay = (date: Date, dateFormat: ExerciseDateFormat): string =>
   formatShortDate(date, dateFormat);
@@ -202,7 +211,7 @@ export function usePeriodSets(target: WeekSetsTarget | null, period: SetPeriod |
   const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null; subject: string | null; scope: string | null }>(
     { groups: [], error: null, for: null, subject: null, scope: null });
   const subjectKey = target === null ? null : !('muscleGroupIds' in target)
-    ? `exercise:${JSON.stringify(exerciseScopeIds(target))}:${accountRevision}` : `muscle:${target.muscleGroupIds.join(',')}:${accountRevision}`;
+    ? `exercise:${JSON.stringify(exerciseScopeIds(target))}:${accountRevision}` : `muscle:${JSON.stringify(target.muscleGroupIds)}:${accountRevision}`;
   const targetKey = target === null ? null : !('muscleGroupIds' in target)
     ? `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}:${target.countSecondary}:${target.countSecondaryVolume}:${target.metric}`;
   const scopeKey = target === null || period === null ? null : `${targetKey}:${target.includeInProgress}|${period.weekKey}:${period.dayKey ?? ''}|${dateFormat}|${lookbackWeeks}`;

@@ -14,7 +14,7 @@ import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-an
 import { selectDatedInProgressSession } from './in-progress-session';
 import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions, userSettings } from './schema';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
-import { exerciseScopeIds, type ExerciseReadScope } from '@/src/utils/exercise-selection';
+import { exerciseScopeIds, type ExerciseReadScope } from '@/src/utils/progress-selection';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
 export type SelectedExerciseWeeklyEffort = SelectedMuscleWeeklyEffort;

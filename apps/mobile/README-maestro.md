@@ -17,7 +17,7 @@ Run commands from `apps/mobile`.
 - `npm run test:e2e:ios:data-smoke` runs the infra-free data/UI smoke flows listed in `scripts/maestro-run-lane.sh` against ONE provisioned simulator and ONE Metro instance (`scripts/maestro-ios-run-flows.sh`), for the same reason the combined `gates` lane does: the provision/launch/teardown overhead is paid once, not once per flow.
 - `npm run test:e2e:ios:gates` runs BOTH the smoke and data-runtime-smoke flows against one provisioned simulator and one Metro instance, so the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) is paid once instead of per gate (measured ~196s separate -> ~140s combined). The standalone gates above are unchanged; this is an additive convenience path for running both together.
 - `./boga test ios-sync-e2e` proves a kg reading entered on the device survives a real sync → wipe → bootstrap round trip. The private preference, contributions, exact as-of selection, kg conversion and LWW/tombstone cases stay in Jest (`sync-infra`'s `cycle-round-trip` against the live server) and the pure/backend lanes.
-- `./boga test ios-combined-progress` runs only the combined-exercise gesture/layout flow; use `IOS_SIM_UDID` for a dedicated small/normal viewport. Both data-smoke suites retain it.
+- `./boga test ios-combined-progress` runs only the combined Progress gesture/layout flow; use `IOS_SIM_UDID` for a dedicated small/normal viewport. Both data-smoke suites retain it.
 - Run artifacts are written to `artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`. The combined runner namespaces each flow's JUnit/output/debug under a per-flow subdirectory of that root.
 
 ## First-time setup
