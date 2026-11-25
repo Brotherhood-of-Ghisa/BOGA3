@@ -504,22 +504,30 @@ describe('The history page over real data', () => {
     await loadMaestroFixture('exercise-block-history');
     await openHistory({ exerciseDefinitionIds, gymId, view: 'timeline', metric: 'sets' });
     const timeline = 'stats-exercise-history-timeline';
-    fireEvent.press(await screen.findByTestId(`${timeline}-expand`));
+    const expand = await screen.findByTestId(`${timeline}-expand`);
+    const portraitWeek = screen.getByTestId(`${timeline}-plot`).props.accessibilityValue;
+    expect(screen.queryByTestId(`${timeline}-legend`)).toBeNull();
+    fireEvent.press(expand);
     expect(mockScreenOptions).toMatchObject({ orientation: 'landscape', headerShown: false });
     expect(screen.getByRole('header', { name: '2 exercises' })).toBeTruthy();
     expect(shownMetric('exercise')).toBe('workingSetCount');
     expect(screen.getByTestId(GYM_BUTTON.exercise)).toHaveAccessibleName(gymButtonLabel('Maestro Block History Gym'));
 
+    const legend = within(screen.getByTestId(`${timeline}-legend`));
+    expect(legend.getByText('Barbell Back Squat')).toBeTruthy();
+    expect(legend.getByText('Barbell Bench Press')).toBeTruthy();
+    expect(screen.getAllByTestId(new RegExp(`^${timeline}-segment-2026-09-28-`))).toHaveLength(2);
     const plot = screen.getByTestId(`${timeline}-plot`);
     fireEvent.press(plot, { nativeEvent: { locationX: plot.props.style.width - 1 } });
     const details = within(screen.getByTestId(`${timeline}-details`));
     expect(await details.findAllByText('Barbell Back Squat')).not.toHaveLength(0);
     expect(await details.findByText('Barbell Bench Press')).toBeTruthy();
-    const selected = plot.props.accessibilityValue;
+    expect(plot.props.accessibilityValue.text).toContain('Barbell Back Squat');
+    expect(plot.props.accessibilityValue.text).toContain('Barbell Bench Press');
     fireEvent.press(screen.getByRole('button', { name: 'Close week details' }));
     fireEvent.press(screen.getByRole('button', { name: 'Collapse chart' }));
     expect(mockScreenOptions).toMatchObject({ orientation: 'portrait', headerShown: true });
-    expect(screen.getByTestId(`${timeline}-plot`)).toHaveProp('accessibilityValue', selected);
+    expect(screen.getByTestId(`${timeline}-plot`)).toHaveProp('accessibilityValue', portraitWeek);
     expect(shownMetric('exercise')).toBe('workingSetCount');
   });
 

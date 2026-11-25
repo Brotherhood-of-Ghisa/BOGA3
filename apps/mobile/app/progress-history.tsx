@@ -378,6 +378,11 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   }, [landscape]));
   // A subject that no longer exists is never read for.
   const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
+  const { weeklyByExercise } = history;
+  const exerciseSeries = useMemo(() => {
+    if (!weeklyByExercise || selectedExercises.length < 2 || selectedExercises.length !== weeklyByExercise.size) return undefined;
+    return selectedExercises.map(({ id, name }) => ({ id, name, weeks: weeklyByExercise.get(id)! }));
+  }, [weeklyByExercise, selectedExercises]);
   const { openDay, openWeek, openSession } = useHistoryNavigation(subject, shownMetric, accountRevision);
   // A muscle's week list links each card's exercise to its own history, on
   // the metric shown here; one the catalogue no longer holds has no page.
@@ -446,6 +451,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
       weekSetsTarget: timelineTarget(subject, muscleMetric),
       onOpenSession: openSession,
       exerciseLink,
+      exerciseSeries,
     },
   };
 

@@ -1,4 +1,4 @@
-import { hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
+import { colourDistance, contrastRatio, hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
 
 // The colours a theme is made from (`docs/specs/ui/design-language.md` §2,
 // "Derivation"): four seeds and a direction. The palette follows these; danger,
@@ -440,4 +440,20 @@ export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light', { ra
         }
       : { accent: at(DARK_ACCENT), record: at(DARK_RECORD), scrim: DARK_SCRIM };
   return { ...stepped, ...own, ...FIXED[drawn], ...changePair(seeds.direction, drawn, stepped.ink) };
+}
+
+const exerciseFillsAt = (lightness: number): string[] =>
+  [260, 55, 155, 325, 105].map(hue => lchToHex({ lightness, chroma: 56, hue }));
+
+// Keep the same five hues, adapting the palette's lightness to the chart and
+// legend grounds. Ink + paper puts the two grounds on opposite ladders.
+export function timelineExerciseFills({ paper, surface }: UiRoles): readonly string[] {
+  let firstLegible: string[] | undefined;
+  for (const lightness of [54, 44, 65, 34, 75, 24, 85, 14, 95]) {
+    const fills = exerciseFillsAt(lightness);
+    if (!fills.every(fill => contrastRatio(fill, paper) >= 3 && contrastRatio(fill, surface) >= 3)) continue;
+    firstLegible ??= fills;
+    if (fills.every((fill, index) => fills.slice(0, index).every(other => colourDistance(fill, other) >= 20))) return fills;
+  }
+  return firstLegible ?? exerciseFillsAt(54);
 }

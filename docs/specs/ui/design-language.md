@@ -53,8 +53,9 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   (default), `blue-orange` (Sage), or `ink` (sign only). Each pair shares one L\*,
   clearing 4.5:1 on `paper`/`surface`; `loss` stays off `danger`'s hue.
 
-`regimeOlder` / `regimeNewer` are fixed categorical hues for the RM chart's
-fitted periods, legible, apart from the `viz` ramp and gain/loss.
+Categorical hues identify RM chart periods (`regimeOlder`, `regimeNewer`)
+and exercise stacks (`timelineExerciseFills`), apart from the `viz` ramp
+and gain/loss.
 
 **Four seeds and `direction` make a theme** (`generateRoles(seeds)`):
 `background`, `text`, `accent`, `record`. A seed sets hue and chroma; the
