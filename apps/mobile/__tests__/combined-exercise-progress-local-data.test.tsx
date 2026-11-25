@@ -30,6 +30,7 @@ import { waitForGone } from './helpers/wait-for-gone';
 import { setAccountLocalPreferenceAccount, ensureAccountLocalPreferencesLoaded } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { exerciseDefinitions } from '@/src/data/schema';
+import { computeSelectedExercisesHistoryEffort } from '@/src/data';
 import { persistSessionDraftSnapshot, completeSessionDraft } from '@/src/data/session-drafts';
 import { progressHistoryHref, exerciseHistoryHref, historyDetailHref } from '@/src/navigation/routes';
 import { calendarWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
@@ -126,6 +127,29 @@ it('uses all three charts and only additive metrics, with a names sheet and dire
   fireEvent.press(screen.getByTestId('progress-history-options-button'));
   fireEvent.press(screen.getByTestId('progress-history-exercise-history'));
   expect(mockPush).toHaveBeenCalledWith(exerciseHistoryHref([SQUAT, BENCH], null));
+});
+
+it('counts exercise segments from the same bounded gym and date read as the combined figures', async () => {
+  const ids = [six[0].id, six[1].id];
+  const start = new Date(recentDate.getTime() - 1000);
+  const end = new Date(recentDate.getTime() + 1000);
+  const weekKey = localDateKey(calendarWeekBounds(1, recentDate).start);
+  const inScope = await computeSelectedExercisesHistoryEffort({
+    exerciseDefinitionIds: [` ${ids[0]} `, ...ids], start, end, gymId: null,
+  });
+  expect([...inScope.weeklyByExercise.keys()]).toEqual(ids);
+  expect(inScope.weekly).toMatchObject([{ weekStartDateKey: weekKey, totalVolume: 300, workingSetCount: 2 }]);
+  for (const id of ids) {
+    expect(inScope.weeklyByExercise.get(id)?.get(weekKey)).toMatchObject({ totalVolume: 150, workingSetCount: 1 });
+  }
+  const gym = await computeSelectedExercisesHistoryEffort({ exerciseDefinitionIds: ids, start, end, gymId: EXERCISE_BLOCK_HISTORY_FIXTURE.gymId });
+  const older = await computeSelectedExercisesHistoryEffort({
+    exerciseDefinitionIds: ids, start: new Date(start.getTime() - 1000), end: start, gymId: null,
+  });
+  for (const outOfScope of [gym, older]) {
+    expect(outOfScope.weekly).toEqual([]);
+    expect([...outOfScope.weeklyByExercise.values()].map(weeks => weeks.size)).toEqual([0, 0]);
+  }
 });
 
 it('carries the full selection and gym from day and weekly chart taps', async () => {

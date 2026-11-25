@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   computeSelectedExerciseHistoryEffort, computeSelectedExercisesHistoryEffort, computeSelectedMuscleHistoryEffort,
-  type DailyEffortMetrics, type SelectedMuscleWeeklyEffort,
+  type DailyEffortMetrics, type SelectedExerciseWeeklyEffort, type SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { encodeGymRouteParam, type GymScopeOption } from '@/src/utils/gym-scope-route';
@@ -24,7 +24,14 @@ export const historyMuscleIds = (subject: MuscleHistorySubject): string[] => sub
 
 const NO_GYMS: GymScopeOption[] = [];
 
-const loadHistory = async (subject: HistorySubject, id: string, weeks: number) => {
+type HistoryRead = {
+  daily: DailyEffortMetrics[];
+  weekly: SelectedMuscleWeeklyEffort[];
+  gyms: GymScopeOption[];
+  weeklyByExercise?: ReadonlyMap<string, ReadonlyMap<string, SelectedExerciseWeeklyEffort>>;
+};
+
+const loadHistory = async (subject: HistorySubject, id: string, weeks: number): Promise<HistoryRead> => {
   // One clock for the window and the workout in progress, which counts here.
   const now = new Date();
   const bounds = { ...historyWeekBounds(weeks, now), now };
@@ -57,9 +64,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   const subjectKey = `${kind ?? ''}:${id ?? ''}:${accountRevision}`;
   const context = `${subjectKey}:${gymKey}:${primaryOnly ? 'primary' : 'all'}:${primaryVolumeOnly}:${weeks}:${revision}`;
   const [loading, setLoading] = useState(id !== null);
-  const [loaded, setLoaded] = useState<{
-    context: string; subjectKey: string; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[]; gyms: GymScopeOption[];
-  } | null>(null);
+  const [loaded, setLoaded] = useState<(HistoryRead & { context: string; subjectKey: string }) | null>(null);
   const [failure, setFailure] = useState<{ context: string; message: string } | null>(null);
   const [retryRevision, setRetryRevision] = useState(0);
   useEffect(() => {
@@ -71,7 +76,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
       try {
         const next = await loadHistory(subject, id, weeks);
         if (!active) return;
-        setLoaded({ context, subjectKey, daily: next.daily, weekly: next.weekly, gyms: next.gyms });
+        setLoaded({ context, subjectKey, ...next });
       } catch (cause) {
         if (active) setFailure({ context, message: cause instanceof Error ? cause.message : 'Unknown error' });
       } finally {
@@ -93,7 +98,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   const error = failure?.context === context ? failure.message : null;
   const shown = id === null ? null : current ?? (error === null && loaded?.subjectKey === subjectKey ? loaded : null);
   return {
-    daily: shown?.daily ?? [], weekly: shown?.weekly ?? [],
+    daily: shown?.daily ?? [], weekly: shown?.weekly ?? [], weeklyByExercise: shown?.weeklyByExercise,
     // The gym choices outlive a gym or secondary-set change on the same
     // subject, so the picker stays put while the new read loads.
     gyms: loaded?.subjectKey === subjectKey ? loaded.gyms : NO_GYMS,

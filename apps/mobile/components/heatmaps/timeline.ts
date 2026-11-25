@@ -6,12 +6,19 @@ import { formatCalendarWeek, formatCalendarWeekHeading } from '@/src/utils/local
 // Week values are the week's sum for Volume and Sets, its best for 1RM and Top
 // weight; a rest week gets no column.
 
-import type { CalendarHeatmapMetric } from '@/src/data';
+import type { CalendarHeatmapMetric, SelectedExerciseWeeklyEffort } from '@/src/data';
 
+import { getMetricValue } from './heatmap-metric';
 import type { WeekCell } from './heatmapData';
 import { timelineOverviewSpan, type TimelineWindow } from './timeline-window';
 
 export type TimelineWeekState = 'training' | 'rest' | 'unavailable';
+
+export type TimelineExercise = {
+  id: string;
+  name: string;
+  weeks: ReadonlyMap<string, SelectedExerciseWeeklyEffort>;
+};
 
 export interface TimelineWeek {
   weekStartDateKey: string;
@@ -20,6 +27,8 @@ export interface TimelineWeek {
   state: TimelineWeekState;
   /** Zero for a rest week; `null` (a gap) when the figure is unavailable. */
   value: number | null;
+  /** In legend order. Missing means no training, null means unavailable. */
+  contributions?: readonly (number | null | undefined)[];
 }
 
 export interface TimelineMonth {
@@ -106,8 +115,14 @@ export const timelineTicks = (values: number[], integer: boolean): number[] => {
 };
 
 /** The weekly series (sums for Volume/Sets, best-of for 1RM/Top weight) as the timeline plots it. */
-export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapMetric): TimelineSeries {
+export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapMetric, exercises?: readonly TimelineExercise[]): TimelineSeries {
   const weeks = weekly.map(toTimelineWeek);
+  if (exercises) for (const week of weeks) {
+    week.contributions = exercises.map(exercise => {
+      const entry = exercise.weeks.get(week.weekStartDateKey);
+      return entry && getMetricValue(entry, metric);
+    });
+  }
   const values = weeks.flatMap(week => week.value === null ? [] : [week.value]);
   return { weeks, ticks: timelineTicks(values, metric === 'workingSetCount'), months: timelineMonths(weeks) };
 }
@@ -199,6 +214,19 @@ export function timelineGeometry(series: TimelineSeries, plotWidth: number, heig
 /** The week under a tap at `x` on the drawn plot. */
 export const timelineWeekIndexAt = (x: number, columnWidth: number, count: number): number =>
   Math.min(count - 1, Math.max(0, Math.floor(x / columnWidth)));
+
+/** Positive contributions stack from the baseline in legend order. */
+export function timelineBarSegments(bar: TimelineBar, week: TimelineWeek) {
+  const { value, contributions } = week;
+  if (!contributions || value === null || value <= 0) return [];
+  let bottom = bar.y + bar.height;
+  return contributions.flatMap((contribution, colourIndex) => {
+    if (contribution === undefined || contribution === null || contribution <= 0) return [];
+    const height = contribution / value * bar.height;
+    bottom -= height;
+    return [{ ...bar, y: bottom, height, colourIndex }];
+  });
+}
 
 /** SVG path of a column with a rounded top and a square baseline. */
 export const barPath = ({ x, y, width, height }: TimelineBar): string => {

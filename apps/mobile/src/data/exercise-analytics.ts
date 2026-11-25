@@ -233,9 +233,11 @@ export type ComputeSelectedExerciseWeeklyEffortOptions = ExerciseReadScope & {
 
 export type ComputeSelectedExerciseDailyEffortOptions = ComputeSelectedExerciseWeeklyEffortOptions;
 
+type ScopedExerciseSession = ExerciseRawSession & { exerciseDefinitionId: string | null };
+
 const loadExerciseRawSessions = async (
   options: ComputeSelectedExerciseWeeklyEffortOptions
-): Promise<ExerciseRawSession[]> => {
+): Promise<ScopedExerciseSession[]> => {
   const database = await bootstrapLocalDataLayer();
   const definitionIds = exerciseScopeIds(options);
   const resolveWeight = loadAsOfWeightResolver(database);
@@ -331,7 +333,7 @@ const loadExerciseRawSessions = async (
     setsByExerciseId.set(set.sessionExerciseId, existing);
   }
 
-  const rawSessions: ExerciseRawSession[] = [];
+  const rawSessions: ScopedExerciseSession[] = [];
   for (const seRow of sessionExerciseRows) {
     const sessionId = sessionIdByExerciseId.get(seRow.id);
     if (!sessionId) continue;
@@ -339,6 +341,7 @@ const loadExerciseRawSessions = async (
     if (!session) continue;
     rawSessions.push({
       id: session.id,
+      exerciseDefinitionId: seRow.exerciseDefinitionId,
       completedAt: session.completedAt,
       gymId: session.gymId,
       gymName: session.gymName,
@@ -350,7 +353,7 @@ const loadExerciseRawSessions = async (
   return rawSessions;
 };
 
-const inGymScope = (rawSessions: ExerciseRawSession[], gymId: string | null | undefined): ExerciseRawSession[] =>
+const inGymScope = <T extends ExerciseRawSession>(rawSessions: T[], gymId: string | null | undefined): T[] =>
   gymId === undefined ? rawSessions : rawSessions.filter((session) => (session.gymId ?? null) === gymId);
 
 /** The gyms trained at in the window, most recently first, with their session counts. */
@@ -390,7 +393,12 @@ export const computeSelectedExercisesHistoryEffort = async (options: ComputeSele
   // A selection is workload, never a strength estimate or a new record book.
   const daily = aggregateExerciseDailyEffort(rawSessions, options.timeZone)
     .map(day => ({ ...day, estimatedRM1: null, highestWeight: null }));
-  return { daily, weekly: aggregateExerciseWeeksFromDaily(daily), gyms: exerciseHistoryGymOptions(allSessions) };
+  const weeklyByExercise = new Map(exerciseScopeIds(options).map(id => {
+    const sessions = rawSessions.filter(session => session.exerciseDefinitionId === id);
+    const weeks = aggregateExerciseWeeklyEffort(sessions, options.timeZone);
+    return [id, new Map(weeks.map(week => [week.weekStartDateKey, week]))];
+  }));
+  return { daily, weekly: aggregateExerciseWeeksFromDaily(daily), gyms: exerciseHistoryGymOptions(allSessions), weeklyByExercise };
 };
 
 /**

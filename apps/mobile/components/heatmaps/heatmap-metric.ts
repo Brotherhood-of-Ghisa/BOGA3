@@ -2,6 +2,7 @@
 // No React / react-native imports, so they unit-test in isolation and are safe to
 // reuse from the aggregation adapter (heatmapData.ts) and the components.
 
+import { colourDistance, hexToLch, lchToHex } from '@/components/ui/lch';
 import type { UiRoles } from '@/components/ui/theme';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
@@ -15,6 +16,23 @@ export type CalendarHeatmapBucket = 0 | 1 | 2 | 3 | 4;
  */
 export const heatRamp = (roles: UiRoles) =>
   [roles.viz0, roles.viz1, roles.viz2, roles.viz3, roles.viz4] as const;
+
+/** Exercise identities use the trained shades, with one extra shade for a fifth exercise. */
+export function timelineExerciseFills({ viz1, viz2, viz3, viz4 }: UiRoles): readonly string[] {
+  const middle = [1, 3, 5].map(offset => {
+    const from = parseInt(viz2.slice(offset, offset + 2), 16);
+    const to = parseInt(viz3.slice(offset, offset + 2), 16);
+    return Math.round((from + to) / 2).toString(16).padStart(2, '0');
+  }).join('');
+  const fills = [viz4, viz2, viz3, viz1, `#${middle}`];
+  if (fills.every((fill, index) => fills.slice(0, index).every(other => colourDistance(fill, other) >= 3))) return fills;
+
+  // Custom themes can use matching ramp ends. Space shades from their chosen hue.
+  const base = hexToLch(viz4);
+  const step = 7;
+  const start = Math.min(100 - step * 4, Math.max(0, base.lightness - step * 2));
+  return [2, 0, 4, 1, 3].map(rank => lchToHex({ ...base, lightness: start + step * rank }));
+}
 
 /** Structural subset of an effort row carrying the four selectable metrics. */
 export type HeatmapMetricSource = {

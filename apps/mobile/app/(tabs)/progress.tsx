@@ -22,6 +22,7 @@ import {
   SearchField,
   StatePanel,
   ToggleChip,
+  uiGeometry,
   uiSpace,
   useUiText,
 } from '@/components/ui';
@@ -31,6 +32,7 @@ import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
 import type { MuscleSetTargets } from '@/components/stats/muscle-body-projection';
+import { MuscleViewButton, type MuscleViewControl } from '@/components/stats/muscle-view-sheet';
 import type { HeatmapView, ProgressExerciseMetric, ProgressMetric, ProgressMuscleLayout } from '@/src/preferences/model';
 import {
   compareFamilySections, countFamilyMuscles, familyHasHeader, nextMuscleSortMode, type MuscleSortMode,
@@ -220,6 +222,7 @@ export type StatsScreenShellProps = {
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
   muscleLayout: ProgressMuscleLayout;
+  muscleViewControl?: MuscleViewControl;
   tableMetric: ProgressMetric;
   onSelectTableMetric: (metric: ProgressMetric) => void;
   // The Exercise table's own metric, which may be one the Muscle table cannot show.
@@ -256,32 +259,37 @@ export type StatsScreenShellProps = {
   activeInjuries?: readonly InjuryView[];
 };
 
-// The pinned search row keeps its controls reachable above either table; the
-// view's choices sit behind its Filters button. Muscle 3D has no table to
-// search, so its row holds the button alone.
+// Muscle List gives search the full width, with its two sheet triggers below.
+// Exercise keeps its single search row, and 3D puts View in the model card.
 function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup, query, onChangeQuery,
   gymId, gymOptions, onSelectGym, countSecondary = true, onChangeCountSecondary, defaultCountSecondary = true,
-  countSecondaryVolume = true, onChangeCountSecondaryVolume, defaultCountSecondaryVolume = true, defaultGrouped = true }: Pick<StatsScreenShellProps,
+  countSecondaryVolume = true, onChangeCountSecondaryVolume, defaultCountSecondaryVolume = true, defaultGrouped = true,
+  muscleViewControl, showMuscleViewTrigger }: Pick<StatsScreenShellProps,
   'viewMode' | 'gymId' | 'gymOptions' | 'onSelectGym' | 'countSecondary' | 'onChangeCountSecondary' | 'defaultCountSecondary'
-  | 'countSecondaryVolume' | 'onChangeCountSecondaryVolume' | 'defaultCountSecondaryVolume' | 'defaultGrouped'> & {
+  | 'countSecondaryVolume' | 'onChangeCountSecondaryVolume' | 'defaultCountSecondaryVolume' | 'defaultGrouped' | 'muscleViewControl'> & {
   tableVisible: boolean; grouped: boolean; onToggleGroup: () => void; query: string; onChangeQuery: (query: string) => void;
+  showMuscleViewTrigger: boolean;
 }) {
   const exercise = viewMode === 'exercise';
   const searchable = exercise || tableVisible;
-  return <View style={[styles.searchRow, searchable ? null : styles.filtersOnly]}>
-    {searchable ? <View style={styles.search}>
-      <SearchField accessibilityLabel={exercise ? 'Exercise filter input' : 'Muscle filter input'}
-        autoCapitalize="none" clearLabel="Clear search input" onChangeText={onChangeQuery}
-        placeholder={exercise ? 'Search exercises or muscles' : 'Search muscles'}
-        testID={exercise ? 'stats-search-input' : 'stats-muscle-search-input'} value={query} />
-    </View> : null}
-    <ProgressFilters testID="stats-filters"
+  const search = <SearchField accessibilityLabel={exercise ? 'Exercise filter input' : 'Muscle filter input'}
+    autoCapitalize="none" clearLabel="Clear search input" onChangeText={onChangeQuery}
+    placeholder={exercise ? 'Search exercises or muscles' : 'Search muscles'}
+    testID={exercise ? 'stats-search-input' : 'stats-muscle-search-input'} value={query} />;
+  const filters = <ProgressFilters testID="stats-filters"
       grouping={tableVisible ? { value: grouped, onChange: onToggleGroup, opening: defaultGrouped } : undefined}
       secondary={!exercise && onChangeCountSecondary
         ? { value: countSecondary, onChange: onChangeCountSecondary, opening: defaultCountSecondary } : undefined}
       secondaryVolume={!exercise && onChangeCountSecondaryVolume
         ? { value: countSecondaryVolume, onChange: onChangeCountSecondaryVolume, opening: defaultCountSecondaryVolume } : undefined}
-      gym={searchable && onSelectGym ? { value: gymId, options: gymOptions ?? [], onChange: onSelectGym } : undefined} />
+      gym={searchable && onSelectGym ? { value: gymId, options: gymOptions ?? [], onChange: onSelectGym } : undefined} />;
+  if (exercise) return <View style={styles.searchRow}><View style={styles.search}>{search}</View>{filters}</View>;
+  return <View style={styles.muscleControls}>
+    {tableVisible ? search : null}
+    <View style={[styles.searchRow, styles.filtersOnly, tableVisible ? styles.muscleListActions : null]}>
+      {muscleViewControl ? <MuscleViewButton {...muscleViewControl} showTrigger={showMuscleViewTrigger} /> : null}
+      {filters}
+    </View>
   </View>;
 }
 
@@ -294,7 +302,8 @@ type ProgressControlsProps = Pick<StatsScreenShellProps, 'viewMode' | 'onSelectV
 
 function ProgressControls({ viewMode, onSelectViewMode, period, targetWindowWeeks = 4, onSelectPeriod,
   tableMetric, onSelectTableMetric, exerciseMetric, onSelectExerciseMetric, search, selection, onShowSelected }: ProgressControlsProps) {
-  return <View style={styles.controls} testID="stats-controls">
+  const muscleList = viewMode === 'muscle' && search.tableVisible;
+  return <View style={[styles.controls, muscleList ? styles.muscleListControls : null]} testID="stats-controls">
     <View style={styles.filters} testID="stats-view-switch">
       <ToggleChip accessibilityLabel="Stats breakdown" options={VIEW_MODE_OPTIONS}
         value={viewMode} onChange={mode => { selection.cancel(); onSelectViewMode(mode); }} testID="stats-view-mode-chip" />
@@ -322,6 +331,19 @@ function ProgressLoadState({ error, pending, onRetry }: { error: string | null; 
   </>;
 }
 
+function defaultProgressMuscleId(muscles: readonly ProgressMuscleComparison[] | undefined, metric: ProgressMetric) {
+  let bestId = 'chest';
+  let bestValue = 0;
+  for (const muscle of muscles ?? []) {
+    const value = muscle.current[metric];
+    if (value !== null && Number.isFinite(value) && value > bestValue) {
+      bestId = muscle.muscleGroupId;
+      bestValue = value;
+    }
+  }
+  return bestId;
+}
+
 // Exercise lists full exercise figures; Muscle owns the saved List/3D layout and its contributors.
 export function StatsScreenShell({
   summary,
@@ -339,6 +361,7 @@ export function StatsScreenShell({
   viewMode,
   onSelectViewMode,
   muscleLayout,
+  muscleViewControl,
   tableMetric,
   onSelectTableMetric,
   exerciseMetric,
@@ -367,9 +390,13 @@ export function StatsScreenShell({
   activeInjuries,
 }: StatsScreenShellProps) {
   const text = useUiText();
-  const tableVisible = viewMode === 'exercise' || muscleLayout === 'list';
+  const contentLayout = viewMode === 'exercise' ? 'exercise' : muscleLayout;
+  const tableVisible = contentLayout !== '3d';
   const selection = useProgressSelection(tableVisible ? viewMode : null);
-  const onOpenSelection = viewMode === 'exercise' ? onOpenSelectedExerciseHistory : onOpenSelectedMuscleHistory;
+  const onOpenSelection = {
+    exercise: onOpenSelectedExerciseHistory,
+    muscle: onOpenSelectedMuscleHistory,
+  }[viewMode];
   const selectionLaunchTarget = useRef<ComponentRef<typeof View> | null>(null);
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
@@ -386,20 +413,7 @@ export function StatsScreenShell({
   const [muscleSearch, setMuscleSearch] = useState('');
   const [contributionId, setContributionId] = useState<string | null>(null);
 
-  const defaultMuscleId = useMemo(() => {
-    if (!summary?.muscles || summary.muscles.length === 0) return 'chest';
-    let topMuscle: ProgressMuscleComparison | null = null;
-    let topVal = -1;
-    for (const m of summary.muscles) {
-      const val = m.current[tableMetric];
-      const num = val !== null && Number.isFinite(val) ? val : 0;
-      if (num > topVal) {
-        topVal = num;
-        topMuscle = m;
-      }
-    }
-    return topMuscle && topVal > 0 ? topMuscle.muscleGroupId : 'chest';
-  }, [summary, tableMetric]);
+  const defaultMuscleId = useMemo(() => defaultProgressMuscleId(summary?.muscles, tableMetric), [summary, tableMetric]);
 
   const effectiveContributionId =
     contributionId ?? (muscleLayout === '3d' && viewMode === 'muscle' ? defaultMuscleId : null);
@@ -476,12 +490,14 @@ export function StatsScreenShell({
         selection={selection} onShowSelected={() => { if (onOpenSelection && selection.selected) openHistory(
           onOpenSelection, selection.selected.map(item => item.id), selectionLaunchTarget.current); }}
         search={{ viewMode, tableVisible, grouped: grouped[viewMode],
+          muscleViewControl, showMuscleViewTrigger: tableVisible || !summary,
           onToggleGroup: () => setGrouped(current => ({ ...current, [viewMode]: !current[viewMode] })),
           query: viewMode === 'exercise' ? searchQuery : muscleSearch,
           onChangeQuery: viewMode === 'exercise' ? onSearchQueryChange : setMuscleSearch,
           gymId, gymOptions, onSelectGym, countSecondary, onChangeCountSecondary,
           countSecondaryVolume, onChangeCountSecondaryVolume, defaultCountSecondaryVolume, defaultCountSecondary, defaultGrouped }} />
-      <ScreenScroll key={viewMode === 'exercise' ? 'exercise' : muscleLayout} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
+      <ScreenScroll key={contentLayout} contentContainerStyle={[styles.scrollContent, contentLayout === 'list' && styles.muscleListScroll]}
+        keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         <ProgressLoadState {...loadState} onRetry={onRetry} />
         {viewMode === 'exercise' ? exerciseDataReady ? <ExerciseListView items={filteredExerciseListItems} metric={exerciseMetric}
           grouped={grouped.exercise} families={exerciseFamilies} familyMuscleCounts={familyMuscleCounts}
@@ -491,6 +507,7 @@ export function StatsScreenShell({
           onToggleExercise={selection.toggle}
           emptyBody={exerciseEmptyBody(exerciseListItems, exerciseMetric)}
           sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} /> : null : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={effectiveContributionId} muscleLayout={muscleLayout}
+          viewControl={muscleViewControl}
           report={muscleReport}
           setTargets={muscleTargets && { ...muscleTargets, weeks: period === 'this-week' ? 1 : targetWindowWeeks }}
           grouped={grouped.muscle} searchQuery={muscleSearch}
@@ -673,6 +690,7 @@ function StatsContent() {
   const params = useLocalSearchParams<{ period?: string | string[]; breakdown?: string | string[] }>();
   const { values } = useAccountLocalPreferenceState();
   const filters = useProgressFilters(params);
+  const muscleLayout = filters.muscleView === 'list' ? 'list' : '3d';
   const weeks = filters.period === 'this-week' ? 1 : values.targetWindowWeeks;
   const catalog = useExerciseCatalog();
   // The tables' gym ([[gym.view-filter]]); this visit's choice only.
@@ -680,7 +698,7 @@ function StatsContent() {
   const { countSecondary, countSecondaryVolume } = filters;
   const { current: thisPeriod, previous: lastPeriod, gymOptions, reload, hasSnapshot: exerciseSnapshot, lastError: exerciseError } = useExerciseCatalogComparison(weeks, gymId);
   const revision = useBodyWeightContextRevision();
-  const summaryGymId = filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list' ? gymId : undefined;
+  const summaryGymId = filters.breakdown === 'muscle' && muscleLayout === 'list' ? gymId : undefined;
   const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload,
     { gymId: summaryGymId, countSecondary, countSecondaryVolume });
   const { state: injuriesState } = useInjuries();
@@ -724,7 +742,7 @@ function StatsContent() {
     onOpenSelectedExerciseHistory={exerciseDefinitionIds => router.push(progressHistoryHref(
       { exerciseDefinitionIds, gymId }, filters.exerciseMetric === 'workingSetCount' ? 'workingSetCount' : 'totalVolume'))}
     viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
-    muscleLayout={values.progressMuscleLayout}
+    muscleLayout={muscleLayout} muscleViewControl={{ value: filters.muscleView, onSelect: filters.selectMuscleView }}
     muscleTargets={{ weeklyTarget: values.weeklyWorkingSetTarget, weeklyTargets }}
     tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
     exerciseMetric={filters.exerciseMetric} onSelectExerciseMetric={filters.selectExerciseMetric}
@@ -756,10 +774,14 @@ const LOADING_PANEL_DELAY_MS = 100;
 // The screen body, in the design language.
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
+  muscleControls: { gap: uiSpace.xs },
+  muscleListControls: { paddingBottom: 0 },
+  muscleListScroll: { paddingTop: uiSpace.sm },
   filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   search: { flex: 1, minWidth: 0 },
   filtersOnly: { justifyContent: 'flex-end' },
+  muscleListActions: { minHeight: uiGeometry.tapTarget },
   // The page's last row clears the display's rounded corner above the tab bar,
   // which otherwise clips it: one more step of the spacing scale than the
   // gutter `ScreenScroll` already applies.

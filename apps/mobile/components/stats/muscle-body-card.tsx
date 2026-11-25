@@ -7,7 +7,6 @@ import {
   Card,
   FigureText,
   Icon,
-  Information,
   ListRow,
   SegmentedControl,
   Sheet,
@@ -48,6 +47,7 @@ import {
 import { MuscleBodyCanvas } from './muscle-body-canvas';
 import type { WireframeFrame } from './muscle-wireframe-renderer';
 import { hitWireframe, selectMuscleMeshes, wireframeCamera } from './muscle-wireframe-scene';
+import { MuscleViewSheet } from './muscle-view-sheet';
 
 type Props = {
   readonly muscles: readonly ProgressMuscleComparison[];
@@ -60,6 +60,7 @@ type Props = {
   readonly defaultOverlay?: MuscleOverlayStyle;
   readonly overlay?: MuscleOverlayStyle;
   readonly onOverlayChange?: (next: MuscleOverlayStyle) => void;
+  readonly onSelectList?: () => void;
   readonly activeInjuries?: readonly (ActiveInjuryOverlay | InjuryView)[];
   readonly comparisonLayout?: ComparisonLayout;
 };
@@ -154,25 +155,6 @@ function MuscleBodyHeader({ orientation, onOrientationChange, focus, focusAvaila
         selectedGround="selection" testIDPrefix="stats-muscle-body-framing" value={focus ? 'focus' : 'body'} />
     </View>
   </>;
-}
-
-function MuscleBodyViewSheet({ visible, onDismiss, overlay, onOverlayChange }: {
-  visible: boolean; onDismiss: () => void; overlay: MuscleOverlayStyle;
-  onOverlayChange: (next: MuscleOverlayStyle) => void;
-}) {
-  return <Sheet visible={visible} onDismiss={onDismiss} dismissLabel="Dismiss model view options"
-    title="View" testID="stats-muscle-body-view-sheet">
-    {([{ value: 'contour', label: 'Patches' }, { value: 'wireframe', label: 'Wireframe' }] as const).map(option =>
-      <ListRow key={option.value} label={option.label} checked={overlay === option.value}
-        onPress={() => { onOverlayChange(option.value); onDismiss(); }}
-        trailing={<Icon name={overlay === option.value ? 'radio-on' : 'radio-off'} size="md" />}
-        testID={`stats-muscle-body-material-${option.value}`} />)}
-    <Information title="About the muscle model" testIDPrefix="stats-muscle-body"
-      renderTrigger={open => <ListRow label="About the model" onPress={open}
-        trailing={<Icon name="chevron-right" size="sm" />} />}
-      body="Wireframe lines are triangle edges. Both views share the same coarse muscle surfaces. Muscle layers partially cover selected anatomy; several layers make it faint. Taps select the foreground body region. Shapes are visually fitted: Forearms use an outer group envelope with hand tendons; spinal erectors use smoothed columns; Abs and Lats use body-surface approximations."
-      sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, forearm/hand fitting, bilateral mirroring and simplified surface envelopes. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
-  </Sheet>;
 }
 
 type PickerSheetProps = {
@@ -461,7 +443,7 @@ const toActiveInjuryOverlays = (
  * contrasting triangle edges over body and selected anatomy. Filled patches share the coarse anatomy,
  * camera, focus and hit testing; switching view changes only its material.
  * The separate muscle strip pages horizontally or opens the metric-aware picker.
- * View owns material/help; the toolbar owns orientation and framing. The footer
+ * View opens the shared layout, material and help choices. The toolbar owns orientation and framing. The footer
  * shares its comparison layout and content insets with the Exercises table.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
@@ -475,6 +457,7 @@ export function MuscleBodyCard({
   defaultOverlay = 'wireframe',
   overlay: controlledOverlay,
   onOverlayChange,
+  onSelectList,
   activeInjuries,
   comparisonLayout,
 }: Props) {
@@ -662,8 +645,8 @@ export function MuscleBodyCard({
         onSelect={onSelect}
         selectedId={selectedId}
       />
-      <MuscleBodyViewSheet visible={viewVisible} onDismiss={() => setViewVisible(false)}
-        overlay={overlay} onOverlayChange={handleOverlayChange} />
+      <MuscleViewSheet visible={viewVisible} onDismiss={() => setViewVisible(false)}
+        value={overlay} onSelectOverlay={handleOverlayChange} onSelectList={onSelectList} />
       <MusclePickerSheet
         metric={metric}
         muscles={muscles}

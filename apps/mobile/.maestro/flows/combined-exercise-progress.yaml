@@ -5,12 +5,13 @@ appId: com.dinoderek.mobile
 # survives Back, and names/all three charts/chronological History open normally.
 # A long current name wraps, and every primary/secondary muscle stays reachable
 # in the bounded Options body (scroll to the last link and back to History).
+# On iOS, dragging moves the legend and week details temporarily hide it.
 # Why device: responder cancellation/release, native stack restoration, viewport
-# clipping and sheet scrolling cannot be proved by invoking Jest events.
-# Muscle List has separate name and disclosure targets, so explicitly prove
-# its native hold release, reachability of selection controls and Back restoration.
+# clipping, rotation, sheet reachability and gesture hit-testing require the native runtime.
+# Muscle List also proves hold release, Back restoration and View switching.
 # Jest counterparts: __tests__/combined-exercise-progress-local-data.test.tsx,
 # __tests__/combined-exercise-history.test.ts, __tests__/exercise-selection.test.ts,
+# __tests__/timeline-history-chart.test.tsx, __tests__/stats-screen-local-data.test.tsx,
 # __tests__/progress-muscle-report-local-data.test.tsx and __tests__/progress-history-local-data.test.tsx.
 # Run alone for focused small/normal checks; both platform data-smoke suites
 # retain this same flow so their aggregate gates continue to cover it.
@@ -112,6 +113,36 @@ appId: com.dinoderek.mobile
     visible: { id: "stats-exercise-history-week-sets" }
     timeout: 15000
 - takeScreenshot: "12b-combined-timeline"
+- runFlow:
+    when: { platform: iOS }
+    commands:
+      - tapOn: { id: "stats-exercise-history-timeline-expand" }
+      # Align the driver bounds with the app's landscape interface.
+      - setOrientation: LANDSCAPE_LEFT
+      - extendedWaitUntil:
+          visible: { id: "stats-exercise-history-timeline-legend-move" }
+          timeout: 10000
+      - waitForAnimationToEnd
+      - takeScreenshot: "12b1-landscape-stacks"
+      - swipe:
+          from: { id: "stats-exercise-history-timeline-legend-move" }
+          direction: RIGHT
+          duration: 600
+      - assertNotVisible: { id: "stats-exercise-history-timeline-details" }
+      - takeScreenshot: "12b2-landscape-moved-legend"
+      - tapOn: { id: "stats-exercise-history-timeline-zoom-in" }
+      - tapOn: { id: "stats-exercise-history-timeline-plot" }
+      - assertVisible: { id: "stats-exercise-history-timeline-details-close" }
+      - assertNotVisible: { id: "stats-exercise-history-timeline-legend-move" }
+      - takeScreenshot: "12b3-landscape-week-details"
+      - tapOn: { id: "stats-exercise-history-timeline-details-close" }
+      - assertVisible: { id: "stats-exercise-history-timeline-legend-move" }
+      - takeScreenshot: "12b4-landscape-restored-legend"
+      - tapOn: { id: "stats-exercise-history-timeline-collapse" }
+      - setOrientation: PORTRAIT
+      - extendedWaitUntil:
+          visible: { id: "stats-exercise-history-timeline-expand" }
+          timeout: 10000
 - tapOn: { id: "progress-history-options-button" }
 - assertNotVisible: { id: "progress-history-rm-curve" }
 - takeScreenshot: "12c-combined-options"
@@ -119,6 +150,10 @@ appId: com.dinoderek.mobile
     element: { id: "progress-history-muscle-triceps" }
     direction: DOWN
 - takeScreenshot: "12d-combined-last-muscle"
+# On compact screens the sheet header can cover a row Maestro already sees.
+- swipe:
+    start: "50%,42%"
+    end: "50%,87%"
 - scrollUntilVisible:
     element: { id: "progress-history-exercise-history" }
     direction: UP
@@ -202,3 +237,23 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "18-muscle-selection-after-back"
 - tapOn: { id: "stats-muscle-selection-cancel" }
 - assertVisible: { id: "stats-muscle-search-input" }
+
+# The List and 3D triggers sit in different places. Prove both open their
+# native sheet and that choosing List again restores the regular list controls.
+- runFlow:
+    when: { platform: iOS }
+    commands:
+      - tapOn: { id: "stats-muscle-list-view" }
+      - tapOn: { id: "stats-muscle-body-material-wireframe" }
+      - extendedWaitUntil:
+          visible: { id: "stats-muscle-body-wireframe" }
+          timeout: 15000
+      - assertNotVisible: { id: "stats-muscle-selection-controls" }
+      - takeScreenshot: "19-muscle-wireframe-from-list"
+      - tapOn: { id: "stats-muscle-body-view" }
+      - tapOn: { id: "stats-muscle-view-list" }
+      - extendedWaitUntil:
+          visible: { id: "stats-muscle-search-input" }
+          timeout: 15000
+      - assertVisible: { id: "stats-muscle-list-view" }
+      - assertNotVisible: { id: "stats-muscle-selection-controls" }
