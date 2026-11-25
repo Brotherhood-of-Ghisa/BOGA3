@@ -3,6 +3,7 @@ import { TimelineDetailsWindow } from '@/components/stats/timeline-details-windo
 import { fireEvent, screen } from '@testing-library/react-native';
 
 import { TimelineHeatmap, buildHeatmapData } from '@/components/heatmaps';
+import { timelineExerciseFills } from '@/components/heatmaps/heatmap-metric';
 import { processColor, StyleSheet, Text } from 'react-native';
 import { Path } from 'react-native-svg';
 
@@ -10,6 +11,7 @@ import { MIN_TIMELINE_COLUMN_WIDTH, type TimelineExercise } from '@/components/h
 import { resizeTimelineWindow, stepTimelineZoom } from '@/components/heatmaps/timeline-window';
 import { uiFonts, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
+import { colourDistance } from '@/components/ui/lch';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
@@ -323,6 +325,22 @@ const exercises: readonly TimelineExercise[] = [
   { id: 'press', name: 'Shoulder Press', weeks: new Map([exerciseWeek('2026-10-05', 0, 0)]) },
 ];
 
+it('derives a fifth exercise shade from the trained steps of a custom theme ramp', () => {
+  const customRamp = { ...roles, viz1: '#aad0e6', viz2: '#68aad9', viz3: '#4886b9', viz4: '#26658d' };
+  expect(timelineExerciseFills(customRamp)).toEqual([
+    customRamp.viz4, customRamp.viz2, customRamp.viz3, customRamp.viz1, '#5898c9',
+  ]);
+});
+
+it('derives visibly distinct shades when a Custom theme uses matching ramp ends', () => {
+  const base = '#6998A3';
+  const fills = timelineExerciseFills({ ...roles, viz1: base, viz2: base, viz3: base, viz4: base });
+  expect(fills[0]).toBe(base);
+  fills.forEach((fill, index) => {
+    for (const other of fills.slice(0, index)) expect(colourDistance(fill, other)).toBeGreaterThanOrEqual(5);
+  });
+});
+
 it('keeps the stack in legend order and retains its colours through focus, zoom and metric changes', () => {
   const display = { expanded: true, onInspect: jest.fn() };
   const days = [day('2026-10-05', { workingSetCount: 4 })];
@@ -332,7 +350,9 @@ it('keeps the stack in legend order and retains its colours through focus, zoom 
   const fill = (id: string) => ({ type: 0, payload: processColor(StyleSheet.flatten(swatch(id).props.style).backgroundColor) });
   const squat = fill('squat');
   const bench = fill('bench');
-  expect(squat).not.toEqual(bench);
+  expect(swatch('squat')).toHaveStyle({ backgroundColor: roles.viz4 });
+  expect(swatch('bench')).toHaveStyle({ backgroundColor: roles.viz2 });
+  expect(swatch('press')).toHaveStyle({ backgroundColor: roles.viz3 });
   expect(bar(0)).toHaveProp('fill', squat);
   expect(bar(1)).toHaveProp('fill', bench);
   expect(bar(0)).toHaveProp('y', 120);

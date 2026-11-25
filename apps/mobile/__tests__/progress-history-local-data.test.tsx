@@ -517,14 +517,22 @@ describe('The history page over real data', () => {
     expect(legend.getByText('Barbell Back Squat')).toBeTruthy();
     expect(legend.getByText('Barbell Bench Press')).toBeTruthy();
     expect(screen.getAllByTestId(new RegExp(`^${timeline}-segment-2026-09-28-`))).toHaveLength(2);
+    fireEvent(legend.getByRole('adjustable', { name: 'Move exercise legend' }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'moveRight' },
+    });
     const plot = screen.getByTestId(`${timeline}-plot`);
     fireEvent.press(plot, { nativeEvent: { locationX: plot.props.style.width - 1 } });
     const details = within(screen.getByTestId(`${timeline}-details`));
+    expect(screen.queryByTestId(`${timeline}-legend`)).toBeNull();
+    expect(screen.queryByRole('adjustable', { name: 'Move exercise legend' })).toBeNull();
     expect(await details.findAllByText('Barbell Back Squat')).not.toHaveLength(0);
     expect(await details.findByText('Barbell Bench Press')).toBeTruthy();
     expect(plot.props.accessibilityValue.text).toContain('Barbell Back Squat');
     expect(plot.props.accessibilityValue.text).toContain('Barbell Bench Press');
     fireEvent.press(screen.getByRole('button', { name: 'Close week details' }));
+    expect(screen.getByTestId(`${timeline}-legend-position`)).toHaveStyle({
+      transform: [{ translateX: 44 }, { translateY: 0 }],
+    });
     fireEvent.press(screen.getByRole('button', { name: 'Collapse chart' }));
     expect(mockScreenOptions).toMatchObject({ orientation: 'portrait', headerShown: true });
     expect(screen.getByTestId(`${timeline}-plot`)).toHaveProp('accessibilityValue', portraitWeek);

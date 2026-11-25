@@ -31,10 +31,10 @@ import Svg, { Line, Path, Rect } from 'react-native-svg';
 import { Card, FigureText, IconButton, uiGeometry, uiSpace, uiTypography, useUiRoles } from '@/components/ui';
 import { contrastRatio } from '@/components/ui/lch';
 import { OnCard, useUiGround } from '@/components/ui/ground';
-import { timelineExerciseFills } from '@/components/ui/theme';
-import { groundInks, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
+import { groundInks, readsOnPage, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
+import { timelineExerciseFills } from './heatmap-metric';
 import type { HeatmapData } from './heatmapData';
 import {
   barPath,
@@ -296,7 +296,7 @@ export function TimelineHeatmap({ data, exerciseSeries, metric, selectedWeekKey,
         <View pointerEvents="box-none" style={[styles.overlay, { left: uiSpace.lg + uiSpace.sm + axisWidth }]}>
           {exercises && fills ? <TimelineExerciseLegend
             area={{ width: legendWidth, height: detailsArea.height, initialX: 0, maxX: plotWidth - legendWidth }}
-            exercises={exercises} fills={fills} testID={`${testIDPrefix}-timeline-legend`} /> : null}
+            exercises={exercises} fills={fills} hidden={!!display?.details} testID={`${testIDPrefix}-timeline-legend`} /> : null}
           {display?.details?.(detailsArea)}
         </View>
       ) : null}
@@ -334,15 +334,20 @@ function useTimelineViewport(expanded: boolean) {
 
 type TimelineStacks = { weeks: TimelineWeek[]; fills: readonly string[] };
 
-function TimelineStack({ bar, stacks, testID }: { bar: TimelineBar; stacks: TimelineStacks; testID: string }) {
+function TimelineStack({ bar, stacks, outlines, testID }: {
+  bar: TimelineBar; stacks: TimelineStacks; outlines: readonly (string | undefined)[]; testID: string;
+}) {
   const segments = timelineBarSegments(bar, stacks.weeks[bar.index]);
   return segments.map(({ colourIndex, ...segment }, index) => {
-    const fill = stacks.fills[colourIndex];
-    const id = `${testID}-segment-${bar.weekStartDateKey}-${colourIndex}`;
+    const paint = {
+      fill: stacks.fills[colourIndex],
+      stroke: outlines[colourIndex],
+      strokeWidth: Math.min(StyleSheet.hairlineWidth, segment.width / 3, segment.height / 3),
+      testID: `${testID}-segment-${bar.weekStartDateKey}-${colourIndex}`,
+    };
     return index === segments.length - 1
-      ? <Path key={colourIndex} d={barPath(segment)} fill={fill} testID={id} />
-      : <Rect key={colourIndex} x={segment.x} y={segment.y} width={segment.width} height={segment.height}
-          fill={fill} testID={id} />;
+      ? <Path key={colourIndex} d={barPath(segment)} {...paint} />
+      : <Rect key={colourIndex} x={segment.x} y={segment.y} width={segment.width} height={segment.height} {...paint} />;
   });
 }
 
@@ -355,6 +360,10 @@ function TimelinePlot({ geometry, focusedIndex, selectedX, testID, stacks }: {
   // that bar reads on it (not on Ink + paper's dark page, whose ink is light).
   const focusedFill = groundInks(roles, useUiGround()).ink;
   const band = contrastRatio(focusedFill, roles.ruleSoft) >= 3;
+  const outlinesFor = (hasContrast: (fill: string) => boolean) =>
+    stacks?.fills.map(fill => hasContrast(fill) ? undefined : focusedFill) ?? [];
+  const outlines = outlinesFor(fill => readsOnPage(roles, fill, 3));
+  const focusedOutlines = band ? outlinesFor(fill => contrastRatio(fill, roles.ruleSoft) >= 3) : outlines;
   return <View pointerEvents="none">
     <Svg height={height + (stacks ? STACK_SELECTION_HEIGHT : 0)} width={width}>
       {focusedIndex >= 0 && band ? <Rect fill={roles.ruleSoft} height={height} testID={`${testID}-selected`}
@@ -362,7 +371,8 @@ function TimelinePlot({ geometry, focusedIndex, selectedX, testID, stacks }: {
       {geometry.ticks.map((tick, index) => <Line key={tick.value} stroke={index === 0 ? roles.rule : roles.ruleSoft}
         strokeWidth={1} x1={0} x2={width} y1={tick.y} y2={tick.y} />)}
       {geometry.bars.map(bar => stacks
-        ? <TimelineStack key={bar.weekStartDateKey} bar={bar} stacks={stacks} testID={testID} />
+        ? <TimelineStack key={bar.weekStartDateKey} bar={bar} stacks={stacks}
+            outlines={bar.index === focusedIndex ? focusedOutlines : outlines} testID={testID} />
         : <Path key={bar.weekStartDateKey} d={barPath(bar)} fill={bar.index === focusedIndex ? focusedFill : roles.viz4}
             testID={`${testID}-bar-${bar.weekStartDateKey}`} />)}
       {stacks && focusedIndex >= 0 ? <Rect fill={focusedFill} height={STACK_SELECTION_HEIGHT} width={columnWidth} x={selectedX} y={height} /> : null}

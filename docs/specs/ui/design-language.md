@@ -53,9 +53,8 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   (default), `blue-orange` (Sage), or `ink` (sign only). Each pair shares one L\*,
   clearing 4.5:1 on `paper`/`surface`; `loss` stays off `danger`'s hue.
 
-Categorical hues identify RM chart periods (`regimeOlder`, `regimeNewer`)
-and exercise stacks (`timelineExerciseFills`), apart from the `viz` ramp
-and gain/loss.
+`regimeOlder` / `regimeNewer` are fixed categorical hues for the RM chart's
+fitted periods, legible, apart from the `viz` ramp and gain/loss.
 
 **Four seeds and `direction` make a theme** (`generateRoles(seeds)`):
 `background`, `text`, `accent`, `record`. A seed sets hue and chroma; the
@@ -116,7 +115,8 @@ leaving a matching icon alone. `app.config.ts` bundles the PNGs in
 every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates need a native build.
 
-**Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
+**Data visualisation:** the ramp grades **more**. Exercise stacks follow
+[[comparison.colour-scale]]. `viz0` is
 empty / rest, `viz1`…`viz4` weakest to strongest; even preset L\*
 steps, so each bucket reads as "more" without hue; no step is `accent` or
 `record`. **Text on a `viz` ground is `ink`**,

@@ -5,7 +5,7 @@ appId: com.dinoderek.mobile
 # survives Back, and names/all three charts/chronological History open normally.
 # A long current name wraps, and every primary/secondary muscle stays reachable
 # in the bounded Options body (scroll to the last link and back to History).
-# On iOS, the legend can be dragged in landscape and the plot still opens week details.
+# On iOS, dragging moves the legend and week details temporarily hide it.
 # Why device: responder cancellation/release, native stack restoration, viewport
 # clipping, rotation and gesture hit-testing require the native runtime.
 # Jest counterparts: __tests__/combined-exercise-progress-local-data.test.tsx,
@@ -131,7 +131,11 @@ appId: com.dinoderek.mobile
       - tapOn: { id: "stats-exercise-history-timeline-zoom-in" }
       - tapOn: { id: "stats-exercise-history-timeline-plot" }
       - assertVisible: { id: "stats-exercise-history-timeline-details-close" }
+      - assertNotVisible: { id: "stats-exercise-history-timeline-legend-move" }
+      - takeScreenshot: "12b3-landscape-week-details"
       - tapOn: { id: "stats-exercise-history-timeline-details-close" }
+      - assertVisible: { id: "stats-exercise-history-timeline-legend-move" }
+      - takeScreenshot: "12b4-landscape-restored-legend"
       - tapOn: { id: "stats-exercise-history-timeline-collapse" }
       - setOrientation: PORTRAIT
       - extendedWaitUntil:

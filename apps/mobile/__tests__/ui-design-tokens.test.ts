@@ -1,8 +1,6 @@
 import * as ui from '@/components/ui';
 import { uiFonts, uiGeometry, uiTypography } from '@/components/ui';
-import { defaultThemeSeeds, generateRoles, timelineExerciseFills, type ThemeMode } from '@/components/ui/theme';
-import { customFromSeeds, generateCustomRoles } from '@/components/ui/theme-custom';
-import { appearanceRoles, DEFAULT_APPEARANCE, themePresets } from '@/components/ui/theme-presets';
+import { defaultThemeSeeds, generateRoles, type ThemeMode } from '@/components/ui/theme';
 import { withNeutrals } from '@/components/ui/theme-neutrals';
 import * as tokens from '@/components/ui/tokens';
 
@@ -69,21 +67,6 @@ describe('design-language tokens', () => {
         'well',
       ].sort(),
     );
-  });
-
-  it('keeps all five Timeline exercise colours distinguishable on the plot and legend', () => {
-    const presets = themePresets.flatMap(({ id }) => MODES.map(mode => appearanceRoles({ ...DEFAULT_APPEARANCE, theme: id }, mode)));
-    const custom = customFromSeeds(defaultThemeSeeds, 'light');
-    const middleGround = generateCustomRoles({ ...custom, background: { ...custom.background, lightness: 44, depth: 300 } });
-    for (const roles of [...presets, middleGround]) {
-      const fills = timelineExerciseFills(roles);
-      expect(fills).toHaveLength(5);
-      fills.forEach((fill, index) => {
-        expect(contrastRatio(fill, roles.paper)).toBeGreaterThanOrEqual(3);
-        expect(contrastRatio(fill, roles.surface)).toBeGreaterThanOrEqual(3);
-        for (const other of fills.slice(0, index)) expect(deltaE(fill, other)).toBeGreaterThanOrEqual(20);
-      });
-    }
   });
 
   it('carries the geometry of §4', () => {

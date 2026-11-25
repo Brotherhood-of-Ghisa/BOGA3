@@ -91,9 +91,9 @@ attenuated selection colour, keep selection, and omit legends. Wireframe adds
 contrasting triangle edges over fills and selected anatomy.
 
 Heatmap legends precede charts. Muscle Sets uses capped `% of target`;
-others use `% of max` over History look-back (daily Grid values, weekly
-sums or strength bests). Empty/all-zero stays neutral. The combined-exercise
-landscape Timeline uses exercise colours and a movable legend.
+others use `% of max` over History look-back (daily Grid, weekly sums or
+strength bests). Empty/all-zero samples stay neutral. Landscape exercise stacks use
+theme intensity shades. The movable legend hides during week inspection.
 
 Why: Sets show goal attainment; Volume shows period change; history shows training intensity.
 Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;
