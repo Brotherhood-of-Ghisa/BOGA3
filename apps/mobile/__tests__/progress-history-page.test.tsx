@@ -527,7 +527,7 @@ describe('ProgressHistoryScreen', () => {
       expect(mockSetParams).not.toHaveBeenCalled();
       fireEvent.press(title);
       fireEvent.press(screen.getByTestId('progress-history-muscle-option-triceps'));
-      expect(mockSetParams).toHaveBeenCalledWith({ muscleGroupId: 'triceps' });
+      expect(mockSetParams).toHaveBeenCalledWith({ muscleGroupId: 'triceps', metric: 'volume', gymId: undefined });
       expect(mockPush).not.toHaveBeenCalled();
     } finally {
       Object.assign(mockCatalog, { muscleSetup: undefined });

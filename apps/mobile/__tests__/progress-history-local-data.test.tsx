@@ -35,7 +35,8 @@ let mockScreenOptions: {
   headerTitle?: (props: { children: string }) => mockReact.ReactNode;
   headerRight?: () => mockReact.ReactNode;
 } = {};
-let mockSearchParams: Record<string, string | string[]> = {};
+let mockSearchParams: Record<string, string | string[] | undefined> = {};
+const mockSetParams = (params: typeof mockSearchParams) => { mockSearchParams = { ...mockSearchParams, ...params }; };
 const mockPush = jest.fn();
 const mockDismissTo = jest.fn();
 const mockFocusCleanups = new Set<() => void>();
@@ -53,7 +54,7 @@ jest.mock('expo-router', () => ({
     },
   },
   useLocalSearchParams: () => mockSearchParams,
-  useRouter: () => ({ push: mockPush, dismissTo: mockDismissTo }),
+  useRouter: () => ({ push: mockPush, dismissTo: mockDismissTo, setParams: mockSetParams }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => {
       mockFocusCallbacks.add(callback);
@@ -73,7 +74,7 @@ import * as statsRepository from '@/src/data/stats';
 import * as sessionEntry from '@/src/session-entry/coordinator';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { seedStandardCatalogFixture } from '@/src/maestro/standard-catalog-fixture';
-import { ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
+import { ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { historyDetailHref, progressHistoryHref } from '@/src/navigation/routes';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, historyWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
@@ -829,6 +830,37 @@ describe('The history page over real data', () => {
     expect((await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).length).toBeGreaterThan(0);
     expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
     expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Sec');
+  });
+
+  it('keeps the current metric, gym and independent secondary choices when switching muscles from the title', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ progressCountSecondary: false, muscleVolumePrimaryOnly: false }));
+    mockSearchParams = {
+      muscleGroupId: 'quads', gymId: EXERCISE_BLOCK_HISTORY_FIXTURE.gymId,
+      metric: 'volume', secondary: 'hidden', secondaryVolume: 'shown',
+    };
+    const page = render(<ProgressHistoryRoute />);
+    const chip = () => screen.getByTestId(SECONDARY_CHIP);
+    await screen.findByTestId(SECONDARY_CHIP);
+    chooseGym('muscle', 'all');
+    fireEvent.press(chip());
+    expect(chip()).toHaveTextContent('Pri');
+    await chooseMetric('muscle', 'workingSetCount');
+    fireEvent.press(chip());
+    expect(chip()).toHaveTextContent('Sec');
+
+    fireEvent.press(screen.getByTestId('progress-history-title'));
+    fireEvent.press(screen.getByTestId('progress-history-muscle-option-glutes_max'));
+    page.rerender(<ProgressHistoryRoute />);
+
+    expect(await screen.findByTestId('progress-history-title-text')).toHaveTextContent('Glute Max');
+    expect(shownMetric('muscle')).toBe('workingSetCount');
+    expect(chip()).toHaveTextContent('Sec');
+    await waitFor(() => expect(screen.getByTestId(GYM_BUTTON.muscle)).toHaveProp('accessibilityLabel', 'Gym: All gyms'));
+    await chooseMetric('muscle', 'totalVolume');
+    expect(chip()).toHaveTextContent('Pri');
+    expect(getAccountLocalPreferenceState().values).toMatchObject({ progressCountSecondary: false, muscleVolumePrimaryOnly: false });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('combines the linked gym with secondary sets, keeping the gym rows while either choice re-reads', async () => {
