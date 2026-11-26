@@ -30,7 +30,8 @@ import type { CalendarHeatmapMetric } from '@/src/data';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
 import {
-  PROGRESS_HISTORY_METRIC_PARAMS, PROGRESS_HISTORY_PRIMARY_ONLY_PARAM, exerciseHistoryHref, progressHistoryHref, rmCurveHref,
+  PROGRESS_HISTORY_METRIC_PARAMS, PROGRESS_HISTORY_PRIMARY_ONLY_PARAM, encodeProgressHistorySecondary,
+  exerciseHistoryHref, progressHistoryHref, rmCurveHref,
 } from '@/src/navigation/routes';
 import { reportedExercisesMuscles, reportedMuscleName } from '@/src/exercise-catalog/reported-muscles';
 import { parseProgressSelection } from '@/src/utils/progress-selection';
@@ -386,15 +387,21 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   const shownMetric = subject?.kind === 'muscle' || subject?.kind === 'exercises' ? muscleMetric : metric;
 
   const { catalog, muscleSetup, exercise, selection, name, muscleLinks } = useHistorySubjectCatalog(subject);
-  // A muscle page's title switches in place to another of the user's muscles,
-  // keeping this visit's metric, gym and secondary-set choices.
+  // A new muscle id remounts the page. Carry this visit's choices in the
+  // params while leaving omitted counting choices to inherit Settings.
   const titleSwitch = useMemo(
     () => subject?.kind === 'muscle' && subject.id ? {
       muscles: muscleSetup.muscles,
       currentId: subject.id,
-      onChoose: (muscleGroupId: string) => router.setParams({ muscleGroupId }),
+      onChoose: (muscleGroupId: string) => router.setParams({
+        muscleGroupId,
+        metric: PROGRESS_HISTORY_METRIC_PARAMS[muscleMetric],
+        gymId: encodeGymRouteParam(gymId),
+        ...(chosenSecondary === null ? {} : { secondary: encodeProgressHistorySecondary(chosenSecondary) }),
+        ...(chosenSecondaryVolume === null ? {} : { secondaryVolume: encodeProgressHistorySecondary(chosenSecondaryVolume) }),
+      }),
     } : undefined,
-    [muscleSetup, router, subject]
+    [muscleSetup, router, subject, muscleMetric, gymId, chosenSecondary, chosenSecondaryVolume]
   );
   // Stable, so the muscle window is not rebuilt on every render of the page.
   const muscleTargets = useMemo(

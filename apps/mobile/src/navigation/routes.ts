@@ -105,6 +105,8 @@ export const PROGRESS_HISTORY_METRIC_PARAMS: Record<CalendarHeatmapMetric, strin
 
 /** `?secondary=` on a muscle's history: Progress counted primary work only ([[muscle.secondary-filter]]). */
 export const PROGRESS_HISTORY_PRIMARY_ONLY_PARAM = 'hidden';
+export const encodeProgressHistorySecondary = (countSecondary: boolean): string =>
+  countSecondary ? 'shown' : PROGRESS_HISTORY_PRIMARY_ONLY_PARAM;
 
 type MuscleHistoryScope = (
   | { muscleGroupId: string; muscleGroupIds?: never }
@@ -129,9 +131,9 @@ export const progressHistoryHref = (
   const gym = encodeGymRouteParam(subject.gymId);
   const carried = metric ? `&metric=${PROGRESS_HISTORY_METRIC_PARAMS[metric]}` : '';
   const secondary = muscle && subject.countSecondary !== undefined
-    ? `&secondary=${subject.countSecondary ? 'shown' : PROGRESS_HISTORY_PRIMARY_ONLY_PARAM}` : '';
+    ? `&secondary=${encodeProgressHistorySecondary(subject.countSecondary)}` : '';
   const volume = muscle && subject.countSecondaryVolume !== undefined
-    ? `&secondaryVolume=${subject.countSecondaryVolume ? 'shown' : PROGRESS_HISTORY_PRIMARY_ONLY_PARAM}` : '';
+    ? `&secondaryVolume=${encodeProgressHistorySecondary(subject.countSecondaryVolume)}` : '';
   return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}${secondary}${volume}${view ? `&view=${view}` : ''}` as Href;
 };
 
