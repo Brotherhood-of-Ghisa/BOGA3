@@ -16,7 +16,6 @@ import {
 } from '@/components/today';
 import { groupsStreamPath } from '@/src/groups';
 import { SIGN_IN_ROUTE, progressHistoryHref } from '@/src/navigation/routes';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 export type TodayScreenProps = {
   isFocused?: boolean;
@@ -35,12 +34,12 @@ const systemNow = () => new Date();
 // opening on You.
 export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = systemNow, groupState }: TodayScreenProps) {
   const router = useRouter();
-  const { values: { progressCountSecondary } } = useAccountLocalPreferenceState();
-  const { state: planState, retry: retryPlan } = useTodayPlan({ isFocused, load: loadPlan, now });
+  const { state: planState, retry: retryPlan, setCountSecondary } = useTodayPlan({ isFocused, load: loadPlan, now });
   const planHandlers = {
     now: now(),
-    onOpenMuscle: (muscleGroupId: string) =>
-      router.push(progressHistoryHref({ muscleGroupId, countSecondary: progressCountSecondary }, 'workingSetCount')),
+    onChangeCountSecondary: setCountSecondary,
+    onOpenMuscle: (muscleGroupId: string, countSecondary: boolean) =>
+      router.push(progressHistoryHref({ muscleGroupId, countSecondary }, 'workingSetCount')),
     onOpenPlan: (planId: string) => router.push(`/session-plan/${encodeURIComponent(planId)}` as Href),
     onOpenProgress: () => router.push('/progress'),
     onOpenPlanner: () => router.push('/planner'),
@@ -120,11 +119,13 @@ const groupHasCards = (state: TodayGroupState) =>
 function TodayPlanSection({
   state,
   onRetry,
+  onOpenMuscle,
   ...handlers
 }: {
   state: TodayPlanState;
   now: Date;
-  onOpenMuscle: (muscleGroupId: string) => void;
+  onChangeCountSecondary: (countSecondary: boolean) => void;
+  onOpenMuscle: (muscleGroupId: string, countSecondary: boolean) => void;
   onOpenPlan: (planId: string) => void;
   onOpenProgress: () => void;
   onOpenPlanner?: () => void;
@@ -145,7 +146,8 @@ function TodayPlanSection({
       />
     );
   }
-  return <TodayPlanCards {...handlers} plan={state.plan} />;
+  return <TodayPlanCards {...handlers} plan={state.plan} countSecondary={state.countSecondary}
+    onOpenMuscle={id => onOpenMuscle(id, state.countSecondary)} />;
 }
 
 function TodayProgressSection({

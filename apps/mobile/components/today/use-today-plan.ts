@@ -8,13 +8,13 @@ import { loadTodayPlan, type TodayPlan, type TodayPlanOptions } from '@/src/toda
 
 import { useDailyReread } from './use-daily-reread';
 
-/** Reads the Plan page at `now`, against Settings' weekly targets and secondary sets. */
+/** Reads the Plan page at `now`, against the saved targets and Recovery's counting mode. */
 export type TodayPlanLoader = (now: Date, options: TodayPlanOptions) => Promise<TodayPlan>;
 
 export type TodayPlanState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'loaded'; plan: TodayPlan };
+  | { status: 'loaded'; plan: TodayPlan; countSecondary: boolean };
 
 export type UseTodayPlanInput = {
   isFocused: boolean;
@@ -26,14 +26,21 @@ const systemNow = () => new Date();
 
 /**
  * The Plan page's read, again on every focus, at local midnight, on return to
- * the foreground and when Recovery days, a weekly target or the secondary-set default changes.
+ * the foreground and when Recovery days, a weekly target or its counting mode changes.
  * Per-muscle targets ([[muscle.weekly-targets]]) wait for the catalogue, which
  * holds the muscle setup whose reported ids they are keyed by.
  * The first read shows loading; a re-read keeps the page until it lands.
  */
 export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow }: UseTodayPlanInput) {
   const { accountRevision: context, values } = useAccountLocalPreferenceState();
-  const { weeklyWorkingSetTarget: weeklyTarget, progressCountSecondary: countSecondary, recoveryDays } = values;
+  const { weeklyWorkingSetTarget: weeklyTarget, progressCountSecondary: defaultCountSecondary, recoveryDays } = values;
+  const [counting, setCounting] = useState({ context, defaultCountSecondary, override: null as boolean | null });
+  // A new account or changed default starts Recovery from Settings again.
+  if (counting.context !== context || counting.defaultCountSecondary !== defaultCountSecondary) {
+    setCounting({ context, defaultCountSecondary, override: null });
+  }
+  const countSecondary = counting.override ?? defaultCountSecondary;
+  const setCountSecondary = (override: boolean) => setCounting(current => ({ ...current, override }));
   const catalog = useExerciseCatalog();
   const calculationRevision = useBodyWeightContextRevision();
   const calculationInputs = [calculationRevision, catalog.exercises, catalog.muscleGroups] as const;
@@ -58,7 +65,7 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
     const isCurrent = () => generationRef.current === generation;
     return loadRef.current(nowRef.current(), { weeklyTarget, overrides: JSON.parse(overridesKey) as Record<string, number>, countSecondary, recoveryDays }).then(
       (plan) => {
-        if (isCurrent()) setResult({ context, state: { status: 'loaded', plan } });
+        if (isCurrent()) setResult({ context, state: { status: 'loaded', plan, countSecondary } });
       },
       (error: unknown) => {
         if (isCurrent()) {
@@ -88,5 +95,5 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
   const state: TodayPlanState = perMuscle && catalog.status === 'error'
     ? { status: 'error', message: catalog.lastError ?? 'Unable to load your muscle targets' }
     : result.context === context ? result.state : { status: 'loading' };
-  return { state, retry };
+  return { state, retry, setCountSecondary };
 }

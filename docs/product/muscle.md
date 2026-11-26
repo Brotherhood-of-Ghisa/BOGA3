@@ -38,15 +38,16 @@ in `apps/mobile/src/data/muscle-analytics.ts`; the whole-set display is
 
 ### muscle.secondary-filter · presentation · accepted
 
-Two account-synced settings govern every muscle figure: `Sets: Primary only`
+Two account-synced settings set the defaults for muscle figures: `Sets: Primary only`
 (new-account default on) and `Volume: Primary only` (default off). Existing
 accounts preserve their old secondary Sets choice; the new Volume choice
 starts off. Explicit saved choices survive upgrades. Targets stay unchanged.
-Progress offers independent visit overrides; history inherits both and its
+Progress offers independent visit overrides. Recovery offers a visit override
+for Sets. Muscle history inherits the choices its source passes, and its
 `Sec`/`Pri` chip changes only the displayed metric. Filtering never redistributes
 Volume. Secondary-only work may show zero Sets in Recovery and positive Volume.
 
-Code: `apps/mobile/src/preferences/`; `collectMuscleSetContributions` in
+Code: `apps/mobile/src/preferences/`, `apps/mobile/components/today/use-today-plan.ts`; `collectMuscleSetContributions` in
 `apps/mobile/src/data/muscle-analytics.ts`.
 
 ### muscle.report-groups · definition · accepted

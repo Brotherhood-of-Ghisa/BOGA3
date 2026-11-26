@@ -32,7 +32,7 @@ import * as exerciseCatalogData from '@/src/data/exercise-catalog';
 import { applyBroadTemplate, clearCombinedMuscles, setMuscleTracked } from '@/src/data/muscle-report-settings';
 import type { Transaction } from '@/src/data/clock';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
-import { refreshAccountLocalSyncedPreferences, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
+import { getAccountLocalPreferenceState, refreshAccountLocalSyncedPreferences, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
 import { preferenceKey } from '@/src/preferences/storage';
 import { Storage } from 'expo-sqlite/kv-store';
@@ -536,6 +536,70 @@ describe('Today: the Plan page over real data', () => {
 
     fireEvent.press(text('today-plan-muscle-chest'));
     expect(mockPush).toHaveBeenCalledWith('/progress-history?muscleGroupId=chest&metric=sets&secondary=hidden');
+  });
+
+  it('switches Recovery counting in place and opens History using the mode that produced the visible counts', async () => {
+    await bootLocalApp();
+    await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 1 }]);
+    const loadPlan = jest.fn(loadTodayPlan);
+    let finishRead!: () => void;
+    const view = await renderToday({ loadPlan });
+    const chip = () => within(text('today-plan-recovery-card')).getByRole('switch', { name: 'Sets: Primary only' });
+    const triceps = () => text('today-plan-muscle-triceps');
+    const primary = '/progress-history?muscleGroupId=triceps&metric=sets&secondary=hidden';
+    const secondary = '/progress-history?muscleGroupId=triceps&metric=sets&secondary=shown';
+    expect(chip()).toHaveTextContent('Pri');
+    expect(chip()).toHaveProp('accessibilityState', { checked: true });
+    expect(muscleRows().indexOf('triceps')).toBeLessThan(muscleRows().indexOf('quads'));
+
+    loadPlan.mockImplementationOnce((now, options) => new Promise(resolve => {
+      finishRead = () => resolve(loadTodayPlan(now, options));
+    }));
+    fireEvent.press(chip());
+    expect(loadPlan).toHaveBeenLastCalledWith(NOW, expect.objectContaining({ countSecondary: true }));
+    expect(chip()).toHaveTextContent('Pri');
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('0/8');
+    fireEvent.press(triceps());
+    expect(mockPush).toHaveBeenLastCalledWith(primary);
+
+    await act(async () => finishRead());
+    await waitFor(() => expect(chip()).toHaveTextContent('Sec'));
+    expect(chip()).toHaveProp('accessibilityState', { checked: false });
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('½');
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('½/8');
+    expect(muscleRows().indexOf('triceps')).toBeGreaterThan(muscleRows().indexOf('quads'));
+    fireEvent.press(triceps());
+    expect(mockPush).toHaveBeenLastCalledWith(secondary);
+    expect(getAccountLocalPreferenceState().values.progressCountSecondary).toBe(false);
+
+    view.rerender(<TodayScreen groupState={signedOut} isFocused={false} loadPlan={loadPlan} now={clock} />);
+    view.rerender(<TodayScreen groupState={signedOut} loadPlan={loadPlan} now={clock} />);
+    expect(loadPlan).toHaveBeenLastCalledWith(NOW, expect.objectContaining({ countSecondary: true }));
+
+    fireEvent.press(chip());
+    await waitFor(() => expect(chip()).toHaveTextContent('Pri'));
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('');
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('0/8');
+    fireEvent.press(triceps());
+    expect(mockPush).toHaveBeenLastCalledWith(primary);
+  });
+
+  it('clears the Recovery override when the saved choice changes or another account opens Today', async () => {
+    await renderToday();
+    const chip = () => text('today-plan-recovery-secondary');
+    expect(chip()).toHaveTextContent('Pri');
+    fireEvent.press(chip());
+    await waitFor(() => expect(chip()).toHaveTextContent('Sec'));
+
+    await act(async () => updatePreferences({ progressCountSecondary: true }));
+    await act(async () => updatePreferences({ progressCountSecondary: false }));
+    await waitFor(() => expect(chip()).toHaveTextContent('Pri'));
+
+    fireEvent.press(chip());
+    await waitFor(() => expect(chip()).toHaveTextContent('Sec'));
+    Storage.setItemSync(preferenceKey('account:B', 'progressCountSecondary'), 'false');
+    await act(async () => setAccountLocalPreferenceAccount('B', true));
+    await waitFor(() => expect(chip()).toHaveTextContent('Pri'));
   });
 
   it('shows targets a sync pull changes while the page is open ([[muscle.weekly-targets]])', async () => {
