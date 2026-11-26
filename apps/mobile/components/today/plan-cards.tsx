@@ -9,6 +9,7 @@ import { FigureText } from '@/components/ui/figure-text';
 import { uiCorner, uiHairline } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { uiMark } from '@/components/ui/marks';
+import { SecondarySetsChip } from '@/components/stats/secondary-sets-chip';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles, useBarFills } from '@/components/ui/theme-context';
@@ -21,6 +22,8 @@ import { formatClockTime, formatShortDate } from '@/src/utils/local-time';
 
 export type TodayPlanCardsProps = {
   plan: TodayPlan;
+  countSecondary: boolean;
+  onChangeCountSecondary: (countSecondary: boolean) => void;
   /** Opens one muscle's progress history. */
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenProgress: () => void;
@@ -193,7 +196,7 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle, dayWidths }
 // appear. Today has an accent label and border-free cells. At/above-target
 // totals turn green; the numeric ratio also communicates whether it is met.
 // The first rows show and the rest scroll, with no indicator over the targets.
-function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
+function RecoveryCard({ plan, countSecondary, onChangeCountSecondary, onOpenMuscle, onOpenProgress }: TodayPlanCardsProps) {
   const { accountRevision, values: { progressGrouped: grouped } } = useAccountLocalPreferenceState();
   const styles = useStyles();
   const text = useUiText();
@@ -212,9 +215,12 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
   return (
     <Card style={[styles.card, styles.fillCard]} testID="today-plan-recovery-card">
       <View style={styles.header}>
-        <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, tone.ink]}>
-          Recovery
-        </Text>
+        <View style={styles.recoveryTitle}>
+          <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, tone.ink]}>
+            Recovery
+          </Text>
+          <SecondarySetsChip value={countSecondary} onChange={onChangeCountSecondary} testID="today-plan-recovery-secondary" />
+        </View>
         <ActionButton label="Progress" onPress={onOpenProgress} testID="today-plan-progress-button" variant="link" />
       </View>
       <View style={[styles.columns, styles.muscleRowLayout, compact ? styles.compactRow : null]}>
@@ -405,6 +411,7 @@ const useStyles = makeStyles((roles) => ({
     minHeight: uiGeometry.tapTarget,
     marginRight: -uiSpace.sm,
   },
+  recoveryTitle: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   columns: {
     paddingBottom: uiSpace.xs,
   },

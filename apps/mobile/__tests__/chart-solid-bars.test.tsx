@@ -123,7 +123,8 @@ describe('the recovery card’s trained days', () => {
   };
   // Rows are grouped by family by default: the family opens to its muscles.
   const renderCards = () => {
-    renderWithTheme(<TodayPlanCards now={day(3)} onOpenMuscle={() => {}} onOpenPlan={() => {}} onOpenProgress={() => {}} plan={plan} />);
+    renderWithTheme(<TodayPlanCards now={day(3)} onOpenMuscle={() => {}} onOpenPlan={() => {}} onOpenProgress={() => {}}
+      plan={plan} countSecondary={false} onChangeCountSecondary={() => {}} />);
     const family = screen.queryByTestId('today-plan-group-Chest');
     if (family) fireEvent.press(family);
   };
