@@ -675,6 +675,16 @@ check "final: reps stay public, the raw weight does not" \
      == [[12, false, null], [10, false, null]]' --arg c "${CH_PULL}"
 check "final: other exercises keep their kg" \
   '[.challenges[] | select(.challenge.challenge_id == $c) | .standings[] | .unavailable] | all(. == false)' --arg c "${CH_E1RM}"
+# D moves the snapshotted Bench set onto their Pull-up, which counts
+# bodyweight: the set's current exercise hides its kg too, place kept.
+next_cuam
+push "${D_TOKEN}" "D's bench block moved onto the pull-up" \
+  "$(e_se "${D_MAIN}-bench" "${D_MAIN}" "${T}-D-pull" 0 Pull-up "${CUAM}")"
+drain "the moved set"
+results "${A_TOKEN}" "${MEET}"
+check "final: a set moved onto an exercise that counts bodyweight hides its kg, place kept" \
+  '[.challenges[] | select(.challenge.challenge_id == $c) | .standings[] | select(.member.user_id == $d)
+     | [.place, .value, .unavailable, .set.weight_value]] == [[4, null, true, null]]' --arg c "${CH_E1RM}" --arg d "${D_UID}"
 check "final: record figures follow the same rule" \
   '[.records[] | select(.group_exercise_id == $x) | .boards[] | select(.unit == "kg" or .unit == "kg_reps") | .value] | all(. == null)' \
   --arg x "${PULL}"

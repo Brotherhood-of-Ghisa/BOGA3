@@ -510,13 +510,18 @@ end $migration$;
 -- 5. Reads and Refresh results.
 -- ---------------------------------------------------------------------------
 
--- The current kg rule for one member's figures on one group exercise: the
--- groups.kg-disclosure answer, plus a kg score's exercise now counting
--- bodyweight (as CoW results).
+-- The current kg rule for one member's figures from one set: the
+-- groups.kg-disclosure answer for the exercise the set was scored on and for
+-- the exercise it is on now (as CoW results), plus a kg score's group exercise
+-- now counting bodyweight.
 create function app_public.group_meet_hides_kg(p_group uuid, p_member uuid, p_definition text,
-  p_group_exercise uuid) returns boolean
+  p_group_exercise uuid, p_set_id text) returns boolean
 language sql stable set search_path = app_public, pg_temp as $$
   select app_public.group_competition_redacts_exercise(array[p_group], p_member, p_definition)
+    or exists (select 1 from app_public.exercise_sets es join app_public.session_exercises se
+        on se.owner_user_id = es.owner_user_id and se.id = es.session_exercise_id
+      where es.owner_user_id = p_member and es.id = p_set_id
+        and app_public.group_competition_redacts_exercise(array[p_group], p_member, se.exercise_definition_id))
     or exists (select 1 from app_public.groups g join app_public.group_exercises ge on ge.group_id = g.id
       where g.id = p_group and g.bodyweight_calculations_enabled and ge.id = p_group_exercise
         and ge.bodyweight_contribution > 0);
@@ -535,7 +540,7 @@ create function app_public.group_meet_standing_json(p_group uuid, p_group_exerci
   p_place integer, p_set_id text, p_session_id text, p_definition text, p_performance jsonb,
   p_value numeric, p_unit text, p_certified boolean) returns jsonb
 language sql stable set search_path = app_public, pg_temp as $$
-  with rule as (select app_public.group_meet_hides_kg(p_group, p_member, p_definition, p_group_exercise) as hides)
+  with rule as (select app_public.group_meet_hides_kg(p_group, p_member, p_definition, p_group_exercise, p_set_id) as hides)
   select jsonb_build_object('place', p_place, 'member', app_public.group_member_ref_json(p_member),
     'current_member', app_public.group_meet_current_member(p_group, p_member),
     'value', case when rule.hides and p_unit in ('kg', 'kg_reps') then null else p_value end,
@@ -567,7 +572,7 @@ language sql stable set search_path = app_public, pg_temp as $$
       (select se.exercise_definition_id from app_public.exercise_sets es
          join app_public.session_exercises se on se.owner_user_id = es.owner_user_id and se.id = es.session_exercise_id
         where es.owner_user_id = x.member_user_id and es.id = r.record_json->>'set_id'),
-      (r.record_json->'group_exercise'->>'group_exercise_id')::uuid) as hides) hide;
+      (r.record_json->'group_exercise'->>'group_exercise_id')::uuid, r.record_json->>'set_id') as hides) hide;
 $$;
 
 -- A meet's results for a current member: per live challenge the ranked rows,
