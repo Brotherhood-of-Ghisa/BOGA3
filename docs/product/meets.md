@@ -19,7 +19,7 @@ Code: `apps/mobile/src/data/session-meet-links.ts`;
 `supabase/migrations/20261127213000_session_meet_links.sql`;
 `supabase/migrations/20261127202908_group_meet_storage.sql` (online Join).
 Pending: the app's meet and session Join/Leave controls (meet Leave must pull,
-then call `leaveMeetSessions`) and meet scoring are not built yet.
+then call `leaveMeetSessions`) are not built yet.
 
 ### meets.results · definition · accepted
 
@@ -33,5 +33,5 @@ does); the podium is places 1–3.
 
 Why: a final result must not drift when an old session is edited later, except
 by an explicit refresh.
-Code: `supabase/functions/group-eval/`.
-Pending: the cutoff snapshot and refresh are not built yet.
+Code: `supabase/migrations/20261127223000_group_meet_scoring.sql`;
+`supabase/functions/group-eval/` (runs the timed transitions).

@@ -9,6 +9,7 @@ import path from 'node:path';
 import {
   CLAIM_LIMIT,
   MAX_CLAIM_ROUNDS,
+  MEET_ADVANCE_LIMIT,
   RULES_REQUEUE_LIMIT,
   runGroupEval,
   type Rpc,
@@ -34,6 +35,7 @@ test.each([
   ['CLAIM_LIMIT', CLAIM_LIMIT],
   ['MAX_CLAIM_ROUNDS', MAX_CLAIM_ROUNDS],
   ['RULES_REQUEUE_LIMIT', RULES_REQUEUE_LIMIT],
+  ['MEET_ADVANCE_LIMIT', MEET_ADVANCE_LIMIT],
 ])('the mirror uses the Edge drain %s', (name, value) => {
   expect(edgeSource).toContain(`const ${name} = ${value};`);
 });
@@ -67,7 +69,7 @@ test('one drain runs session jobs, then comparison jobs, and counts what each ev
   expect(calls.map((call) => call.name)).toEqual([
     'group_eval_requeue_rules', 'group_eval_claim', 'group_eval_session_rows', 'group_eval_complete', 'group_eval_claim',
     'group_metric_eval_claim', 'group_metric_eval_prepare', 'group_metric_eval_publish', 'group_metric_eval_claim',
-    'group_cow_eval_claim',
+    'group_cow_eval_claim', 'group_meet_eval_advance',
   ]);
   expect(calls[3].args).toEqual({ p_job_id: 1, p_generation: 3, p_facts: [] });
   expect(calls[0].args).toEqual({ p_rules_version: GROUP_EVAL_RULES_VERSION, p_limit: RULES_REQUEUE_LIMIT });
@@ -144,4 +146,19 @@ test('a failure that cannot be recorded is reported and the drain goes on, as th
     'group_eval job 1: boom', 'group_eval_fail job 1: fenced', 'metric job 9: late', 'group_metric_eval_fail job 9: gone',
   ]);
   expect(calls.filter((call) => call.name === 'group_metric_eval_claim')).toHaveLength(2);
+});
+
+test('meet transitions run once, after every queue, and count what fired and failed', async () => {
+  const calls: Call[] = [];
+  const rpc = fakeRpc({
+    group_meet_eval_advance: [{ on: 2, results: 1, snapshots: 1, deferred: 3, failed: 1 }],
+  }, calls);
+
+  const summary = await runGroupEval(rpc);
+
+  const advances = calls.filter((call) => call.name === 'group_meet_eval_advance');
+  expect(advances).toEqual([{ name: 'group_meet_eval_advance', args: { p_limit: MEET_ADVANCE_LIMIT } }]);
+  expect(calls[calls.length - 1].name).toBe('group_meet_eval_advance');
+  // Deferred cutoffs are not transitions: they wait for the evaluator.
+  expect(summary).toMatchObject({ meetTransitions: 4, meetFailed: 1 });
 });
