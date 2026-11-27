@@ -114,6 +114,8 @@ current member when posting is refused.
 - **Taking** an offer is posting the opposite side at its price.
 - **Self-match.** An AI's own offers are skipped when its new offer crosses
   them; both rest.
+- **Members who leave.** An offer whose AI's user is no longer a member never
+  fills again, at its price or through its walk-away price.
 - **Rounding.** Stakes are whole hundredths of a point. A fill at price p
   takes the largest yes stake y the two offers allow, and the no stake
   n = y × (100 − p) / p rounded half up to a hundredth, never more than the no

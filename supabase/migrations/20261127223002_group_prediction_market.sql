@@ -155,15 +155,31 @@ language sql stable set search_path = app_public, pg_temp as $$
     'enabled', coalesce((select s.enabled from app_public.group_prediction_settings s where s.group_id = p_group), false));
 $$;
 
+-- The OAuth client's name is chosen by whoever registered the client, and
+-- other AIs read it: control characters are dropped and it is cut to 60.
+create function app_public.group_prediction_client_name(p_client_id text) returns text
+language sql stable set search_path = app_public, pg_temp as $$
+  select nullif(left(btrim(regexp_replace(c.client_name, '[[:cntrl:]]', '', 'g')), 60), '')
+    from auth.oauth_clients c where c.id::text = p_client_id;
+$$;
+
 create function app_public.group_prediction_bettor_json(p_bettor uuid) returns jsonb
 language sql stable set search_path = app_public, pg_temp as $$
   select jsonb_build_object('bettor_id', b.id, 'member', app_public.group_member_ref_json(b.user_id),
-    'client_name', nullif(btrim(c.client_name), ''),
+    'client_name', app_public.group_prediction_client_name(b.client_id),
     'display_name', coalesce((select nullif(btrim(p.username), '') from app_public.user_profiles p where p.id = b.user_id), 'Member')
-      || ' · ' || coalesce(nullif(btrim(c.client_name), ''), 'AI'))
+      || ' · ' || coalesce(app_public.group_prediction_client_name(b.client_id), 'AI'))
   from app_public.group_prediction_bettors b
-  left join auth.oauth_clients c on c.id::text = b.client_id
   where b.id = p_bettor;
+$$;
+
+-- An offer meets others only while its AI's user is a current member: a
+-- member who left can no longer withdraw, so nothing new may fill.
+create function app_public.group_prediction_bettor_current(p_bettor uuid, p_group uuid) returns boolean
+language sql stable set search_path = app_public, pg_temp as $$
+  select exists (select 1 from app_public.group_prediction_bettors b
+    join app_public.group_memberships gm on gm.user_id = b.user_id
+   where b.id = p_bettor and gm.group_id = p_group and gm.ended_at is null);
 $$;
 
 create function app_public.group_prediction_parameters_json(p_market app_public.group_prediction_markets) returns jsonb
@@ -514,6 +530,7 @@ begin
   -- it at the counter's price when inside that offer's walk-away price.
   if _answered.id is not null and _answered.walk_away_price is not null
      and _answered.remaining_cents > 0 and _answered.released_at is null
+     and app_public.group_prediction_bettor_current(_answered.bettor_id, p_group_id)
      and (case when _answered.side = 'yes' then p_price > _answered.price and p_price <= _answered.walk_away_price
                else p_price < _answered.price and p_price >= _answered.walk_away_price end) then
     _match := app_public.group_prediction_match(_offer.id, _answered.id, p_price, 'counter', p_now);
@@ -526,7 +543,7 @@ begin
   -- oldest, each at its own posted price.
   for _r in select o.id, o.price from app_public.group_prediction_offers o
      where o.market_id = _market.id and o.side <> _side and o.remaining_cents > 0 and o.released_at is null
-       and o.bettor_id <> _bettor
+       and o.bettor_id <> _bettor and app_public.group_prediction_bettor_current(o.bettor_id, p_group_id)
        and case when _side = 'yes' then o.price <= p_price else o.price >= p_price end
      order by case when _side = 'yes' then o.price else -o.price end, o.seq loop
     exit when (select o.remaining_cents from app_public.group_prediction_offers o where o.id = _offer.id) = 0;

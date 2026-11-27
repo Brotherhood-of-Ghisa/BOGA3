@@ -34,7 +34,10 @@
 #     counters refused;
 #   - stake: open + matched capped at 100.00 per AI, group and week; withdraw
 #     frees only the unmatched remainder; another AI's offer is NOT_FOUND;
-#   - concurrency: two simultaneous crossing posts never over-fill.
+#   - concurrency: two simultaneous crossing posts never over-fill, and one
+#     AI's two simultaneous posts never pass the stake cap;
+#   - an offer of a member who has left never fills; a client name is
+#     stripped of control characters and cut to 60.
 #
 # Hermetic: per-run users and OAuth clients, deleted on exit with everything
 # they own.
@@ -183,7 +186,8 @@ provision ALEX alex
 provision BLAIR blair
 provision FORMER former
 provision STRANGER stranger
-for who in OWNER ADMIN ALEX BLAIR FORMER STRANGER; do
+provision LEAVER leaver
+for who in OWNER ADMIN ALEX BLAIR FORMER STRANGER LEAVER; do
   uid_var="${who}_UID"
   set_username "${!uid_var}" "pred-$(printf '%s' "${who}" | tr 'A-Z' 'a-z')-${RUN_TAG}"
 done
@@ -194,7 +198,7 @@ expect_ok "owner creates the group"
 GROUP="$(jq -r '.group_id' <<<"${BODY}")"
 rpc "${OWNER_TOKEN}" group_invite_get "$(settings_body "${GROUP}")"
 CODE="$(jq -r '.code' <<<"${BODY}")"
-for who in ADMIN ALEX BLAIR FORMER; do
+for who in ADMIN ALEX BLAIR FORMER LEAVER; do
   token_var="${who}_TOKEN"
   rpc "${!token_var}" group_join "$(jq -nc --arg c "${CODE}" '{p_code:$c}')"
   expect_ok "${who} joins"
@@ -233,6 +237,10 @@ add_bettor G1 "${BLAIR_UID}"
 add_bettor G2 "${ADMIN_UID}"
 add_bettor X "${FORMER_UID}"
 add_bettor S "${STRANGER_UID}"
+add_bettor L "${LEAVER_UID}" "Claude"
+add_bettor H "${OWNER_UID}"
+add_bettor N "${ALEX_UID}"
+run_psql "update auth.oauth_clients set client_name = 'Evil' || chr(10) || repeat('x', 80) where id = '${N_CLIENT}';" >/dev/null
 rpc "${FORMER_TOKEN}" group_leave "$(settings_body "${GROUP}")"
 expect_ok "former member leaves"
 
@@ -419,13 +427,13 @@ pass "offer fields: price, stake, side, walk-away, note bounds; notes never retu
 
 # --- matching ---------------------------------------------------------------------------
 
-M1="$(records 3)"
-post_ok "A1 rests a yes" A1 records_line "${M1}" yes 40 10
+BOOK1="$(records 3)"
+post_ok "A1 rests a yes" A1 records_line "${BOOK1}" yes 40 10
 A1_YES="${OFFER}"
 check "a lone offer rests" '.matches == [] and .offer.state == "open" and .offer.remaining == 10'
-post_ok "A1 rests a crossing no of its own" A1 records_line "${M1}" no 30 1
+post_ok "A1 rests a crossing no of its own" A1 records_line "${BOOK1}" no 30 1
 check "an AI never matches itself" '.matches == []'
-post_ok "B takes part of A1's yes" B records_line "${M1}" no 35 6
+post_ok "B takes part of A1's yes" B records_line "${BOOK1}" no 35 6
 check "crosses at the resting price, the remainder of A1 rests" \
   '.matches | length == 1 and .[0].price == 40 and .[0].yes_stake == 4 and .[0].no_stake == 6 and .[0].via == "cross"
    and .[0].yes_offer_id == $y and .[0].side == "no"' --arg y "${A1_YES}"
@@ -433,26 +441,26 @@ check "the counterparty is named username · client" '.matches[0].counterparty.d
   --arg n "pred-alex-${RUN_TAG} · Claude"
 check "B is filled" '.offer.state == "filled" and .offer.matched == 6 and .offer.remaining == 0'
 expect_sql "A1's yes keeps 6.00 resting" "select remaining_cents from app_public.group_prediction_offers where id = '${A1_YES}';" 600
-post_ok "A2, the same user's other AI, takes A1's yes" A2 records_line "${M1}" no 40 1.5
+post_ok "A2, the same user's other AI, takes A1's yes" A2 records_line "${BOOK1}" no 40 1.5
 check "two AIs of one user match" '.matches | length == 1 and .[0].yes_offer_id == $y and .[0].no_stake == 1.5 and .[0].yes_stake == 1' \
   --arg y "${A1_YES}"
 
-M2="$(records 4)"
-post_ok "A1 yes @50" A1 records_line "${M2}" yes 50 1; Y50="${OFFER}"
-post_ok "A1 yes @60 (older)" A1 records_line "${M2}" yes 60 1; Y60_OLD="${OFFER}"
-post_ok "A2 yes @60 (newer)" A2 records_line "${M2}" yes 60 1; Y60_NEW="${OFFER}"
-post_ok "O yes @45, below the sweep" O records_line "${M2}" yes 45 1
-post_ok "B sweeps with a no @50" B records_line "${M2}" no 50 10
+BOOK2="$(records 4)"
+post_ok "A1 yes @50" A1 records_line "${BOOK2}" yes 50 1; Y50="${OFFER}"
+post_ok "A1 yes @60 (older)" A1 records_line "${BOOK2}" yes 60 1; Y60_OLD="${OFFER}"
+post_ok "A2 yes @60 (newer)" A2 records_line "${BOOK2}" yes 60 1; Y60_NEW="${OFFER}"
+post_ok "O yes @45, below the sweep" O records_line "${BOOK2}" yes 45 1
+post_ok "B sweeps with a no @50" B records_line "${BOOK2}" no 50 10
 check "best price then oldest, each at its resting price" \
   '[.matches[] | [.yes_offer_id, .price]] == [[$a, 60], [$b, 60], [$c, 50]]' \
   --arg a "${Y60_OLD}" --arg b "${Y60_NEW}" --arg c "${Y50}"
 check "B's remainder rests" '.offer.state == "open" and .offer.matched > 0 and .offer.remaining > 0'
 
-M3="$(records 7)"
-post_ok "B rests a no @37" B records_line "${M3}" no 37 1; B37="${OFFER}"
-post_ok "A1 takes it with 0.50 at 37" A1 records_line "${M3}" yes 37 0.5
+BOOK3="$(records 7)"
+post_ok "B rests a no @37" B records_line "${BOOK3}" no 37 1; B37="${OFFER}"
+post_ok "A1 takes it with 0.50 at 37" A1 records_line "${BOOK3}" yes 37 0.5
 check "odd price: no = yes × 63 / 37 rounded half up" '.matches[0].yes_stake == 0.5 and .matches[0].no_stake == 0.85'
-post_ok "A2 takes the 0.15 left at 37" A2 records_line "${M3}" yes 40 1
+post_ok "A2 takes the 0.15 left at 37" A2 records_line "${BOOK3}" yes 40 1
 check "the no side's last cents: yes 0.09 against no 0.15" '.matches[0].yes_stake == 0.09 and .matches[0].no_stake == 0.15'
 expect_sql "B's no @37 is filled" "select remaining_cents from app_public.group_prediction_offers where id = '${B37}';" 0
 post_ok "B rests a no @99 of one cent" B records_line "$(records 9)" no 99 0.01
@@ -478,8 +486,8 @@ pass "matching: resting price, best then oldest, partial fills, no self-match, s
 
 # --- counters -----------------------------------------------------------------------------
 
-M4="$(records 5)"
-post_ok "A1 yes @40 with walk-away 55" A1 records_line "${M4}" yes 40 4 '{"p_walk_away_price":55}'; A1_W="${OFFER}"
+BOOK4="$(records 5)"
+post_ok "A1 yes @40 with walk-away 55" A1 records_line "${BOOK4}" yes 40 4 '{"p_walk_away_price":55}'; A1_W="${OFFER}"
 counter B "${A1_W}" 50 6
 expect_ok "B counters no @50"
 check "inside the walk-away: an immediate match at the counter's price" \
@@ -497,12 +505,12 @@ counter E "${A1_W}" 50 1 "$(jq -nc --argjson p "$(records 6)" '{p_template:"reco
 expect_error VALIDATION "a counter naming another market"
 counter E "${MISSING_GROUP}" 50 1
 expect_error NOT_FOUND "a counter on an unknown offer"
-counter E "${A1_W}" 50 0.5 "$(jq -nc --argjson p "${M4}" '{p_template:"records_line", p_parameters:$p, p_side:"no"}')"
+counter E "${A1_W}" 50 0.5 "$(jq -nc --argjson p "${BOOK4}" '{p_template:"records_line", p_parameters:$p, p_side:"no"}')"
 expect_ok "a counter may repeat its market and side"
 check "a filled answered offer leaves the counter resting" '.matches == []'
 
-M5="$(records 6)"
-post_ok "A2 yes @40 with walk-away 45" A2 records_line "${M5}" yes 40 1 '{"p_walk_away_price":45}'; A2_W="${OFFER}"
+BOOK5="$(records 6)"
+post_ok "A2 yes @40 with walk-away 45" A2 records_line "${BOOK5}" yes 40 1 '{"p_walk_away_price":45}'; A2_W="${OFFER}"
 counter E "${A2_W}" 50 1
 expect_ok "E counters no @50, outside the walk-away"
 check "outside the walk-away the counter rests" '.matches == [] and .offer.state == "open"'
@@ -513,6 +521,18 @@ post_ok "A1 yes @45 with walk-away 70" A1 records_line "$(records 12)" yes 45 1 
 counter E "${A1_X}" 40 2
 expect_ok "a counter that crosses the posted price"
 check "crosses at the answered offer's own price" '.matches | length == 1 and .[0].via == "cross" and .[0].price == 45'
+post_ok "N rests a yes" N records_line "$(records 18)" yes 50 1
+post_ok "B takes N's yes" B records_line "$(records 18)" no 50 1
+check "a registered client name loses control characters and is cut to 60" \
+  '.matches[0].counterparty.client_name == ("Evil" + ("x" * 56)) and (.matches[0].counterparty.display_name | test("[[:cntrl:]]") | not)'
+post_ok "L rests a yes @50 with walk-away 60" L records_line "$(records 17)" yes 50 1 '{"p_walk_away_price":60}'; L_YES="${OFFER}"
+rpc "${LEAVER_TOKEN}" group_leave "$(settings_body "${GROUP}")"
+expect_ok "L's user leaves the group"
+post_ok "E posts a crossing no after L's user left" E records_line "$(records 17)" no 50 1
+check "an offer of a member who left no longer fills" '.matches == []'
+counter E "${L_YES}" 55 1
+expect_ok "E counters inside L's walk-away"
+check "nor through its walk-away price" '.matches == []'
 pass "counters: inside walk-away match at the counter's price, outside rests, plain offers ignore walk-away, one per AI per offer"
 
 # --- stake limit and withdraw ---------------------------------------------------------------
@@ -558,19 +578,30 @@ pass "moved clock: posting and withdrawing close at the board's start"
 
 # --- concurrency -------------------------------------------------------------------------------
 
-M7="$(records 11)"
-post_ok "F rests a yes @50 for 1.00" F records_line "${M7}" yes 50 1; F_YES="${OFFER}"
+BOOK7="$(records 11)"
+post_ok "F rests a yes @50 for 1.00" F records_line "${BOOK7}" yes 50 1; F_YES="${OFFER}"
 RACE_DIR="$(mktemp -d)"
-(post G1 records_line "${M7}" no 50 1; printf '%s' "${STATUS}") >"${RACE_DIR}/a" &
+(post G1 records_line "${BOOK7}" no 50 1; printf '%s' "${STATUS}") >"${RACE_DIR}/a" &
 race_a=$!
-(post G2 records_line "${M7}" no 50 1; printf '%s' "${STATUS}") >"${RACE_DIR}/b" &
+(post G2 records_line "${BOOK7}" no 50 1; printf '%s' "${STATUS}") >"${RACE_DIR}/b" &
 race_b=$!
 wait "${race_a}"; wait "${race_b}"
 [[ "$(tail -c 3 "${RACE_DIR}/a"):$(tail -c 3 "${RACE_DIR}/b")" == "200:200" ]] || fail "both concurrent posts must commit"
 expect_sql "F's yes is filled exactly once" "select remaining_cents || ':' || (select count(*) from app_public.group_prediction_matches
   where yes_offer_id = '${F_YES}') || ':' || (select sum(yes_stake_cents) from app_public.group_prediction_matches
   where yes_offer_id = '${F_YES}') from app_public.group_prediction_offers where id = '${F_YES}';" "0:1:100"
-pass "concurrency: two simultaneous crossing posts never over-fill"
+# H exists before the race, so only the prediction lock orders the two posts.
+post_ok "H stakes one cent first" H records_line "$(records 19)" yes 50 0.01
+(post H records_line "$(records 19)" yes 50 50; printf '%s' "${STATUS}") >"${RACE_DIR}/c" &
+race_a=$!
+(post H records_line "$(records 20)" yes 50 50; printf '%s' "${STATUS}") >"${RACE_DIR}/d" &
+race_b=$!
+wait "${race_a}"; wait "${race_b}"
+[[ "$(sort <<<"$(tail -c 3 "${RACE_DIR}/c")
+$(tail -c 3 "${RACE_DIR}/d")" | tr '\n' ':')" == "200:400:" ]] || fail "exactly one of two concurrent 50.00 posts past the cap must commit"
+expect_sql "the stake cap held under the race" "select app_public.group_prediction_exposure(id, '${GROUP}', '${OPEN_WEEK}')
+  from app_public.group_prediction_bettors where user_id = '${OWNER_UID}' and client_id = '${H_CLIENT}';" 5001
+pass "concurrency: two simultaneous crossing posts never over-fill; one AI's concurrent posts never pass the cap"
 
 COMPLETED=1
 pass "group predictions: setting, access, markets, offers, matching, counters, stake limit (run ${RUN_TAG})"
