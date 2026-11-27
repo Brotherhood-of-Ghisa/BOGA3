@@ -1,4 +1,3 @@
-import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
@@ -69,14 +68,19 @@ export function useSessionMeets({
     }
   }, [userId, sessionId]);
 
-  useFocusEffect(useCallback(() => {
-    void reload();
-  }, [reload]));
-  useEffect(() => subscribeSessionMeetLinks(() => void reload()), [reload]);
+  // Re-read on mount, when a link changes, and on the clock tick, so a meet list
+  // cached while this screen stayed mounted (the Train tab) shows up.
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), SESSION_MEET_CLOCK_MS);
+    void reload();
+    return subscribeSessionMeetLinks(() => void reload());
+  }, [reload]);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+      void reload();
+    }, SESSION_MEET_CLOCK_MS);
     return () => clearInterval(timer);
-  }, []);
+  }, [reload]);
 
   const startedAtMs = times?.startedAt.getTime();
   const completedAtMs = times?.completedAt?.getTime() ?? null;
@@ -116,7 +120,7 @@ export function useSessionMeets({
 
 /**
  * The session's exercise definitions that are challenge exercises of a joined
- * meet, re-read on focus and when a link changes. A failed read tags nothing.
+ * meet, re-read on mount, when a link changes and on the clock tick. A failed read tags nothing.
  */
 export function useSessionChallengeExercises(
   userId: string | null,
@@ -144,9 +148,14 @@ export function useSessionChallengeExercises(
       if (alive.current) setTagged(new Set());
     }
   }, [userId, sessionId, key]);
-  useFocusEffect(useCallback(() => {
+  useEffect(() => {
     void reload();
-  }, [reload]));
-  useEffect(() => subscribeSessionMeetLinks(() => void reload()), [reload]);
+    const unsubscribe = subscribeSessionMeetLinks(() => void reload());
+    const timer = setInterval(() => void reload(), SESSION_MEET_CLOCK_MS);
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, [reload]);
   return tagged;
 }
