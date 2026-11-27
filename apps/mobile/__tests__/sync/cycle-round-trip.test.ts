@@ -581,7 +581,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
       .insert(sessions)
       .values({ id: ids.session, status: 'active', startedAt: new Date(ms), localDirty: true, localUpdatedAtMs: ms })
       .run();
-    const meet = { meetId: `${ids.group}-meet`, startsAtMs: ms - 3_600_000, endsAtMs: ms + 3_600_000 };
+    const meet = { meetId: `${ids.group}-meet`, startsAtMs: ms - 3_600_000, endsAtMs: ms + 3_600_000, cutoffAtMs: ms + 90_000_000 };
     const linkId = `${meet.meetId}:${ids.session}`;
     const readLink = () => database.select().from(sessionMeetLinks).where(eq(sessionMeetLinks.id, linkId)).get();
 
@@ -594,7 +594,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
     expect(readLink()).toMatchObject({ sessionId: ids.session, meetId: meet.meetId, deletedAt: null, localDirty: false });
 
     // 2. Leave → the tombstone syncs and survives a wiped re-pull.
-    await leaveSessionMeet(ids.session, meet.meetId);
+    await leaveSessionMeet(ids.session, meet);
     await runSyncCycle();
     wipeLocalStore();
     await runSyncCycle();

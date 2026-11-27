@@ -3,8 +3,9 @@
 /**
  * Outcome: a member's session → meet links are local synced rows with a
  * deterministic id, so leaving tombstones the row and re-joining undeletes the
- * same id (sync-v2 contract, "LWW and undelete"), and a session that can no
- * longer overlap the meet window is never attached ([[meets.linking]]).
+ * same id (sync-v2 contract, "LWW and undelete"), a session that can no
+ * longer overlap the meet window is never attached ([[meets.linking]]), and
+ * nothing joins or leaves once the meet has closed at its results cutoff.
  *
  * Driver: a real in-memory SQLite built from the shipped migration bundle (FK
  * enforcement on, like the production handle), with `bootstrapLocalDataLayer`
@@ -42,6 +43,7 @@ import {
   listSessionLinksForMeet,
   sessionCanOverlapMeet,
   sessionMeetLinkId,
+  SessionMeetClosedError,
   SessionMeetWindowError,
   type MeetWindow,
 } from '@/src/data/session-meet-links';
@@ -55,7 +57,7 @@ const HOUR = 3_600_000;
 const MEET_ID = '0f8b2c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
 const OTHER_MEET_ID = '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
 const STARTS = Date.parse('2026-11-27T18:00:00.000Z');
-const WINDOW: MeetWindow = { meetId: MEET_ID, startsAtMs: STARTS, endsAtMs: STARTS + 3 * HOUR };
+const WINDOW: MeetWindow = { meetId: MEET_ID, startsAtMs: STARTS, endsAtMs: STARTS + 3 * HOUR, cutoffAtMs: STARTS + 27 * HOUR };
 const OTHER_WINDOW: MeetWindow = { ...WINDOW, meetId: OTHER_MEET_ID };
 const T0 = new Date(STARTS + HOUR);
 const T1 = new Date(STARTS + 2 * HOUR);
@@ -161,7 +163,7 @@ describe('session meet links repository', () => {
     await joinSessionToMeet('sess-in', WINDOW, T0);
     db().update(sessionMeetLinks).set({ localDirty: false }).run();
 
-    await expect(leaveSessionMeet('sess-in', MEET_ID, T1)).resolves.toBe(true);
+    await expect(leaveSessionMeet('sess-in', WINDOW, T1)).resolves.toBe(true);
     const id = `${MEET_ID}:sess-in`;
     expect(readLink(id)).toMatchObject({ deletedAt: T1, updatedAt: T1, localDirty: true });
     const tombstoneClock = readLink(id)?.localUpdatedAtMs ?? 0;
@@ -174,12 +176,12 @@ describe('session meet links repository', () => {
   });
 
   it('leaving a missing or already-left link writes nothing', async () => {
-    await expect(leaveSessionMeet('sess-in', MEET_ID, T1)).resolves.toBe(false);
+    await expect(leaveSessionMeet('sess-in', WINDOW, T1)).resolves.toBe(false);
     await joinSessionToMeet('sess-in', WINDOW, T0);
-    await leaveSessionMeet('sess-in', MEET_ID, T1);
+    await leaveSessionMeet('sess-in', WINDOW, T1);
     mockNotifyLocalWrite.mockClear();
 
-    await expect(leaveSessionMeet('sess-in', MEET_ID, T2)).resolves.toBe(false);
+    await expect(leaveSessionMeet('sess-in', WINDOW, T2)).resolves.toBe(false);
     expect(readLink(`${MEET_ID}:sess-in`)?.deletedAt).toEqual(T1);
     expect(mockNotifyLocalWrite).not.toHaveBeenCalled();
   });
@@ -221,22 +223,49 @@ describe('session meet links repository', () => {
     await joinSessionToMeet('sess-in', OTHER_WINDOW, T0);
     mockNotifyLocalWrite.mockClear();
 
-    await expect(leaveMeetSessions(MEET_ID.toUpperCase(), T1)).resolves.toBe(2);
+    await expect(leaveMeetSessions({ ...WINDOW, meetId: MEET_ID.toUpperCase() }, T1)).resolves.toBe(2);
     expect(mockNotifyLocalWrite).toHaveBeenCalledTimes(1);
     expect(await listSessionLinksForMeet(MEET_ID)).toEqual([]);
     expect((await listSessionLinksForMeet(OTHER_MEET_ID)).map((l) => l.sessionId)).toEqual(['sess-in']);
 
-    await expect(leaveMeetSessions(MEET_ID, T2)).resolves.toBe(0);
+    await expect(leaveMeetSessions(WINDOW, T2)).resolves.toBe(0);
     expect(mockNotifyLocalWrite).toHaveBeenCalledTimes(1);
   });
 
   it('lists only live links, ordered', async () => {
     await joinSessionToMeet('sess-running', WINDOW, T0);
     await joinSessionToMeet('sess-in', WINDOW, T0);
-    await leaveSessionMeet('sess-running', MEET_ID, T1);
+    await leaveSessionMeet('sess-running', WINDOW, T1);
 
     expect((await listSessionLinksForMeet(MEET_ID)).map((l) => l.sessionId)).toEqual(['sess-in']);
     expect(await listMeetLinksForSession('sess-running')).toEqual([]);
+  });
+
+  it('refuses joins and leaves once the meet has closed at its cutoff, writing nothing', async () => {
+    await joinSessionToMeet('sess-in', WINDOW, T0);
+    mockNotifyLocalWrite.mockClear();
+    const closed = new Date(WINDOW.cutoffAtMs);
+
+    await expect(joinSessionToMeet('sess-running', WINDOW, closed)).rejects.toBeInstanceOf(SessionMeetClosedError);
+    await expect(leaveSessionMeet('sess-in', WINDOW, closed)).rejects.toThrow(`Meet ${MEET_ID} has closed`);
+    await expect(leaveMeetSessions(WINDOW, closed)).rejects.toBeInstanceOf(SessionMeetClosedError);
+    expect(allLinkRows()).toHaveLength(1);
+    expect(readLink(`${MEET_ID}:sess-in`)?.deletedAt).toBeNull();
+    expect(mockNotifyLocalWrite).not.toHaveBeenCalled();
+    // One millisecond before the cutoff is still open.
+    await expect(leaveSessionMeet('sess-in', WINDOW, new Date(WINDOW.cutoffAtMs - 1))).resolves.toBe(true);
+  });
+
+  it('does not list a deleted session\'s links, and lists them again when it is undeleted', async () => {
+    await joinSessionToMeet('sess-in', WINDOW, T0);
+    db().update(sessions).set({ deletedAt: T1 }).where(eq(sessions.id, 'sess-in')).run();
+
+    expect(await listSessionLinksForMeet(MEET_ID)).toEqual([]);
+    expect(await listMeetLinksForSession('sess-in')).toEqual([]);
+    expect(readLink(`${MEET_ID}:sess-in`)?.deletedAt).toBeNull();
+
+    db().update(sessions).set({ deletedAt: null }).where(eq(sessions.id, 'sess-in')).run();
+    expect((await listSessionLinksForMeet(MEET_ID)).map((l) => l.sessionId)).toEqual(['sess-in']);
   });
 
   it('the local CHECK refuses a row whose id is not <meet_id>:<session_id>', () => {

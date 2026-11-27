@@ -14,7 +14,8 @@ import { notifyLocalWrite } from '@/src/sync/write-nudge';
 // The server decides whether a link counts ([[meets.linking]]: shared session,
 // current member, meet not cancelled, overlap). This repository only refuses a
 // session that can no longer overlap the meet window, which no later write can
-// fix, so the app never attaches one.
+// fix, and any join or leave once the meet has closed at its results cutoff,
+// like the meet's online Join and Leave.
 
 export type SessionMeetLinkRecord = {
   id: string;
@@ -24,11 +25,13 @@ export type SessionMeetLinkRecord = {
   updatedAt: Date;
 };
 
-/** The meet window a join is checked against, as the meet read carries it. */
+/** The meet window a join or leave is checked against, as the meet read carries it. */
 export type MeetWindow = {
   meetId: string;
   startsAtMs: number;
   endsAtMs: number;
+  /** The results cutoff (`cutoff_at_ms`): joins and leaves close here. */
+  cutoffAtMs: number;
 };
 
 type SessionTimes = {
@@ -42,6 +45,14 @@ export class SessionMeetWindowError extends Error {
   constructor(sessionId: string, meetId: string) {
     super(`Session ${sessionId} does not overlap meet ${meetId}`);
     this.name = 'SessionMeetWindowError';
+  }
+}
+
+/** A join or leave refused because the meet closed at its results cutoff. */
+export class SessionMeetClosedError extends Error {
+  constructor(meetId: string) {
+    super(`Meet ${meetId} has closed`);
+    this.name = 'SessionMeetClosedError';
   }
 }
 
@@ -91,6 +102,17 @@ const linkColumns = {
   updatedAt: sessionMeetLinks.updatedAt,
 };
 
+const requireOpen = (window: MeetWindow, now: Date): void => {
+  if (now.getTime() >= window.cutoffAtMs) {
+    throw new SessionMeetClosedError(normalizeMeetId(window.meetId));
+  }
+};
+
+// Links whose session is live: a deleted session's link is kept (an undelete
+// restores it) but is not listed, as the server does not count it.
+const liveLinks = (where: ReturnType<typeof and>) =>
+  and(where, isNull(sessionMeetLinks.deletedAt), isNull(sessions.deletedAt));
+
 const readLiveSession = (tx: Transaction, sessionId: string): SessionTimes => {
   const session = tx
     .select({ status: sessions.status, startedAt: sessions.startedAt, completedAt: sessions.completedAt })
@@ -112,6 +134,7 @@ const tombstone = (tx: Transaction, id: string, now: Date): void => {
 
 const joinInTransaction = (tx: Transaction, sessionId: string, window: MeetWindow, now: Date): boolean => {
   const meetId = normalizeMeetId(window.meetId);
+  requireOpen(window, now);
   if (!sessionCanOverlapMeet(readLiveSession(tx, sessionId), window)) {
     throw new SessionMeetWindowError(sessionId, meetId);
   }
@@ -150,9 +173,9 @@ const joinInTransaction = (tx: Transaction, sessionId: string, window: MeetWindo
 /**
  * Joins one of the member's live sessions to a meet: creates the link, or
  * undeletes a left one under the same id. Joining an already-joined session is
- * a no-op (nothing is dirtied or pushed). Throws `SessionMeetWindowError` when
- * the session cannot overlap the meet window, and an `Error` when the session
- * is missing or deleted.
+ * a no-op (nothing is dirtied or pushed). Throws `SessionMeetClosedError` once
+ * the meet has closed, `SessionMeetWindowError` when the session cannot overlap
+ * the meet window, and an `Error` when the session is missing or deleted.
  */
 export const joinSessionToMeet = async (
   sessionId: string,
@@ -176,10 +199,16 @@ export const joinSessionToMeet = async (
 /**
  * Leaves a meet for one session by tombstoning its link, so the leave syncs
  * under LWW and a re-join undeletes the same id. Returns whether it wrote; a
- * missing or already-left link returns false.
+ * missing or already-left link returns false. Throws `SessionMeetClosedError`
+ * once the meet has closed.
  */
-export const leaveSessionMeet = async (sessionId: string, meetId: string, now: Date = new Date()): Promise<boolean> => {
-  const id = sessionMeetLinkId(meetId, sessionId);
+export const leaveSessionMeet = async (
+  sessionId: string,
+  window: MeetWindow,
+  now: Date = new Date(),
+): Promise<boolean> => {
+  const id = sessionMeetLinkId(window.meetId, sessionId);
+  requireOpen(window, now);
   const database = await bootstrapLocalDataLayer();
   const wrote = database.transaction((tx) => {
     const existing = tx
@@ -202,10 +231,13 @@ export const leaveSessionMeet = async (sessionId: string, meetId: string, now: D
 /**
  * Tombstones every live link the member holds to a meet (leaving the meet
  * itself). The server never writes these rows, so this is the only way a leave
- * reaches them. Returns how many links it left.
+ * reaches them; it reaches the links this device holds, so a caller pulls
+ * first. Returns how many links it left. Throws `SessionMeetClosedError` once
+ * the meet has closed.
  */
-export const leaveMeetSessions = async (meetId: string, now: Date = new Date()): Promise<number> => {
-  const meet = normalizeMeetId(meetId);
+export const leaveMeetSessions = async (window: MeetWindow, now: Date = new Date()): Promise<number> => {
+  const meet = normalizeMeetId(window.meetId);
+  requireOpen(window, now);
   const database = await bootstrapLocalDataLayer();
   const left = database.transaction((tx) => {
     const live = tx
@@ -224,26 +256,28 @@ export const leaveMeetSessions = async (meetId: string, now: Date = new Date()):
   return left;
 };
 
-/** The live links of one session, ordered by meet. */
+/** The live links of one live session, ordered by meet. */
 export const listMeetLinksForSession = async (sessionId: string): Promise<SessionMeetLinkRecord[]> => {
   const session = requireId(sessionId, 'sessionId');
   const database = await bootstrapLocalDataLayer();
   return database
     .select(linkColumns)
     .from(sessionMeetLinks)
-    .where(and(eq(sessionMeetLinks.sessionId, session), isNull(sessionMeetLinks.deletedAt)))
+    .innerJoin(sessions, eq(sessions.id, sessionMeetLinks.sessionId))
+    .where(liveLinks(eq(sessionMeetLinks.sessionId, session)))
     .orderBy(asc(sessionMeetLinks.meetId))
     .all();
 };
 
-/** The member's live links to one meet, ordered by session. */
+/** The member's live links to one meet, from live sessions, ordered by session. */
 export const listSessionLinksForMeet = async (meetId: string): Promise<SessionMeetLinkRecord[]> => {
   const meet = normalizeMeetId(meetId);
   const database = await bootstrapLocalDataLayer();
   return database
     .select(linkColumns)
     .from(sessionMeetLinks)
-    .where(and(eq(sessionMeetLinks.meetId, meet), isNull(sessionMeetLinks.deletedAt)))
+    .innerJoin(sessions, eq(sessions.id, sessionMeetLinks.sessionId))
+    .where(liveLinks(eq(sessionMeetLinks.meetId, meet)))
     .orderBy(asc(sessionMeetLinks.sessionId))
     .all();
 };

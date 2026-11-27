@@ -230,7 +230,7 @@ describe('every entity write path flips the dirty bit in the write transaction',
 
   it('session_meet_links — join and leave each flip local_dirty and stamp a newer timestamp', async () => {
     seedSession();
-    const meet = { meetId: 'meet-1', startsAtMs: Date.parse('2026-05-30T09:00:00.000Z'), endsAtMs: Date.parse('2026-05-30T12:00:00.000Z') };
+    const meet = { meetId: 'meet-1', startsAtMs: Date.parse('2026-05-30T09:00:00.000Z'), endsAtMs: Date.parse('2026-05-30T12:00:00.000Z'), cutoffAtMs: Date.parse('2026-05-31T12:00:00.000Z') };
 
     const joined = await joinSessionToMeet(SESSION_ID, meet, new Date('2026-05-30T10:00:00.000Z'));
     const readLink = () => db().select().from(sessionMeetLinks).where(eq(sessionMeetLinks.id, joined.id)).get();
@@ -239,7 +239,7 @@ describe('every entity write path flips the dirty bit in the write transaction',
     expect(afterJoin?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
 
     db().update(sessionMeetLinks).set({ localDirty: false }).run();
-    await leaveSessionMeet(SESSION_ID, 'meet-1', new Date('2026-05-30T11:00:00.000Z'));
+    await leaveSessionMeet(SESSION_ID, meet, new Date('2026-05-30T11:00:00.000Z'));
 
     const afterLeave = readLink();
     expect(afterLeave?.localDirty).toBe(true);

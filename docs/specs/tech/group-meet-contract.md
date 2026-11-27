@@ -83,7 +83,9 @@ Sync v2 entity `session_meet_links` (load
 [sync-v2-server-contract.md](sync-v2-server-contract.md) when changing it), so
 it works offline. Only the member's client writes it: the server never writes
 a member's Sync v2 rows, so detaching all of a member's sessions from a meet is
-the client tombstoning its own links (`leaveMeetSessions`). The client refuses a session that can
+the client tombstoning the links it holds (`leaveMeetSessions`; pull first to
+reach links made on another device). Like the online Join and Leave, the
+client joins and leaves only until the cutoff, and refuses a session that can
 no longer overlap the window (it started at or after `ends_at`, or ended at or
 before `starts_at`); the server accepts every link and decides at read time.
 
@@ -98,7 +100,9 @@ and ignored. Scoring reuses the same helper.
 **Roster.** The meet read lists joined members ∪ members with a counting link
 (`group_meet_roster_members`): `joined` and `joined_at_ms` are the explicit
 join (null for a member there by a link only), `linked` marks a counting link,
-and `current_member` is false for those who have since left the group. Joined members
+and `current_member` is false for joined members who have since left the
+group (a member there only by a link drops off when they leave, as their links
+stop counting). Joined members
 come first, in join order.
 
 ## Scoring, snapshot and refresh
