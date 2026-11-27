@@ -12,6 +12,7 @@
 | Wire shapes | `apps/mobile/src/groups/types.ts`, `competition-wire.ts` |
 | Protocol-4 metrics, units, disclosure, history (changing competition scoring or readers) | [group-competition-contract.md](group-competition-contract.md) |
 | CoW intake, publication and readers (changing CoW) | [group-cow-contract.md](group-cow-contract.md) |
+| Meet storage, linking, scoring and readers (changing meets) | [group-meet-contract.md](group-meet-contract.md) |
 | Bodyweight policy and privacy (changing group bodyweight scoring) | [bodyweight-load-contract.md](bodyweight-load-contract.md) |
 | Authorization baseline | `docs/specs/10-api-authn-authz-guidelines.md` rules 15–19 |
 | Routes, screens, wording (changing group UI) | `docs/specs/ui/group-screens.md`, `docs/product/copy.md`, the group components (`apps/mobile/components/groups/`) |
@@ -23,8 +24,9 @@
 
 The group record is a server-side **share ledger**, `group_session_shares`,
 written by a trigger on `app_public.sessions` when a member's session arrives
-through `sync_push`. Nothing is copied: group reads read through to the
-member's own live Sync v2 rows. So the group owns a permanent record that
+through `sync_push`. Nothing is copied (the one accepted exception, meet
+snapshots, is in [group-meet-contract.md](group-meet-contract.md)): group reads
+read through to the member's own live Sync v2 rows. So the group owns a permanent record that
 nothing recomputes from membership; sessions update until complete; edits,
 deletes and undeletes flow through; membership at logging time decides; and
 personal sync never changes (no second push path; triggers failure-isolated).

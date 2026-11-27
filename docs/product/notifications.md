@@ -56,3 +56,23 @@ original deadline.
 
 Why: avoid bursts from old offline history.
 Code: `supabase/migrations/20261014115352_notification_delivery.sql`.
+
+### notifications.meets · definition · accepted
+
+A meet sends one push at its `starts_at` ("<meet> is on at <venue>") and one at
+its `ends_at` (results, standings so far) to current members, subject to each
+member's per-group Meets preference. A cancelled meet sends nothing. Results
+becoming final sends no second push.
+
+Why: one start and one end push keep meets from flooding a group's members.
+Code: `supabase/migrations/20261014115352_notification_delivery.sql`.
+Pending: meet notifications are not built yet.
+
+### notifications.meets-default · definition · open
+
+Whether the per-group Meets preference is on by default, and whether muting a
+group silences its meet pushes, is undecided. The card building meet
+notifications decides it and names the choice in its PR's `Product facts:` line.
+
+Why: the plan left the default open; a builder must not pick it silently.
+Code: `supabase/migrations/20261014115352_notification_delivery.sql`.

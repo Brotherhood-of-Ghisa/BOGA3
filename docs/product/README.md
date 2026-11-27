@@ -15,6 +15,7 @@ facts as needed. Authoring: load `docs/procedures/product-facts-authoring.md`.
 | `muscle.md` | attributing sets or work to muscles; muscle setup, tracking, lists |
 | `gym.md` | gyms, gym pickers, or per-gym exercise figures |
 | `groups.md` | medals, certification, CoW and kg disclosure rules |
+| `meets.md` | group meets: joining a session to a meet, roster, results cutoff and snapshot, challenges, meet leaderboard |
 | `notifications.md` | which notifications are sent, to whom, with what counts |
 | `timer.md` | rest timer rules |
 | `agents.md` | what a coaching agent (MCP) may read or change |

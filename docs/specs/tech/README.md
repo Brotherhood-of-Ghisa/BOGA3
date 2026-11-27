@@ -36,6 +36,9 @@ Current docs:
 - `group-competition-contract.md`: group competition representation —
   metric/unit meaning, the public boundary and disclosure, witness history and
   the protocol-4 server surface.
+- `group-meet-contract.md`: group meets — meet and challenge storage, the
+  session↔meet link, cutoff snapshot and refresh, meets leaderboard and
+  notification delivery. Skeleton; load when changing meets.
 
 When measuring or changing the server cost of group evaluation or the pg_cron
 sweeps, load `groups-performance-measurement.md`.
