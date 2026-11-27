@@ -145,14 +145,14 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   // Live results read every counting session's sets and their scores; a
   // meet's window is at most a week, so the cost does not grow with history.
   { fn: 'group_meet_results', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_meet_id: c.liveMeet }),
-    budget: { kind: 'budgeted', pages: 4_600, scoped: true } },
+    budget: { kind: 'budgeted', pages: 4_100, scoped: true } },
   // Counts come from a tally of one row per member; a member's trophies are a
   // keyset page. Neither grows with the number of meets the group has held.
   { fn: 'group_meet_leaderboard', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'budgeted', pages: 140, scoped: true } },
+    budget: { kind: 'budgeted', pages: 40, scoped: true } },
   { fn: 'group_meet_trophies', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.trophyMember, p_before: null, p_limit: 20 }),
-    budget: { kind: 'budgeted', pages: 140, scoped: true } },
+    budget: { kind: 'budgeted', pages: 70, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }), budget: { kind: 'budgeted', pages: 30, scoped: true } },
   { fn: 'group_competition_exercise_list', via: 'member', args: (c) => ({ p_group_id: c.groupId }),

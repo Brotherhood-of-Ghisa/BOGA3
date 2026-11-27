@@ -174,21 +174,30 @@ language sql stable set search_path = app_public, pg_temp as $$
   with ge as (
     select x.* from app_public.group_exercises x
      where x.id = p_group_exercise and x.published_rules_revision = x.rules_revision
+  ), source as materialized (
+    -- Per set, once: the entry mode and mode generation a score must match,
+    -- and whether the set holds any active certification at all.
+    select ed.load_input_mode, app_public.group_source_mode_generation(p_member, p_definition) as generation,
+      exists (select 1 from app_public.group_metric_certifications c
+        where c.group_exercise_id = p_group_exercise and c.member_user_id = p_member and c.set_id = p_set_id
+          and c.ended_at is null) as has_certification
+      from app_public.exercise_definitions ed
+     where ed.owner_user_id = p_member and ed.id = p_definition and exists (select 1 from ge)
   ), scored as (
     select sc.metric, sc.value, sc.unit, (sc.performance->>'reps')::numeric as reps, ge.load_input_mode,
       ge.bodyweight_contribution,
-      (app_public.group_metric_certification_matching(ge.id, p_member, p_set_id, sc.metric, sc.fingerprint)).id
-        is not null as certified
-      from ge join app_public.group_metric_set_scores sc
+      case when source.has_certification then
+        (app_public.group_metric_certification_matching(ge.id, p_member, p_set_id, sc.metric, sc.fingerprint)).id
+          is not null else false end as certified
+      from ge cross join source join app_public.group_metric_set_scores sc
         on sc.group_exercise_id = ge.id and sc.rules_revision = ge.rules_revision
        and sc.member_user_id = p_member and sc.set_id = p_set_id
-      join app_public.exercise_definitions ed on ed.owner_user_id = p_member and ed.id = p_definition
      where sc.counting and sc.metric in ('e1rm', 'volume', 'seconds')
        and sc.performance->>'session_id' = p_session_id
        and sc.performance->>'session_exercise_id' = p_session_exercise_id
        and sc.performance->>'exercise_definition_id' = p_definition
-       and sc.performance->>'source_load_input_mode' = ed.load_input_mode
-       and sc.source_mode_generation = app_public.group_source_mode_generation(p_member, p_definition)
+       and sc.performance->>'source_load_input_mode' = source.load_input_mode
+       and sc.source_mode_generation = source.generation
        and sc.performance->>'weight_value' = p_performance->>'weight_value'
        and sc.performance->>'reps_value' = p_performance->>'reps_value'
        and (sc.performance->>'duration_sec') is not distinct from (p_performance->>'duration_sec')
@@ -213,7 +222,9 @@ language sql stable set search_path = app_public, pg_temp as $$
 $$;
 
 -- Scored sets of a meet, live (read through to the members' rows) or from its
--- snapshot: one row per set and qualifying metric.
+-- snapshot: one row per set and qualifying metric. Live, only sets on a
+-- challenge's exercise are scored, as only those rank; the snapshot scores
+-- every mapped set.
 create function app_public.group_meet_scored_sets(p_meet app_public.group_meets, p_now timestamptz,
   p_from_snapshot boolean)
 returns table(member_user_id uuid, session_id text, set_id text, exercise_definition_id text,
@@ -226,7 +237,9 @@ language sql stable set search_path = app_public, pg_temp as $$
     from app_public.group_meet_live_sets(p_meet, p_now) l
     cross join lateral app_public.group_meet_set_scores(l.member_user_id, l.set_id, l.group_exercise_id,
       l.session_id, l.session_exercise_id, l.exercise_definition_id, l.performance, l.fingerprint) sc
-   where not p_from_snapshot and l.group_exercise_id is not null
+   where not p_from_snapshot and l.group_exercise_id in (
+       select c.group_exercise_id from app_public.group_meet_challenges c
+        where c.meet_id = p_meet.id and c.removed_at is null)
   union all
   select ss.member_user_id, ss.session_id, ss.set_id, ss.exercise_definition_id, ss.group_exercise_id,
     se.started_at_ms, ss.exercise_order_index, ss.set_order_index, ss.set_created_at_ms, ss.performance,
