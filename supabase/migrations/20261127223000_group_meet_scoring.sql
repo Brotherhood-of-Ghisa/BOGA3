@@ -455,6 +455,44 @@ begin
   return jsonb_build_object('advanced', false);
 end $$;
 
+-- Operators revive parked work with one call (RUNBOOK "Group evaluator
+-- triage"): it now also clears parked meets' attempts and backoff.
+create or replace function app_public.group_eval_retry_parked() returns integer
+language plpgsql security definer set search_path = app_public, pg_temp as $$
+declare
+  _sessions integer;
+  _exercises integer;
+  _meets integer;
+begin
+  update app_public.group_eval_queue set attempts = 0, available_at = now()
+   where available_at = 'infinity'::timestamptz;
+  get diagnostics _sessions = row_count;
+  update app_public.group_metric_eval_queue set attempts = 0, available_at = now()
+   where available_at = 'infinity'::timestamptz;
+  get diagnostics _exercises = row_count;
+  update app_public.group_meets set transition_attempts = 0, transition_available_at = null
+   where transition_attempts >= app_public.group_eval_max_attempts();
+  get diagnostics _meets = row_count;
+  return _sessions + _exercises + _meets;
+end;
+$$;
+
+-- The meet events' own messages in the shared failure log.
+do $migration$
+declare definition text; revised text;
+begin
+  definition := pg_get_functiondef('app_public.group_eval_log_failure(text,uuid,jsonb)'::regprocedure);
+  revised := replace(definition,
+    $anchor$        else 'group evaluator job failed; it stays queued and retries'$anchor$,
+    $patch$        when 'group.meet_advance_failed' then 'meet transition failed and rolled back; it retries after a backoff'
+        when 'group.meet_advance_parked' then 'meet transition failed too often and is parked; group_eval_retry_parked() revives it'
+        else 'group evaluator job failed; it stays queued and retries'$patch$);
+  if revised = definition then
+    raise exception 'group_eval_log_failure meet message anchor missing';
+  end if;
+  execute revised;
+end $migration$;
+
 -- The hourly backstop also kicks when a meet transition is due.
 create or replace function app_public.group_eval_sweep() returns boolean
 language plpgsql security definer set search_path = app_public, pg_temp as $$
@@ -519,6 +557,9 @@ begin
     update app_public.group_meet_trophy_tallies set gold = gold - (old.place = 1)::integer,
       silver = silver - (old.place = 2)::integer, bronze = bronze - (old.place = 3)::integer
      where group_id = old.group_id and member_user_id = old.member_user_id;
+    -- A member with no trophy left keeps no row.
+    delete from app_public.group_meet_trophy_tallies
+     where group_id = old.group_id and member_user_id = old.member_user_id and gold + silver + bronze = 0;
   end if;
   if tg_op in ('INSERT', 'UPDATE') and new.place <= 3 then
     insert into app_public.group_meet_trophy_tallies(group_id, member_user_id, gold, silver, bronze)

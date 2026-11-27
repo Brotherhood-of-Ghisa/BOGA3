@@ -298,6 +298,8 @@ idempotent, inserts only missing items.
 | `group.eval_kick_failed` | the `pg_net` kick failed | the `group-eval-sweep` cron job (every 5 min) retries |
 | `group.eval_failed` | a job failed and stays queued with backoff. `context` = `{job_id, kind, sqlstate}` | inspect `app_public.group_eval_queue` (`attempts`, `last_sqlstate`) |
 | `group.eval_parked` | failed `group_eval_max_attempts()` times (10); stopped retrying (`available_at = 'infinity'`). `context` adds `attempts` | a recurring sqlstate after a deploy usually means the `group-eval` function is older than the migrations — redeploy it, then `select app_public.group_eval_retry_parked();` |
+| `group.meet_advance_failed` | a meet's start, end or snapshot transition failed and rolled back; it retries after a backoff. No `user_id`; `context` = `{meet_id, group_id, sqlstate, attempts}` | inspect `app_public.group_meets` (`transition_attempts`, `transition_available_at`) |
+| `group.meet_advance_parked` | that meet failed 10 times and is no longer tried, so its results stay live, not final | fix the cause, then `select app_public.group_eval_retry_parked();` (it revives parked meets too) |
 
 Comparison jobs (`kind = 'exercise'`, `app_public.group_metric_eval_queue`) carry
 `group_id` and no `user_id`. To drain now:

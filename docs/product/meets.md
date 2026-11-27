@@ -73,5 +73,6 @@ accounts leave. Rescoring and Refresh update it. It is separate from
 [[groups.medals]].
 
 Why: compare who wins meets, not who holds boards.
-Code: `group_meet_leaderboard` in
+Code: `group_meet_leaderboard`, `group_meet_trophies` and the
+`group_meet_standings_tally` trigger in
 `supabase/migrations/20261127223000_group_meet_scoring.sql`.

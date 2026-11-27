@@ -514,12 +514,20 @@ check "nothing is due any more" '.meets == {on: 0, results: 0, snapshots: 0, def
 PARKED="$(new_meet "$((S - 26 * HOUR))" "$((E - 26 * HOUR))")"
 run_psql "update app_public.group_meets set transition_attempts = app_public.group_eval_max_attempts() where id = '${PARKED}';" >/dev/null
 [[ -z "$(advance_all)" ]] || fail "a parked meet is not advanced"
-expect_sql "a parked meet fires nothing and the sweep sees no meet work" \
-  "select (on_at is null and finalized_at is null) || '|' || not exists (select 1 from app_public.group_meets m
-     where m.cancelled_at is null and m.finalized_at is null and m.starts_at <= now()
-       and m.transition_attempts < app_public.group_eval_max_attempts() and app_public.group_meet_transition_due(m, now())
-       and m.group_id = '${GID}')
-   from app_public.group_meets where id = '${PARKED}';" "true|true"
+expect_sql "a parked meet fires nothing" \
+  "select on_at is null and finalized_at is null from app_public.group_meets where id = '${PARKED}';" t
+expect_sql "the sweep skips parked meets" \
+  "select position('m.transition_attempts<app_public.group_eval_max_attempts()' in
+     pg_get_functiondef('app_public.group_eval_sweep()'::regprocedure)) > 0;" t
+run_psql "select app_public.group_eval_retry_parked();" >/dev/null
+[[ "$(advance_all | jq -s --arg m "${PARKED}" 'map(select(.meet_id == $m) | .done) | add | index("snapshot") != null')" == true ]] ||
+  fail "group_eval_retry_parked revives a parked meet"
+run_psql "select app_public.group_eval_log_failure(e, null, jsonb_build_object('meet_id', '${PARKED}', 'group_id', '${GID}'))
+  from unnest(array['group.meet_advance_failed', 'group.meet_advance_parked']) e;" >/dev/null
+expect_sql "the meet events log their own messages" \
+  "select string_agg(event || '=' || (message like '%meet transition%')::text, ',' order by event)
+     from public.app_logs l where l.event like 'group.meet_advance_%' and l.context->>'meet_id' = '${PARKED}';" \
+  "group.meet_advance_failed=true,group.meet_advance_parked=true"
 expect_sql "the snapshot is written once: a retry never rewrites it" \
   "select (taken_at = '${TAKEN}'::timestamptz) || '|' || refresh_count from app_public.group_meet_snapshots where meet_id = '${MEET}';" \
   "true|0"
@@ -740,6 +748,16 @@ results "${A_TOKEN}" "${PULL_LIVE}"
 check "live: normalized Weight is the added load %BW, without the raw kg" \
   '[.challenges[] | select(.challenge.challenge_id == $c) | .standings[] | [.value, .unit, .unavailable, .set.weight_value]]
      == [[12.5, "percent_bw", false, null]]' --arg c "${CH_LIVE_PULL}"
+# While a comparison rebuilds (a revision not yet published), none of its
+# metrics scores live, reps included.
+CH_LIVE_REPS="$(challenge "${PULL_LIVE}" "${PULL}" reps)"
+results "${A_TOKEN}" "${PULL_LIVE}"
+expect_places "${CH_LIVE_REPS}" "A=1" "live reps on the pull-up"
+run_psql "update app_public.group_exercises set rules_revision = rules_revision + 1 where id = '${PULL}';" >/dev/null
+results "${A_TOKEN}" "${PULL_LIVE}"
+expect_places "${CH_LIVE_REPS}" "" "a rebuilding comparison's reps do not score"
+expect_places "${CH_LIVE_PULL}" "" "nor its Weight"
+run_psql "update app_public.group_exercises set rules_revision = rules_revision - 1 where id = '${PULL}';" >/dev/null
 pass "access: outsiders, anon, old clients and clients denied; kg disclosure on live and final reads"
 
 # --- deletion ------------------------------------------------------------------
@@ -764,9 +782,10 @@ run_psql "begin;
   select set_config('request.jwt.claims', json_build_object('sub', '${B_UID}', 'role', 'authenticated')::text, true);
   select app_public.dev_wipe_my_data();
   commit;" >/dev/null
-expect_sql "B's snapshot rows and standings are gone" \
+expect_sql "B's snapshot rows, standings and trophy tallies are gone" \
   "select (select count(*) from app_public.group_meet_snapshot_sets where member_user_id = '${B_UID}')
-     + (select count(*) from app_public.group_meet_standings where member_user_id = '${B_UID}');" 0
+     + (select count(*) from app_public.group_meet_standings where member_user_id = '${B_UID}')
+     + (select count(*) from app_public.group_meet_trophy_tallies where member_user_id = '${B_UID}');" 0
 results "${A_TOKEN}" "${MEET}"
 expect_places "${CH_PRESS}" "A=1" "a wiped member's places are freed"
 
