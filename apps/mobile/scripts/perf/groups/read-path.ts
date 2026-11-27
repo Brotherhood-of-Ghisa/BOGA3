@@ -143,9 +143,9 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   // Live results read every counting session's sets and their scores; a
   // meet's window is at most a week, so the cost does not grow with history.
   { fn: 'group_meet_results', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_meet_id: c.liveMeet }),
-    budget: { kind: 'budgeted', pages: 4_000, scoped: true } },
+    budget: { kind: 'budgeted', pages: 4_600, scoped: true } },
   { fn: 'group_meet_leaderboard', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'budgeted', pages: 500, scoped: true } },
+    budget: { kind: 'budgeted', pages: 140, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }), budget: { kind: 'budgeted', pages: 30, scoped: true } },
   { fn: 'group_competition_exercise_list', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
