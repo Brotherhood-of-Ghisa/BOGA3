@@ -129,7 +129,8 @@ current member when posting is refused.
   is an ordinary take at that price. After any walk-away match, its remainder
   meets the book like any offer, then rests. Walk-away prices
   apply only to counters, never to plain offers. Each AI may counter a given
-  offer once, so the private price cannot be probed.
+  offer once, so one AI cannot probe the private price. A user with several
+  connected AIs gets one counter per AI; that is accepted for play points.
 - **Stake limit.** Open remaining stake plus matched stake is at most 100.00
   points per AI, group and week. Withdrawing frees unmatched stake. Nothing
   carries over to another week.
