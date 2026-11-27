@@ -509,6 +509,17 @@ expect_sql "a success clears the backoff" \
   "select transition_attempts || '|' || (transition_available_at is null) from app_public.group_meets where id = '${FAULT}';" "0|true"
 drain "a second retry"
 check "nothing is due any more" '.meets == {on: 0, results: 0, snapshots: 0, deferred: 0, failed: 0}'
+# A meet that failed up to the evaluator's attempt cap is parked: neither the
+# worker nor the sweep picks it up again.
+PARKED="$(new_meet "$((S - 26 * HOUR))" "$((E - 26 * HOUR))")"
+run_psql "update app_public.group_meets set transition_attempts = app_public.group_eval_max_attempts() where id = '${PARKED}';" >/dev/null
+[[ -z "$(advance_all)" ]] || fail "a parked meet is not advanced"
+expect_sql "a parked meet fires nothing and the sweep sees no meet work" \
+  "select (on_at is null and finalized_at is null) || '|' || not exists (select 1 from app_public.group_meets m
+     where m.cancelled_at is null and m.finalized_at is null and m.starts_at <= now()
+       and m.transition_attempts < app_public.group_eval_max_attempts() and app_public.group_meet_transition_due(m, now())
+       and m.group_id = '${GID}')
+   from app_public.group_meets where id = '${PARKED}';" "true|true"
 expect_sql "the snapshot is written once: a retry never rewrites it" \
   "select (taken_at = '${TAKEN}'::timestamptz) || '|' || refresh_count from app_public.group_meet_snapshots where meet_id = '${MEET}';" \
   "true|0"
@@ -617,9 +628,33 @@ pass "rescoring: add, edit and remove after the cutoff, and the leaderboard with
 leaderboard
 expect_ok "leaderboard"
 expect_tally "A:1:5/3/1:true,D:2:2/0/0:true,B:3:1/3/2:true,C:4:1/1/3:true" "medal tally across final meets"
-check "trophies link their meets" \
-  '[.rows[] | select(.member.user_id == $d) | .trophies[] | [.meet_id, .place, .metric]] | sort == [[$m, 1, "reps"], [$m, 1, "volume"]]' \
-  --arg d "${D_UID}" --arg m "${MEET}"
+check "the leaderboard holds counts only" 'all(.rows[]; (keys | sort) == ["bronze","current_member","gold","member","rank","silver"])'
+trophies() {
+  rpc "${A_TOKEN}" group_meet_trophies "$(jq -nc --arg g "${GID}" --arg u "$1" --argjson l "$2" --arg c "${3:-}" \
+    '{p_group_id:$g, p_member_user_id:$u, p_limit:$l, p_before:(if $c == "" then null else $c end)}')"
+  expect_ok "trophies"
+}
+trophies "${D_UID}" 20
+check "a member's trophies link their meets and challenges" \
+  '([.trophies[] | [.meet_id, .place, .metric, .exercise_name]] | sort) == [[$m, 1, "reps", "Bench"], [$m, 1, "volume", "Bench"]]
+   and .next_cursor == null' --arg m "${MEET}"
+trophies "${A_UID}" 20
+ALL_A="$(jq -c '[.trophies[] | .challenge_id]' <<<"${BODY}")"
+[[ "$(jq 'length' <<<"${ALL_A}")" == 9 ]] || fail "A holds nine trophies: ${ALL_A}"
+PAGED="[]"
+trophies "${A_UID}" 4
+while :; do
+  PAGED="$(jq -c --argjson acc "${PAGED}" '$acc + [.trophies[] | .challenge_id]' <<<"${BODY}")"
+  CURSOR="$(jq -r '.next_cursor // empty' <<<"${BODY}")"
+  [[ -n "${CURSOR}" ]] || break
+  trophies "${A_UID}" 4 "${CURSOR}"
+done
+[[ "${PAGED}" == "${ALL_A}" ]] || fail "trophy pages of 4 give the same trophies as one page: ${PAGED} vs ${ALL_A}"
+rpc "${A_TOKEN}" group_meet_trophies "$(jq -nc --arg g "${GID}" --arg u "${A_UID}" '{p_group_id:$g, p_member_user_id:$u, p_before:"{}"}')"
+expect_error VALIDATION "a malformed trophy cursor"
+rpc "${A_TOKEN}" group_meet_trophies "$(jq -nc --arg g "${GID}" --arg u "${A_UID}" --arg c "${CURSOR:-}" \
+  '{p_group_id:$g, p_member_user_id:$u, p_before:("{\"group_id\":\"" + $g + "\",\"member_user_id\":\"" + $u + "\",\"starts_at_ms\":1,\"meet_id\":\"x\",\"challenge_id\":\"y\"}")}')"
+expect_error VALIDATION "a trophy cursor with bad ids"
 
 # A former member keeps their trophies, marked.
 rpc "${D_TOKEN}" group_leave "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
@@ -633,6 +668,9 @@ pass "leaderboard: medals across final meets, ties, trophies, former members"
 
 # --- reads and access ------------------------------------------------------------
 
+trophies_body="$(jq -nc --arg g "${GID}" --arg u "${A_UID}" '{p_group_id:$g, p_member_user_id:$u}')"
+rpc "${OUTSIDER_TOKEN}" group_meet_trophies "${trophies_body}"; expect_error NOT_FOUND "trophies: a non-member"
+rpc "${ANON_KEY}" group_meet_trophies "${trophies_body}"; expect_error AUTH_REQUIRED "trophies: anon"
 for fn in group_meet_results group_meet_refresh_results; do
   rpc "${OUTSIDER_TOKEN}" "${fn}" "$(jq -nc --arg g "${GID}" --arg m "${MEET}" '{p_group_id:$g,p_meet_id:$m}')"
   expect_error NOT_FOUND "${fn}: a non-member"
@@ -741,6 +779,13 @@ for ch in "${CH_PRESS}" "${CH_PLANK}" "${CH_PULL}" "${CH_PULL_WEIGHT}" "${CH_SQU
 done
 leaderboard
 expect_tally "A:1:2/2/0:true,D:1:2/2/0:false" "an equal tuple shares a rank, ordered by name"
+expect_sql "the tallies equal the standings' places 1-3" \
+  "select count(*) from app_public.group_meet_trophy_tallies t full join (
+     select st.group_id, st.member_user_id, count(*) filter (where place = 1) g, count(*) filter (where place = 2) s,
+       count(*) filter (where place = 3) b from app_public.group_meet_standings st where st.place <= 3
+       group by st.group_id, st.member_user_id) x using (group_id, member_user_id)
+   where (t.group_id = '${GID}' or x.group_id = '${GID}')
+     and (coalesce(t.gold, 0), coalesce(t.silver, 0), coalesce(t.bronze, 0)) is distinct from (coalesce(x.g, 0), coalesce(x.s, 0), coalesce(x.b, 0));" 0
 pass "deletion: account deletion and dev_wipe_my_data remove snapshot rows and trophies"
 
 COMPLETED=1

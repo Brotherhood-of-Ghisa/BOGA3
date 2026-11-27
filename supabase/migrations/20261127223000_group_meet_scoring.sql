@@ -93,8 +93,12 @@ create table app_public.group_meet_snapshot_scores (
 );
 
 -- Each challenge's ranking from the snapshot; places 1-3 are the trophies.
+-- group_id and meet_starts_at copy the meet's (fixed once it is final), so a
+-- member's trophies page by index.
 create table app_public.group_meet_standings (
   meet_id uuid not null references app_public.group_meet_snapshots(meet_id) on delete cascade,
+  group_id uuid not null references app_public.groups(id) on delete cascade,
+  meet_starts_at timestamptz not null,
   challenge_id uuid not null references app_public.group_meet_challenges(id) on delete cascade,
   member_user_id uuid not null,
   place integer not null check (place >= 1),
@@ -106,8 +110,21 @@ create table app_public.group_meet_standings (
   foreign key (meet_id, member_user_id, set_id)
     references app_public.group_meet_snapshot_sets(meet_id, member_user_id, set_id) on delete cascade
 );
-create index group_meet_standings_podium on app_public.group_meet_standings(meet_id, place) where place <= 3;
 create index group_meet_standings_member on app_public.group_meet_standings(member_user_id);
+create index group_meet_standings_trophies on app_public.group_meet_standings
+  (group_id, member_user_id, meet_starts_at, meet_id, challenge_id) where place <= 3;
+
+-- Each member's trophy counts in a group, kept by a trigger on the standings
+-- (their only source), so the leaderboard reads one row per member however
+-- many meets the group has held.
+create table app_public.group_meet_trophy_tallies (
+  group_id uuid not null references app_public.groups(id) on delete cascade,
+  member_user_id uuid not null references auth.users(id) on delete cascade,
+  gold integer not null default 0 check (gold >= 0),
+  silver integer not null default 0 check (silver >= 0),
+  bronze integer not null default 0 check (bronze >= 0),
+  primary key (group_id, member_user_id)
+);
 
 -- ---------------------------------------------------------------------------
 -- 2. Scoring helpers (no client execute; they run inside the definer RPCs).
@@ -191,7 +208,7 @@ language sql stable set search_path = app_public, pg_temp as $$
   union all
   select 'reps', f.reps, 'reps', witnessed.certified
     from app_public.group_set_facts f cross join witnessed
-   where p_group_exercise is not null and f.member_user_id = p_member and f.set_id = p_set_id
+   where exists (select 1 from ge) and f.member_user_id = p_member and f.set_id = p_set_id
      and f.fingerprint = p_fingerprint and f.live and f.performed and f.working is not false and f.reps > 0;
 $$;
 
@@ -254,8 +271,10 @@ begin
   end if;
   delete from app_public.group_meet_standings
    where meet_id = p_meet.id and (p_challenge is null or challenge_id = p_challenge);
-  insert into app_public.group_meet_standings(meet_id, challenge_id, member_user_id, place, set_id, value, unit, certified)
-  select p_meet.id, r.challenge_id, r.member_user_id, r.place, r.set_id, r.value, r.unit, r.certified
+  insert into app_public.group_meet_standings(meet_id, group_id, meet_starts_at, challenge_id, member_user_id, place,
+    set_id, value, unit, certified)
+  select p_meet.id, p_meet.group_id, p_meet.starts_at, r.challenge_id, r.member_user_id, r.place, r.set_id, r.value,
+    r.unit, r.certified
     from app_public.group_meet_rankings(p_meet, clock_timestamp(), true, p_challenge) r
   on conflict (challenge_id, member_user_id) do update
     set place = excluded.place, set_id = excluded.set_id, value = excluded.value, unit = excluded.unit,
@@ -391,7 +410,9 @@ $$;
 -- nothing advanced. Group row then meet row, the order the meet RPCs lock in;
 -- a meet or group another transaction holds is skipped this call. A deferred
 -- snapshot waits a minute; a failure rolls the meet back, logs a sanitized
--- row and backs off (2 s doubling to 5 min), so neither starves other meets.
+-- row and backs off (2 s doubling to 5 min), so neither starves other meets;
+-- after the evaluator's attempt cap the meet is parked (logged) until an
+-- operator resets transition_attempts.
 create function app_public.group_meet_eval_advance() returns jsonb
 language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
 declare _picked record; _meet app_public.group_meets; _now timestamptz; _done text[] := '{}'; _code text;
@@ -400,6 +421,7 @@ begin
   for _picked in select m.id, m.group_id from app_public.group_meets m
       where m.cancelled_at is null and m.finalized_at is null and m.starts_at <= clock_timestamp()
         and (m.transition_available_at is null or m.transition_available_at <= clock_timestamp())
+        and m.transition_attempts < app_public.group_eval_max_attempts()
         and app_public.group_meet_transition_due(m, clock_timestamp())
       order by coalesce(m.transition_available_at, '-infinity'::timestamptz), m.starts_at, m.id limit 20 loop
     perform 1 from app_public.groups g where g.id = _picked.group_id and g.deleted_at is null
@@ -422,8 +444,10 @@ begin
       update app_public.group_meets set transition_attempts = transition_attempts + 1,
         transition_available_at = _now + make_interval(secs => least(300, power(2, least(transition_attempts + 1, 9))))
        where id = _meet.id;
-      perform app_public.group_eval_log_failure('group.meet_advance_failed', null,
-        jsonb_build_object('meet_id', _meet.id, 'group_id', _meet.group_id, 'sqlstate', _code));
+      perform app_public.group_eval_log_failure(case when _meet.transition_attempts + 1 >= app_public.group_eval_max_attempts()
+          then 'group.meet_advance_parked' else 'group.meet_advance_failed' end, null,
+        jsonb_build_object('meet_id', _meet.id, 'group_id', _meet.group_id, 'sqlstate', _code,
+          'attempts', _meet.transition_attempts + 1));
       return jsonb_build_object('advanced', true, 'meet_id', _meet.id, 'done', '[]'::jsonb, 'failed', true);
     end;
     return jsonb_build_object('advanced', true, 'meet_id', _meet.id, 'done', to_jsonb(_done), 'failed', false);
@@ -441,7 +465,7 @@ begin
     and not exists(select 1 from app_public.group_metric_eval_queue where available_at<=now() and (claimed_until is null or claimed_until<now()))
     and not exists(select 1 from app_public.group_meets m where m.cancelled_at is null and m.finalized_at is null
       and m.starts_at<=now() and (m.transition_available_at is null or m.transition_available_at<=now())
-      and app_public.group_meet_transition_due(m, now()))
+      and m.transition_attempts<app_public.group_eval_max_attempts() and app_public.group_meet_transition_due(m, now()))
     and not exists(select 1 from app_public.group_eval_rules_state s where
       (select min(f.rules_version) from app_public.group_set_facts f)<s.rules_version
       and exists(select 1 from app_public.group_eval_rules_stale(s.rules_version,1))) then return false; end if;
@@ -486,6 +510,28 @@ create trigger group_meet_snapshot_sets_deleted
   after delete on app_public.group_meet_snapshot_sets
   referencing old table as gone
   for each statement execute function app_public.group_meet_snapshot_sets_deleted();
+
+-- Keeps the trophy tallies equal to the standings' places 1-3.
+create function app_public.group_meet_standings_tally() returns trigger
+language plpgsql security definer set search_path = app_public, pg_temp as $$
+begin
+  if tg_op in ('DELETE', 'UPDATE') and old.place <= 3 then
+    update app_public.group_meet_trophy_tallies set gold = gold - (old.place = 1)::integer,
+      silver = silver - (old.place = 2)::integer, bronze = bronze - (old.place = 3)::integer
+     where group_id = old.group_id and member_user_id = old.member_user_id;
+  end if;
+  if tg_op in ('INSERT', 'UPDATE') and new.place <= 3 then
+    insert into app_public.group_meet_trophy_tallies(group_id, member_user_id, gold, silver, bronze)
+    values (new.group_id, new.member_user_id, (new.place = 1)::integer, (new.place = 2)::integer, (new.place = 3)::integer)
+    on conflict (group_id, member_user_id) do update set
+      gold = app_public.group_meet_trophy_tallies.gold + excluded.gold,
+      silver = app_public.group_meet_trophy_tallies.silver + excluded.silver,
+      bronze = app_public.group_meet_trophy_tallies.bronze + excluded.bronze;
+  end if;
+  return null;
+end $$;
+create trigger group_meet_standings_tally after insert or update or delete on app_public.group_meet_standings
+  for each row execute function app_public.group_meet_standings_tally();
 
 do $migration$
 declare
@@ -684,43 +730,76 @@ begin
   return app_public.group_meet_results_json(_meet, _now);
 end $$;
 
--- The Meets leaderboard: members ranked by trophies (places 1-3) across the
--- group's final meets, gold then silver then bronze; equal tuples share a
--- rank, ordered by name then ID. Former members stay, marked. Each row lists
--- its trophies with their meets.
+-- The Meets leaderboard ([[meets.leaderboard]]): members with a trophy across
+-- the group's final meets, gold then silver then bronze; equal tuples share a
+-- rank, ordered by name then ID. Former members stay, marked. It reads the
+-- tallies, one row per member; each member's trophies page separately.
 create function app_public.group_meet_leaderboard(p_group_id uuid) returns jsonb
 language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
 declare _uid uuid := app_public.group_require_app_user();
 begin
   perform app_public.group_meet_require_reader(p_group_id, _uid);
   return jsonb_build_object('rows', coalesce((
-    with podium as (
-      select st.member_user_id, st.place, st.challenge_id, m.id as meet_id, m.title, m.venue_name, m.starts_at,
-        c.group_exercise_id, c.metric
-        from app_public.group_meets m
-        join app_public.group_meet_standings st on st.meet_id = m.id and st.place <= 3
-        join app_public.group_meet_challenges c on c.id = st.challenge_id and c.removed_at is null
-       where m.group_id = p_group_id and m.cancelled_at is null and m.finalized_at is not null
-    ), tally as (
-      select member_user_id, count(*) filter (where place = 1) as gold, count(*) filter (where place = 2) as silver,
-        count(*) filter (where place = 3) as bronze
-        from podium group by member_user_id
-    ), ranked as (
-      select t.*, rank() over (order by gold desc, silver desc, bronze desc) as rank,
+    with ranked as (
+      select t.*, rank() over (order by t.gold desc, t.silver desc, t.bronze desc) as rank,
         (select p.username from app_public.user_profiles p where p.id = t.member_user_id) as username
-        from tally t
+        from app_public.group_meet_trophy_tallies t
+       where t.group_id = p_group_id and t.gold + t.silver + t.bronze > 0
     )
     select jsonb_agg(jsonb_build_object('rank', r.rank, 'member', app_public.group_member_ref_json(r.member_user_id),
         'current_member', app_public.group_meet_current_member(p_group_id, r.member_user_id),
-        'gold', r.gold, 'silver', r.silver, 'bronze', r.bronze,
-        'trophies', (select jsonb_agg(jsonb_build_object('place', p.place, 'meet_id', p.meet_id, 'title', p.title,
-            'venue_name', p.venue_name, 'starts_at_ms', app_public.group_meet_ms(p.starts_at),
-            'challenge_id', p.challenge_id, 'group_exercise_id', p.group_exercise_id,
-            'exercise_name', (select ge.name from app_public.group_exercises ge where ge.id = p.group_exercise_id),
-            'metric', p.metric) order by p.starts_at desc, p.meet_id, p.place, p.challenge_id)
-          from podium p where p.member_user_id = r.member_user_id))
+        'gold', r.gold, 'silver', r.silver, 'bronze', r.bronze)
         order by r.rank, r.username collate "C" nulls last, r.member_user_id)
       from ranked r), '[]'::jsonb));
+end $$;
+
+-- One member's trophies in the group, newest meet first, as a keyset page
+-- (`next_cursor` sent back verbatim): each with its place, meet and challenge.
+create function app_public.group_meet_trophies(p_group_id uuid, p_member_user_id uuid, p_before text default null,
+  p_limit integer default 20) returns jsonb
+language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
+declare _uid uuid := app_public.group_require_app_user(); _cursor jsonb; _edge timestamptz; _edge_meet uuid;
+  _edge_challenge uuid; _rows jsonb; _more boolean; _last jsonb;
+begin
+  perform app_public.group_meet_require_reader(p_group_id, _uid);
+  if p_member_user_id is null or p_limit is null or p_limit not between 1 and 50 then
+    raise exception 'VALIDATION: invalid trophy page' using errcode = 'P0001';
+  end if;
+  if p_before is not null then
+    begin
+      _cursor := p_before::jsonb;
+      if jsonb_typeof(_cursor) <> 'object' or (select count(*) from jsonb_object_keys(_cursor)) <> 5
+         or _cursor->>'group_id' is distinct from p_group_id::text
+         or _cursor->>'member_user_id' is distinct from p_member_user_id::text
+         or jsonb_typeof(_cursor->'starts_at_ms') is distinct from 'number' then
+        raise exception 'bad cursor';
+      end if;
+      _edge := app_public.group_meet_at((_cursor->>'starts_at_ms')::bigint);
+      _edge_meet := (_cursor->>'meet_id')::uuid;
+      _edge_challenge := (_cursor->>'challenge_id')::uuid;
+      if _edge_meet is null or _edge_challenge is null then raise exception 'bad cursor'; end if;
+    exception when others then
+      raise exception 'VALIDATION: invalid trophy cursor' using errcode = 'P0001';
+    end;
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('place', x.place, 'meet_id', x.meet_id, 'title', m.title,
+      'venue_name', m.venue_name, 'starts_at_ms', app_public.group_meet_ms(x.meet_starts_at),
+      'challenge_id', x.challenge_id, 'group_exercise_id', c.group_exercise_id,
+      'exercise_name', (select ge.name from app_public.group_exercises ge where ge.id = c.group_exercise_id),
+      'metric', c.metric) order by x.meet_starts_at desc, x.meet_id desc, x.challenge_id desc), '[]'::jsonb),
+    count(*) > p_limit
+    into _rows, _more
+    from (select st.* from app_public.group_meet_standings st
+           where st.group_id = p_group_id and st.member_user_id = p_member_user_id and st.place <= 3
+             and (_edge is null or (st.meet_starts_at, st.meet_id, st.challenge_id) < (_edge, _edge_meet, _edge_challenge))
+           order by st.meet_starts_at desc, st.meet_id desc, st.challenge_id desc limit p_limit + 1) x
+    join app_public.group_meets m on m.id = x.meet_id
+    join app_public.group_meet_challenges c on c.id = x.challenge_id;
+  if _more then _rows := _rows - (jsonb_array_length(_rows) - 1); end if;
+  _last := _rows -> (jsonb_array_length(_rows) - 1);
+  return jsonb_build_object('trophies', _rows, 'next_cursor', case when _more then
+    jsonb_build_object('group_id', p_group_id, 'member_user_id', p_member_user_id,
+      'starts_at_ms', _last->'starts_at_ms', 'meet_id', _last->'meet_id', 'challenge_id', _last->'challenge_id')::text end);
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -732,7 +811,7 @@ do $$
 declare t text; f record;
 begin
   foreach t in array array['group_meet_snapshots', 'group_meet_snapshot_sessions', 'group_meet_snapshot_sets',
-      'group_meet_snapshot_scores', 'group_meet_standings'] loop
+      'group_meet_snapshot_scores', 'group_meet_standings', 'group_meet_trophy_tallies'] loop
     execute format('alter table app_public.%I enable row level security', t);
     execute format('revoke all on app_public.%I from public, anon, authenticated, service_role', t);
   end loop;
@@ -743,9 +822,10 @@ begin
        'group_meet_take_snapshot', 'group_meet_advance_meet', 'group_meet_transition_due', 'group_meet_eval_advance',
        'group_meet_challenge_rescore', 'group_meet_snapshot_sets_deleted', 'group_meet_hides_kg',
        'group_meet_current_member', 'group_meet_standing_json', 'group_meet_records_json', 'group_meet_results_json',
-       'group_meet_results', 'group_meet_refresh_results', 'group_meet_leaderboard') loop
+       'group_meet_results', 'group_meet_refresh_results', 'group_meet_leaderboard', 'group_meet_trophies',
+       'group_meet_standings_tally') loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', f.signature);
-    if f.proname in ('group_meet_results', 'group_meet_refresh_results', 'group_meet_leaderboard') then
+    if f.proname in ('group_meet_results', 'group_meet_refresh_results', 'group_meet_leaderboard', 'group_meet_trophies') then
       execute format('grant execute on function %s to anon, authenticated', f.signature);
     elsif f.proname = 'group_meet_eval_advance' then
       execute format('grant execute on function %s to service_role', f.signature);

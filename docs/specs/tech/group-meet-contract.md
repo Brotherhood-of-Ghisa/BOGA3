@@ -133,9 +133,9 @@ on each read from the counting links. Server finality, never the clock, makes
 them final: the results read's own state says so, while the embedded meet's
 clock-derived state can already read final.
 
-**✓** follows [[meets.results-display]]: live, it is an active certification
-matching the ranked score's current fingerprint; final, it is stored with the
-snapshot's scores.
+**✓** follows [[meets.results-display]]: live, the set's witness (any of its
+certifications matching one of its current scores, so one certification marks
+every metric of the set); final, stored with the snapshot's scores.
 
 **Timed transitions.** Each group-eval run, after its queues, fires what is
 due: the `on` item at `starts_at`, `results` at `ends_at`, the snapshot at the
@@ -143,8 +143,9 @@ cutoff. The kick or the hourly sweep starts the run, so a transition can lag
 by up to an hour; items sort at their boundary. The worker advances one meet
 per call, so each meet commits in its own transaction under its group then
 meet row locks, with a marker on the meet: a crash or failure rolls back and
-retries after a backoff, a concurrent run skips a meet or group another holds,
-and nothing fires twice. A cancelled meet or deleted group fires nothing. The
+retries after a backoff (parked, and logged, at the evaluator's attempt cap),
+a concurrent run skips a meet or group another holds, and nothing fires
+twice. A cancelled meet or deleted group fires nothing. The
 snapshot waits (a minute at a time) while the evaluator still has unparked
 work for a counting session, a counting member's targets or the group's
 comparisons, checked again after it is taken.
@@ -173,8 +174,11 @@ kept, and the raw weight is withheld whenever the rule hides kg.
 
 ## Meets leaderboard
 
-Implements [[meets.leaderboard]] for current members, reading the stored
-standings, so rescoring, Refresh and deletion update it without a job.
+Implements [[meets.leaderboard]] for current members. A trigger keeps one
+trophy tally per member and group from the stored standings, so rescoring,
+Refresh and deletion update it without a job and the leaderboard reads one
+row per member. Each member's trophies, with their meets and challenges, are a
+separate keyset page, newest meet first.
 
 ## Notifications
 
