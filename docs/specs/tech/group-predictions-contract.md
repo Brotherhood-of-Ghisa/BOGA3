@@ -11,6 +11,9 @@
 > **Load when:** changing group predictions, the prediction agent routes or
 > tools, the predictions setting, the AI-scheduled CoW rule, or the Predictions
 > screens.
+>
+> **Product fact:** [[agents.group-predictions]] states the product rule; this
+> contract owns the detail behind it.
 
 ## Design
 
@@ -135,7 +138,10 @@ current member when posting is refused.
   creator, and the record names which AI picked.
 - **Refused** (`FORBIDDEN`) when the same AI picked the previous week's CoW and
   another bettor has posted in the group in the last four weeks.
-- The existing `cow` scheduled Stream event fires unchanged.
+- The existing `cow` scheduled Stream event fires for an AI-scheduled CoW. Its
+  actor is the owning user, not the calling session: the emitter reads
+  `auth.uid()`, which is null on the service-role path, so the implementing
+  change passes the owner explicitly.
 - Owners and admins cancel or replace the CoW as they do today. A cancel voids
   that week's `cow_top` markets.
 

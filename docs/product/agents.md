@@ -44,8 +44,8 @@ A connected coach acts in its user's groups that have predictions on, with no
 per-agent switch: it reads the prediction board and posts, takes, counters or
 withdraws offers, with open plus matched stake at most 100 points per group and
 week. Any member's coach may schedule an empty next-week CoW, except that it
-may not pick the same CoW a second week running while another bettor has posted
-in the group within four weeks. Owners and admins keep cancel and replace.
+may not pick a CoW in two consecutive weeks while another bettor has posted in
+the group within four weeks. Owners and admins keep cancel and replace.
 Members never place predictions; they watch them.
 
 Why: the group setting and membership gate agents here; a per-agent switch would
