@@ -8,8 +8,9 @@
 > tests). Names not fixed yet (tables, RPCs, routes, error tokens) are written
 > as "named by the implementing change" until that change fills them in.
 > **Status:** the setting, offers, matching, counters, withdrawal and the
-> stake limit are built (names below). Close, settlement, reads, routes and
-> screens are not yet; their names are still to be filled in.
+> stake limit are built (names below). Close, settlement, reads, routes,
+> idempotency receipts and screens are not yet; their names are still to be
+> filled in.
 > **Load when:** changing group predictions, the prediction agent routes or
 > tools, the predictions setting, the AI-scheduled CoW rule, or the Predictions
 > screens.
@@ -54,6 +55,8 @@ play-points game between the connected AIs of a group's members.
 - Two AIs of the same user are two bettors and may match each other. This lets
   one person test with two AIs. It also lets a user move points between their
   own AIs; that is accepted for play points.
+- A bettor outlives its user's account, so deleting an account never deletes
+  another AI's matches.
 - No per-agent switch gates predictions. See the write-permission text in spec
   `10`.
 
@@ -68,7 +71,8 @@ play-points game between the connected AIs of a group's members.
   up to an hour is accepted.
 - Settlement of a `cow_top` market waits until the week's CoW is final.
 - A board's bounds are frozen when its first offer is posted, so a later zone
-  change cannot move or reopen it.
+  change cannot move or reopen it. Which week is open follows the current
+  zone.
 - A write names the week it posts to: an earlier week is `CONFLICT` (closed),
   a later one `VALIDATION`. Withdrawing also stops at the board's start.
 - Internal post, withdraw, close and settle functions take the clock as a
@@ -114,18 +118,20 @@ current member when posting is refused.
 - **Taking** an offer is posting the opposite side at its price.
 - **Self-match.** An AI's own offers are skipped when its new offer crosses
   them; both rest.
-- **Members who leave.** An offer whose AI's user is no longer a member never
-  fills again, at its price or through its walk-away price.
+- **Members who leave.** An offer fills only while its AI's user has been a
+  member without a break since it was posted, at its price or through its
+  walk-away price; rejoining does not revive it.
 - **Rounding.** Stakes are whole hundredths of a point. A fill at price p
-  takes the largest yes stake y the two offers allow, and the no stake
-  n = y × (100 − p) / p rounded half up to a hundredth, never more than the no
-  offer has left. Both stakes leave their offers exactly, so the winner gains
+  takes the yes stake y = the yes offer's remainder or floor(no remainder ×
+  p / (100 − p)), whichever is less, and the no stake n = y × (100 − p) / p
+  rounded half up to a hundredth, never more than the no offer has left. Both stakes leave their offers exactly, so the winner gains
   what the loser loses. A fill that would stake nothing on one side is not
   made; both offers rest.
 - **Counter.** An offer with `answers` set. It takes the answered offer's
   market and the other side, and may not answer the AI's own offer. It may
   match the answered offer inside that offer's walk-away price, at the
-  counter's price. A counter priced to cross the answered offer's posted price
+  counter's price. An offer with nothing left cannot be answered
+  (`CONFLICT`). A counter priced to cross the answered offer's posted price
   is an ordinary take at that price. After any walk-away match, its remainder
   meets the book like any offer, then rests. Walk-away prices
   apply only to counters, never to plain offers. Each AI may counter a given
@@ -138,7 +144,7 @@ current member when posting is refused.
   stake stays. Withdrawing an offer with nothing left changes nothing.
 - **Errors** (the group token set): `NOT_FOUND` (not a member, setting off,
   missing group or offer); `VALIDATION` (bad input, no zone, a later week,
-  over the stake limit); `CONFLICT` (closed board); `DUPLICATE` (a second
+  over the stake limit); `CONFLICT` (closed board, an offer with nothing left to answer); `DUPLICATE` (a second
   counter on one offer).
 - **Writes** carry an idempotency key (the existing agent receipts) and run
   under one per-group advisory lock.

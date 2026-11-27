@@ -36,8 +36,9 @@
 #     frees only the unmatched remainder; another AI's offer is NOT_FOUND;
 #   - concurrency: two simultaneous crossing posts never over-fill, and one
 #     AI's two simultaneous posts never pass the stake cap;
-#   - an offer of a member who has left never fills; a client name is
-#     stripped of control characters and cut to 60.
+#   - an offer of a member who has left never fills, even after a rejoin; a
+#     counter on an offer with nothing left is CONFLICT; a client name is
+#     stripped of control, bidi and zero-width characters and cut to 60.
 #
 # Hermetic: per-run users and OAuth clients, deleted on exit with everything
 # they own.
@@ -83,6 +84,7 @@ cleanup() {
     delete from app_public.group_eval_queue where member_user_id in (${ids});
     delete from app_public.groups where created_by in (${ids})
       or id in (select group_id from app_public.group_memberships where user_id in (${ids}));
+    delete from app_public.group_prediction_bettors where user_id in (${ids});
     delete from auth.users where id in (${ids});
     delete from auth.oauth_clients where id::text in (${clients});
     commit;" >/dev/null
@@ -240,7 +242,7 @@ add_bettor S "${STRANGER_UID}"
 add_bettor L "${LEAVER_UID}" "Claude"
 add_bettor H "${OWNER_UID}"
 add_bettor N "${ALEX_UID}"
-run_psql "update auth.oauth_clients set client_name = 'Evil' || chr(10) || repeat('x', 80) where id = '${N_CLIENT}';" >/dev/null
+run_psql "update auth.oauth_clients set client_name = 'Evil' || chr(10) || chr(8238) || chr(8203) || chr(65279) || repeat('x', 80) where id = '${N_CLIENT}';" >/dev/null
 rpc "${FORMER_TOKEN}" group_leave "$(settings_body "${GROUP}")"
 expect_ok "former member leaves"
 
@@ -256,6 +258,8 @@ expect_sql "no API role holds a table privilege" "select count(*) from unnest(ar
   where has_table_privilege(r.role, 'app_public.' || t.name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER');" 0
 expect_sql "no table enters sync scope" "select count(*) from information_schema.columns where table_schema = 'app_public'
   and table_name in (${TABLES}) and column_name = 'owner_user_id';" 0
+expect_sql "bettors outlive an account: no FK to auth.users" "select count(*) from pg_constraint con
+  where con.contype = 'f' and con.conrelid = 'app_public.group_prediction_bettors'::regclass;" 0
 expect_sql "no FK into a Sync v2 table" "select count(*) from pg_constraint con join pg_class c on c.oid = con.conrelid
   join pg_class r on r.oid = con.confrelid join pg_namespace n on n.oid = r.relnamespace
   where con.contype = 'f' and c.relname in (${TABLES}) and n.nspname = 'app_public' and r.relname in (${SYNC_TABLES});" 0
@@ -461,11 +465,11 @@ post_ok "B rests a no @37" B records_line "${BOOK3}" no 37 1; B37="${OFFER}"
 post_ok "A1 takes it with 0.50 at 37" A1 records_line "${BOOK3}" yes 37 0.5
 check "odd price: no = yes × 63 / 37 rounded half up" '.matches[0].yes_stake == 0.5 and .matches[0].no_stake == 0.85'
 post_ok "A2 takes the 0.15 left at 37" A2 records_line "${BOOK3}" yes 40 1
-check "the no side's last cents: yes 0.09 against no 0.15" '.matches[0].yes_stake == 0.09 and .matches[0].no_stake == 0.15'
-expect_sql "B's no @37 is filled" "select remaining_cents from app_public.group_prediction_offers where id = '${B37}';" 0
+check "the no side limits: yes = floor(0.15 × 37 / 63) = 0.08 against no 0.14" '.matches[0].yes_stake == 0.08 and .matches[0].no_stake == 0.14'
+expect_sql "B's no @37 keeps a cent no yes cent can match" "select remaining_cents from app_public.group_prediction_offers where id = '${B37}';" 1
 post_ok "B rests a no @99 of one cent" B records_line "$(records 9)" no 99 0.01
 post_ok "A1 takes it with 1.00" A1 records_line "$(records 9)" yes 99 1
-check "a one-cent no side matches 1.00 of yes at 99" '.matches[0].yes_stake == 1 and .matches[0].no_stake == 0.01 and .offer.remaining == 0'
+check "a one-cent no side covers 0.99 of yes at 99, never more" '.matches[0].yes_stake == 0.99 and .matches[0].no_stake == 0.01 and .offer.remaining == 0.01'
 post_ok "B rests a yes @1 of one cent" B records_line "$(records 10)" yes 1 0.01
 post_ok "A1's 0.50 no cannot cover it" A1 records_line "$(records 10)" no 1 0.5
 check "a fill that would stake nothing on one side is not made" '.matches == [] and .offer.remaining == 0.5'
@@ -505,14 +509,13 @@ counter E "${A1_W}" 50 1 "$(jq -nc --argjson p "$(records 6)" '{p_template:"reco
 expect_error VALIDATION "a counter naming another market"
 counter E "${MISSING_GROUP}" 50 1
 expect_error NOT_FOUND "a counter on an unknown offer"
-counter E "${A1_W}" 50 0.5 "$(jq -nc --argjson p "${BOOK4}" '{p_template:"records_line", p_parameters:$p, p_side:"no"}')"
-expect_ok "a counter may repeat its market and side"
-check "a filled answered offer leaves the counter resting" '.matches == []'
+counter E "${A1_W}" 50 0.5
+expect_error CONFLICT "a counter on a filled offer"
 
 BOOK5="$(records 6)"
 post_ok "A2 yes @40 with walk-away 45" A2 records_line "${BOOK5}" yes 40 1 '{"p_walk_away_price":45}'; A2_W="${OFFER}"
-counter E "${A2_W}" 50 1
-expect_ok "E counters no @50, outside the walk-away"
+counter E "${A2_W}" 50 1 "$(jq -nc --argjson p "${BOOK5}" '{p_template:"records_line", p_parameters:$p, p_side:"no"}')"
+expect_ok "E counters no @50, outside the walk-away, repeating the market and side"
 check "outside the walk-away the counter rests" '.matches == [] and .offer.state == "open"'
 post_ok "O yes @30 with walk-away 60" O records_line "$(records 8)" yes 30 1 '{"p_walk_away_price":60}'
 post_ok "E posts a plain no @50, inside that walk-away" E records_line "$(records 8)" no 50 1
@@ -533,6 +536,10 @@ check "an offer of a member who left no longer fills" '.matches == []'
 counter E "${L_YES}" 55 1
 expect_ok "E counters inside L's walk-away"
 check "nor through its walk-away price" '.matches == []'
+rpc "${LEAVER_TOKEN}" group_join "$(jq -nc --arg c "${CODE}" '{p_code:$c}')"
+expect_ok "L's user rejoins"
+post_ok "O posts a crossing no after the rejoin" O records_line "$(records 17)" no 50 1
+check "rejoining does not revive an offer posted before the break" '.matches == []'
 pass "counters: inside walk-away match at the counter's price, outside rests, plain offers ignore walk-away, one per AI per offer"
 
 # --- stake limit and withdraw ---------------------------------------------------------------

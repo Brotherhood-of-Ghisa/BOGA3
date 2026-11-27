@@ -14,10 +14,11 @@ create table app_public.group_prediction_settings (
 );
 
 -- One connected AI: a user plus an OAuth client. A new grant on the same
--- client is the same bettor.
+-- client is the same bettor. No FK to auth.users (like group_cows.created_by):
+-- deleting an account must not delete its counterparties' matches.
 create table app_public.group_prediction_bettors (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid not null,
   client_id text not null check (char_length(client_id) between 1 and 200),
   created_at timestamptz not null default clock_timestamp(),
   unique (user_id, client_id)
@@ -137,15 +138,16 @@ language sql immutable set search_path = app_public, pg_temp as $$
   select floor(extract(epoch from p_at) * 1000)::bigint;
 $$;
 
--- The rounding rule: a fill takes the largest whole-hundredths yes stake y
--- that the two offers allow, and the no stake n = y * (100 - p) / p rounded
--- half up to a hundredth, never more than the no side has left. Both stakes
--- leave their offers exactly, so a match moves points without creating any.
+-- The rounding rule: a fill takes the yes stake y = the yes side's remainder,
+-- or the whole hundredths the no side's remainder covers at p
+-- (floor(no * p / (100 - p))), whichever is less, and the no stake
+-- n = y * (100 - p) / p rounded half up to a hundredth (never more than the no
+-- side has left). Both stakes leave their offers exactly, so a match moves
+-- points without creating any.
 create function app_public.group_prediction_fill(p_yes_cents integer, p_no_cents integer, p_price integer,
   out yes_cents integer, out no_cents integer)
 language sql immutable set search_path = app_public, pg_temp as $$
-  with y as (select least(p_yes_cents::bigint,
-      ((2 * p_no_cents::bigint + 1) * p_price - 1) / (2 * (100 - p_price))) as y)
+  with y as (select least(p_yes_cents::bigint, p_no_cents::bigint * p_price / (100 - p_price)) as y)
   select y::integer, ((2 * y * (100 - p_price) + p_price) / (2 * p_price))::integer from y;
 $$;
 
@@ -156,10 +158,12 @@ language sql stable set search_path = app_public, pg_temp as $$
 $$;
 
 -- The OAuth client's name is chosen by whoever registered the client, and
--- other AIs read it: control characters are dropped and it is cut to 60.
+-- other AIs read it: control, bidi and zero-width characters are dropped and
+-- it is cut to 60.
 create function app_public.group_prediction_client_name(p_client_id text) returns text
 language sql stable set search_path = app_public, pg_temp as $$
-  select nullif(left(btrim(regexp_replace(c.client_name, '[[:cntrl:]]', '', 'g')), 60), '')
+  select nullif(btrim(left(btrim(regexp_replace(c.client_name,
+      '[[:cntrl:]\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]', '', 'g')), 60)), '')
     from auth.oauth_clients c where c.id::text = p_client_id;
 $$;
 
@@ -173,13 +177,16 @@ language sql stable set search_path = app_public, pg_temp as $$
   where b.id = p_bettor;
 $$;
 
--- An offer meets others only while its AI's user is a current member: a
--- member who left can no longer withdraw, so nothing new may fill.
-create function app_public.group_prediction_bettor_current(p_bettor uuid, p_group uuid) returns boolean
+-- An offer meets others only while its AI's user has been a member without a
+-- break since it was posted: a member who left can no longer withdraw it, and
+-- rejoining does not revive it.
+create function app_public.group_prediction_offer_live(p_offer app_public.group_prediction_offers, p_group uuid)
+returns boolean
 language sql stable set search_path = app_public, pg_temp as $$
   select exists (select 1 from app_public.group_prediction_bettors b
     join app_public.group_memberships gm on gm.user_id = b.user_id
-   where b.id = p_bettor and gm.group_id = p_group and gm.ended_at is null);
+   where b.id = p_offer.bettor_id and gm.group_id = p_group and gm.ended_at is null
+     and gm.joined_at <= p_offer.created_at);
 $$;
 
 create function app_public.group_prediction_parameters_json(p_market app_public.group_prediction_markets) returns jsonb
@@ -514,6 +521,9 @@ begin
       where o.answers_offer_id = _answered.id and o.bettor_id = _bettor) then
     raise exception 'DUPLICATE: this AI already countered that offer' using errcode = 'P0001';
   end if;
+  if _answered.id is not null and (_answered.remaining_cents = 0 or _answered.released_at is not null) then
+    raise exception 'CONFLICT: that offer has nothing left to answer' using errcode = 'P0001';
+  end if;
   _exposure := app_public.group_prediction_exposure(_bettor, p_group_id, _board.week_start);
   if _exposure + _cents > 10000 then
     raise exception 'VALIDATION: this offer needs % points; % are left this week',
@@ -530,7 +540,7 @@ begin
   -- it at the counter's price when inside that offer's walk-away price.
   if _answered.id is not null and _answered.walk_away_price is not null
      and _answered.remaining_cents > 0 and _answered.released_at is null
-     and app_public.group_prediction_bettor_current(_answered.bettor_id, p_group_id)
+     and app_public.group_prediction_offer_live(_answered, p_group_id)
      and (case when _answered.side = 'yes' then p_price > _answered.price and p_price <= _answered.walk_away_price
                else p_price < _answered.price and p_price >= _answered.walk_away_price end) then
     _match := app_public.group_prediction_match(_offer.id, _answered.id, p_price, 'counter', p_now);
@@ -543,7 +553,7 @@ begin
   -- oldest, each at its own posted price.
   for _r in select o.id, o.price from app_public.group_prediction_offers o
      where o.market_id = _market.id and o.side <> _side and o.remaining_cents > 0 and o.released_at is null
-       and o.bettor_id <> _bettor and app_public.group_prediction_bettor_current(o.bettor_id, p_group_id)
+       and o.bettor_id <> _bettor and app_public.group_prediction_offer_live(o, p_group_id)
        and case when _side = 'yes' then o.price <= p_price else o.price >= p_price end
      order by case when _side = 'yes' then o.price else -o.price end, o.seq loop
     exit when (select o.remaining_cents from app_public.group_prediction_offers o where o.id = _offer.id) = 0;
