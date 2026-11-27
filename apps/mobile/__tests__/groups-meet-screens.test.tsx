@@ -27,7 +27,8 @@ import MeetScheduleRoute from '@/app/group/[groupId]/meets/schedule';
 import MeetsRoute from '@/app/group/[groupId]/meets';
 import { MeetGroupPreview } from '@/components/groups/meet-group-preview';
 import { MeetStreamCard } from '@/components/groups/meet-stream-card';
-import { renderWithTheme } from './helpers/theme';
+import { DEFAULT_APPEARANCE, type AppearanceChoice } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 const api = groupApi as jest.Mocked<typeof groupApi>;
 const online = (value: boolean) => act(() => { mockOnline = value; mockListeners.forEach(listener => listener({ isConnected: value, isInternetReachable: value })); });
 beforeEach(() => {
@@ -171,4 +172,24 @@ it('removes confirmed and unsaved challenges through their respective server and
     fireEvent.press(screen.getByTestId('meet-form-submit')); await waitFor(() => expect(mockRouter.replace).toHaveBeenCalled());
     expect(persisted.challenges).toEqual([]); expect(api.createMeet).toHaveBeenCalledTimes(1);
   } finally { alert.mockRestore(); }
+});
+
+it('repaints page headings and empty-state copy with page inks on Ink + paper', async () => {
+  api.listMeets.mockResolvedValue({ upcoming: [], past: [], next_cursor: null });
+  renderWithTheme(<MeetsRoute />); await screen.findByText('Nothing scheduled');
+  const appearance: AppearanceChoice = { theme: 'ink-paper', mode: 'light', custom: null };
+  try {
+    await switchTheme(appearance); const roles = rolesFor(appearance);
+    expect(screen.getByText('Next meets')).toHaveStyle({ color: roles.pageInkMuted });
+    expect(screen.getByText('Past meets')).toHaveStyle({ color: roles.pageInkMuted });
+    expect(screen.getByText('Nothing scheduled')).toHaveStyle({ color: roles.pageInk });
+    expect(screen.getByText('No past meets')).toHaveStyle({ color: roles.pageInk });
+  } finally { await switchTheme(DEFAULT_APPEARANCE); }
+});
+
+it('keeps the schedule time zone readable on the contrasting page ground', async () => {
+  renderWithTheme(<MeetScheduleRoute />); await screen.findByTestId('meet-form-title');
+  const appearance: AppearanceChoice = { theme: 'ink-paper', mode: 'light', custom: null };
+  try { await switchTheme(appearance); expect(screen.getByText('Europe/London')).toHaveStyle({ color: rolesFor(appearance).pageInkMuted }); }
+  finally { await switchTheme(DEFAULT_APPEARANCE); }
 });

@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
-import { ActionButton, ScreenScroll, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, ScreenScroll, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 import { canManageGroup, getGroup, groupCacheKeys, useGroupResource } from '@/src/groups';
 import { listMeets, toGroupApiError } from '@/src/groups/api';
@@ -15,7 +15,7 @@ import { usePullToRefresh } from './use-pull-to-refresh';
 
 /** Cache-first current/archive browser, with a results-owned leaderboard extension slot. */
 export function GroupMeetsPage({ groupId, userId, embedded = false, leaderboard }: { groupId: string; userId: string; embedded?: boolean; leaderboard?: ReactNode }) {
-  const text = useUiText(); const router = useRouter();
+  const text = useUiText(); const tone = useUiTextTone(); const router = useRouter();
   const meets = useMeets(groupId, userId);
   const read = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource({ userId, cacheKey: groupCacheKeys.group(groupId), fetcher: read, evictGroupIdOnNotFound: groupId });
@@ -44,13 +44,13 @@ export function GroupMeetsPage({ groupId, userId, embedded = false, leaderboard 
     {meets.offline ? <GroupOfflineBanner lastUpdatedAtMs={meets.lastUpdatedAtMs} /> : null}
     {error && meets.data ? <GroupInlineError testID="meet-inline-error" error={error} onRetry={() => void meets.refresh()} /> : null}
     {!meets.data ? <GroupMissingDataState error={error} offline={meets.offline} onRetry={() => void meets.refresh()} testIDPrefix="meets" /> : <>
-      <Text allowFontScaling={false} style={text.label}>Next meets</Text>
-      {meets.data.upcoming.length ? meets.data.upcoming.map(meet => <MeetSummaryCard key={meet.meet_id} meet={meet} />) : <Text allowFontScaling={false} style={text.body}>Nothing scheduled</Text>}
+      <Text allowFontScaling={false} style={[text.label, tone.pageMuted]}>Next meets</Text>
+      {meets.data.upcoming.length ? meets.data.upcoming.map(meet => <MeetSummaryCard key={meet.meet_id} meet={meet} />) : <Text allowFontScaling={false} style={[text.body, tone.page]}>Nothing scheduled</Text>}
       {group.data && canManageGroup(group.data.group.my_role) ? <ActionButton label="Schedule meet" variant="text" testID="meets-schedule" onPress={() => router.push(meetScheduleHref(groupId))} /> : null}
       {leaderboard}
-      <Text allowFontScaling={false} style={text.label}>Past meets</Text>
+      <Text allowFontScaling={false} style={[text.label, tone.pageMuted]}>Past meets</Text>
       <View style={{ gap: uiSpace.sm }}>{past.map(meet => <MeetSummaryCard key={meet.meet_id} meet={meet} />)}</View>
-      {!past.length ? <Text allowFontScaling={false} style={text.body}>No past meets</Text> : null}
+      {!past.length ? <Text allowFontScaling={false} style={[text.body, tone.page]}>No past meets</Text> : null}
       {cursor ? <ActionButton label={loading ? 'Loading…' : 'More meets'} variant="text" disabled={loading || meets.offline} onPress={() => void more()} /> : null}
       {moreError ? <GroupInlineError testID="meet-inline-error" error={moreError} onRetry={() => void more()} /> : null}
     </>}
