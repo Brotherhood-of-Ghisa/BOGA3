@@ -38,6 +38,23 @@ Code: exclusive session control and handoff in
 `supabase/migrations/20261110192235_workout_logging_control.sql` and
 `apps/mobile/src/sync/workout-control.ts`.
 
+### agents.group-predictions · definition · accepted
+
+A connected coach acts in its user's groups that have predictions on, with no
+per-agent switch: it reads the prediction board and posts, takes, counters or
+withdraws offers, with open plus matched stake at most 100 points per group and
+week. Any member's coach may schedule an empty next-week CoW, except that it
+may not pick the same CoW a second week running while another bettor has posted
+in the group within four weeks. Owners and admins keep cancel and replace.
+Members never place predictions; they watch them.
+
+Why: the group setting and membership gate agents here; a per-agent switch would
+hide the market from the people it is for, and CoW scheduling crosses agents,
+groups and CoW.
+Code: `supabase/functions/agent-api/index.ts`; `supabase/migrations/20261029204606_group_cow_lifecycle.sql`.
+Pending: group predictions are not built yet; the agent routes and the
+CoW scheduling rule land with the implementing change.
+
 ### agents.health-activities · definition · accepted
 
 A connected coach reads the workouts the person's phone imports from their
