@@ -83,6 +83,8 @@ edits `joined_at` or reopens a period must move the item.
 `group_events_backfill()` inserts missing session/membership items.
 CoW lifecycle uses a dedicated Stream family; load
 [group-cow-contract.md](group-cow-contract.md) when changing its capture/readers.
+Meet items (kind `meet`) are owned by
+[group-meet-contract.md](group-meet-contract.md); load it when changing them.
 
 **Group exercises & shared library.** A comparison identity that members link
 their exercises to. Shares `ExerciseCore` with personal exercises; SQL trims with
