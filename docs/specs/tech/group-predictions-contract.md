@@ -7,7 +7,9 @@
 > **Not here:** what the code states (columns, SQL, wire shapes, messages,
 > tests). Names not fixed yet (tables, RPCs, routes, error tokens) are written
 > as "named by the implementing change" until that change fills them in.
-> **Status:** skeleton; the rules below are settled, the names are not.
+> **Status:** the setting, offers, matching, counters, withdrawal and the
+> stake limit are built (names below). Close, settlement, reads, routes and
+> screens are not yet; their names are still to be filled in.
 > **Load when:** changing group predictions, the prediction agent routes or
 > tools, the predictions setting, the AI-scheduled CoW rule, or the Predictions
 > screens.
@@ -24,8 +26,9 @@ play-points game between the connected AIs of a group's members.
 
 ## Access
 
-- **Setting.** Each group has a Predictions setting, off by default. Only an
-  owner or admin changes it. While it is off, every prediction read and write
+- **Setting.** Each group has a Predictions setting, off by default. Any
+  member reads it (`group_prediction_settings_get`); only an owner or admin
+  changes it (`group_prediction_settings_set`, else `FORBIDDEN`). While it is off, every prediction read and write
   for that group is refused and the app shows no Predictions UI.
 - **Agent access** needs three things: a live grant on the agent's OAuth
   client, the user's current membership of the group, and the group's
@@ -38,6 +41,9 @@ play-points game between the connected AIs of a group's members.
   service-role `agent_group_prediction_*` RPCs, called only by the agent API
   (`docs/specs/10-api-authn-authz-guidelines.md` rules 15 and 17). They take a
   validated owner and client ID and re-check membership and the setting.
+  Built: `agent_group_prediction_post` and `agent_group_prediction_withdraw`.
+  They refuse OAuth claims (`AGENT_FORBIDDEN`) and any caller but the service
+  role (`SERVICE_ROLE_REQUIRED`); no client role may execute them.
 
 ## Bettors
 
@@ -61,8 +67,12 @@ play-points game between the connected AIs of a group's members.
   freezes each member's e1RM baselines. After the week ends it settles. Lag of
   up to an hour is accepted.
 - Settlement of a `cow_top` market waits until the week's CoW is final.
-- Internal close and settle functions take the clock as a parameter, so tests
-  can move time.
+- A board's bounds are frozen when its first offer is posted, so a later zone
+  change cannot move or reopen it.
+- A write names the week it posts to: an earlier week is `CONFLICT` (closed),
+  a later one `VALIDATION`. Withdrawing also stops at the board's start.
+- Internal post, withdraw, close and settle functions take the clock as a
+  parameter, so tests can move time.
 
 ## Markets
 
@@ -102,15 +112,31 @@ current member when posting is refused.
   The execution price is the resting offer's posted price. Order is best price
   first, then oldest. Partial fills are allowed; the remainder rests.
 - **Taking** an offer is posting the opposite side at its price.
-- **Counter.** An offer with `answers` set. It may match the answered offer
-  inside that offer's walk-away price, at the counter's price. Walk-away prices
+- **Self-match.** An AI's own offers are skipped when its new offer crosses
+  them; both rest.
+- **Rounding.** Stakes are whole hundredths of a point. A fill at price p
+  takes the largest yes stake y the two offers allow, and the no stake
+  n = y × (100 − p) / p rounded half up to a hundredth, never more than the no
+  offer has left. Both stakes leave their offers exactly, so the winner gains
+  what the loser loses. A fill that would stake nothing on one side is not
+  made; both offers rest.
+- **Counter.** An offer with `answers` set. It takes the answered offer's
+  market and the other side, and may not answer the AI's own offer. It may
+  match the answered offer inside that offer's walk-away price, at the
+  counter's price. A counter priced to cross the answered offer's posted price
+  is an ordinary take at that price. After any walk-away match, its remainder
+  meets the book like any offer, then rests. Walk-away prices
   apply only to counters, never to plain offers. Each AI may counter a given
   offer once, so the private price cannot be probed.
 - **Stake limit.** Open remaining stake plus matched stake is at most 100.00
   points per AI, group and week. Withdrawing frees unmatched stake. Nothing
   carries over to another week.
 - **Withdraw** removes the unmatched remainder of the AI's own offer. Matched
-  stake stays.
+  stake stays. Withdrawing an offer with nothing left changes nothing.
+- **Errors** (the group token set): `NOT_FOUND` (not a member, setting off,
+  missing group or offer); `VALIDATION` (bad input, no zone, a later week,
+  over the stake limit); `CONFLICT` (closed board); `DUPLICATE` (a second
+  counter on one offer).
 - **Writes** carry an idempotency key (the existing agent receipts) and run
   under one per-group advisory lock.
 - **Notes** are stored and shown to members only. No agent route returns them.
@@ -118,8 +144,8 @@ current member when posting is refused.
 ## Settlement and ranking
 
 - **Per match:** the winner gains the loser's stake. A void market moves
-  nothing. Points are never created or destroyed; the rounding rule for the
-  two sides is named by the implementing change.
+  nothing. Points are never created or destroyed (the rounding rule is in
+  "Offers, matching and counters").
 - **Finality:** results are final once written. Later edits to sessions never
   resettle a market.
 - **Stored** per AI, group and week: profit, matched bets, wins, losses and
@@ -188,8 +214,9 @@ Members read; nothing here writes.
 
 ## Verification ownership
 
-- **Settlement and matching:** Jest and the backend lanes named by the
-  implementing change.
+- **Setting, offers, matching, counters, stake limit:**
+  `supabase/tests/groups-predictions.sh`, a body of the `groups-contract`
+  lane. Settlement: named by its change.
 - **Agent routes and tools:** the agent API tests and the MCP smoke lane.
 - **Group isolation:** the group authorization lanes, with negative tests for
   non-members, the setting off, and agent tokens.
