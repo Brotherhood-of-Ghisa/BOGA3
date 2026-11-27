@@ -96,6 +96,11 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
   injuries: [
     { parentIdField: 'muscle_group_id', parentType: 'muscle_groups', required: false },
   ],
+  // `meet_id` is deliberately absent: plain text with no FK (meets are group
+  // storage, not syncable parents).
+  session_meet_links: [
+    { parentIdField: 'session_id', parentType: 'sessions', required: true },
+  ],
   session_exercises: [
     { parentIdField: 'source_plan_use_id', parentType: 'session_plan_uses', required: false },
     { parentIdField: 'session_id', parentType: 'sessions', required: true },
@@ -142,6 +147,7 @@ const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,
   injuries: schema.injuries,
+  session_meet_links: schema.sessionMeetLinks,
 };
 
 /** A single preflight failure: one dirty child whose parent is not provably safe. */
