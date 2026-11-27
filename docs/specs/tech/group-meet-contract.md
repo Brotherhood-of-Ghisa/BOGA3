@@ -133,9 +133,9 @@ on each read from the counting links. Server finality, never the clock, makes
 them final: the results read's own state says so, while the embedded meet's
 clock-derived state can already read final.
 
-**✓** is a set's active certification of the score being ranked: live, pinned
-to its current score; final, as the snapshot took it, so a later edit or
-withdrawal changes it only through Refresh.
+**✓** follows [[meets.results-display]]: live, it is an active certification
+matching the ranked score's current fingerprint; final, it is stored with the
+snapshot's scores.
 
 **Timed transitions.** Each group-eval run, after its queues, fires what is
 due: the `on` item at `starts_at`, `results` at `ends_at`, the snapshot at the
@@ -163,10 +163,10 @@ and while the evaluator is behind, so both are `CONFLICT`; so is a cancelled
 meet.
 
 **Reads** (current members): one meet's results, per live challenge its ranked
-rows with the set, value, unit and ✓ (an active certification of the set on
-that exercise), a caption state (`scheduled`, `live`, `so_far` with the final
-time, `final`, `refreshed` with when and who, `cancelled`), the counting
-sessions, and the group records set in them. Every read applies
+rows with the set, value, unit and ✓, a caption state (`scheduled`, `live`,
+`so_far` with the final time, `final`, `refreshed` with when and who,
+`cancelled`), the counting sessions, and the group records set in them, read
+live ([[meets.results-display]]). Every read applies
 [[groups.kg-disclosure]] per row, plus a kg score's exercise now counting
 bodyweight (as CoW): hidden kg figures are null with `unavailable`, places
 kept, and the raw weight is withheld whenever the rule hides kg.

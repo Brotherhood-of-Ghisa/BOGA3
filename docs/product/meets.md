@@ -38,6 +38,18 @@ by an explicit refresh.
 Code: `supabase/migrations/20261127223000_group_meet_scoring.sql`;
 `supabase/functions/group-eval/` (runs the timed transitions).
 
+### meets.results-display · presentation · accepted
+
+A ranked set shows ✓ while it holds an active [[groups.certification]], as
+context, never eligibility; final results keep the ✓ the snapshot took until
+Refresh. Results also list the group records set in the counting sessions as
+those records stand now; they are not snapshotted.
+
+Why: a ✓ belongs to the frozen result it was seen on; records are group
+history, already in the stream.
+Code: `group_meet_set_scores` and `group_meet_records_json` in
+`supabase/migrations/20261127223000_group_meet_scoring.sql`.
+
 ### meets.challenge-metrics · calculation · accepted
 
 A challenge ranks each member's best single qualifying set. 1RM, Volume and
