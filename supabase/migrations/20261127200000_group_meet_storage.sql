@@ -134,11 +134,16 @@ declare
   _venue text := nullif(app_public.group_exercise_trim(p_venue_name), '');
   _address text := nullif(app_public.group_exercise_trim(p_address), '');
   _note text := nullif(app_public.group_exercise_trim(p_entry_note), '');
-  _ends bigint := coalesce(p_ends_at_ms, p_starts_at_ms + 3 * 3600 * 1000);
+  _ends bigint;
 begin
   if p_starts_at_ms is null then
     raise exception 'VALIDATION: a meet needs a start time' using errcode = 'P0001';
   end if;
+  -- Year 1970 to about 5138: keeps the arithmetic and casts below in range.
+  if p_starts_at_ms not between 0 and 100000000000000 or p_ends_at_ms not between 0 and 100000000000000 then
+    raise exception 'VALIDATION: a meet time is out of range' using errcode = 'P0001';
+  end if;
+  _ends := coalesce(p_ends_at_ms, p_starts_at_ms + 3 * 3600 * 1000);
   if _ends <= p_starts_at_ms then
     raise exception 'VALIDATION: a meet must end after it starts' using errcode = 'P0001';
   end if;
@@ -176,8 +181,7 @@ begin
   end if;
 end $$;
 
--- Challenge metrics are those the group scorer can rank for the exercise: a
--- Hold exercise ranks seconds; any other exercise ranks the repetition metrics.
+-- Challenge metrics follow the exercise's comparison ([[groups.hold-ranking]]).
 create function app_public.group_meet_challenge_validate(p_group uuid, p_exercise uuid, p_metric text) returns void
 language plpgsql stable set search_path = app_public, pg_temp as $$
 declare _default text;
@@ -258,10 +262,21 @@ create unique index group_events_meet_transition on app_public.group_events
 -- with p_lock) before the role check; reads take KEY SHARE.
 -- ---------------------------------------------------------------------------
 
+-- Membership, then the Hold-client check every group reader makes (a group
+-- with a Hold comparison refuses clients that cannot show seconds).
+create function app_public.group_meet_require_member(p_group uuid, p_user uuid, p_lock boolean) returns text
+language plpgsql set search_path = app_public, pg_temp as $$
+declare _role text;
+begin
+  _role := app_public.group_require_member(p_group, p_user, p_lock);
+  perform app_public.group_competition_require_seconds(p_group);
+  return _role;
+end $$;
+
 create function app_public.group_meet_require_manager(p_group uuid, p_user uuid) returns void
 language plpgsql set search_path = app_public, pg_temp as $$
 begin
-  if app_public.group_require_member(p_group, p_user, true) not in ('owner', 'admin') then
+  if app_public.group_meet_require_member(p_group, p_user, true) not in ('owner', 'admin') then
     raise exception 'FORBIDDEN: only owners and admins can manage meets' using errcode = 'P0001';
   end if;
 end $$;
@@ -270,7 +285,7 @@ create function app_public.group_meet_require_reader(p_group uuid, p_user uuid) 
 language plpgsql set search_path = app_public, pg_temp as $$
 begin
   perform 1 from app_public.groups where id = p_group and deleted_at is null for key share;
-  return app_public.group_require_member(p_group, p_user, false);
+  return app_public.group_meet_require_member(p_group, p_user, false);
 end $$;
 
 create function app_public.group_meet_create(p_group_id uuid, p_meet_id uuid, p_title text,
@@ -338,6 +353,11 @@ begin
     raise exception 'CONFLICT: this meet has ended; only its challenges can change' using errcode = 'P0001';
   end if;
   perform app_public.group_meet_check_window(_fields, _now);
+  -- A started meet stays started: moving its start into the future would
+  -- reopen cancellation.
+  if _meet.starts_at <= _now and app_public.group_meet_at((_fields->>'starts_at_ms')::bigint) > _now then
+    raise exception 'CONFLICT: this meet has started; its start cannot move later than now' using errcode = 'P0001';
+  end if;
   update app_public.group_meets set title = _fields->>'title',
     starts_at = app_public.group_meet_at((_fields->>'starts_at_ms')::bigint),
     ends_at = app_public.group_meet_at((_fields->>'ends_at_ms')::bigint),
@@ -401,11 +421,12 @@ language plpgsql volatile security definer set search_path = app_public, pg_temp
 declare _uid uuid := app_public.group_require_app_user(); _meet app_public.group_meets;
   _challenge app_public.group_meet_challenges; _key text; _now timestamptz;
 begin
-  perform app_public.group_require_member(p_group_id, _uid, true);
+  perform app_public.group_meet_require_member(p_group_id, _uid, true);
   if p_challenge_id is null then
     raise exception 'VALIDATION: a challenge needs a request id' using errcode = 'P0001';
   end if;
-  perform app_public.group_meet_challenge_validate(p_group_id, p_group_exercise_id, p_metric);
+  -- An identical retry returns the stored challenge, even after the exercise
+  -- was archived since.
   _key := jsonb_build_array(p_meet_id, p_group_exercise_id, p_metric)::text;
   select * into _challenge from app_public.group_meet_challenges where id = p_challenge_id;
   if found then
@@ -415,6 +436,7 @@ begin
     end if;
     raise exception 'CONFLICT: this challenge request already exists' using errcode = 'P0001';
   end if;
+  perform app_public.group_meet_challenge_validate(p_group_id, p_group_exercise_id, p_metric);
   _meet := app_public.group_meet_for_challenge(p_group_id, p_meet_id);
   if exists (select 1 from app_public.group_meet_challenges c where c.meet_id = _meet.id
       and c.group_exercise_id = p_group_exercise_id and c.metric = p_metric and c.removed_at is null) then
@@ -460,8 +482,7 @@ language plpgsql volatile security definer set search_path = app_public, pg_temp
 declare _uid uuid := app_public.group_require_app_user(); _role text; _meet app_public.group_meets;
   _challenge app_public.group_meet_challenges; _previous jsonb; _key text; _now timestamptz;
 begin
-  _role := app_public.group_require_member(p_group_id, _uid, true);
-  perform app_public.group_meet_challenge_validate(p_group_id, p_group_exercise_id, p_metric);
+  _role := app_public.group_meet_require_member(p_group_id, _uid, true);
   _challenge := app_public.group_meet_challenge_for_write(p_group_id, p_meet_id, p_challenge_id, _uid, _role);
   _key := jsonb_build_array('edit', p_expected_version, p_group_exercise_id, p_metric)::text;
   if _challenge.last_write_key = _key and _challenge.removed_at is null then
@@ -472,6 +493,11 @@ begin
   end if;
   if _challenge.version is distinct from p_expected_version then
     raise exception 'CONFLICT: this challenge changed; refresh before saving' using errcode = 'P0001';
+  end if;
+  perform app_public.group_meet_challenge_validate(p_group_id, p_group_exercise_id, p_metric);
+  -- Saving it unchanged changes nothing: no version, no stream item.
+  if (_challenge.group_exercise_id, _challenge.metric) = (p_group_exercise_id, p_metric) then
+    return jsonb_build_object('challenge', app_public.group_meet_challenge_json(_challenge));
   end if;
   if exists (select 1 from app_public.group_meet_challenges c where c.meet_id = p_meet_id and c.id <> _challenge.id
       and c.group_exercise_id = p_group_exercise_id and c.metric = p_metric and c.removed_at is null) then
@@ -494,7 +520,7 @@ language plpgsql volatile security definer set search_path = app_public, pg_temp
 declare _uid uuid := app_public.group_require_app_user(); _role text; _meet app_public.group_meets;
   _challenge app_public.group_meet_challenges; _now timestamptz;
 begin
-  _role := app_public.group_require_member(p_group_id, _uid, true);
+  _role := app_public.group_meet_require_member(p_group_id, _uid, true);
   _challenge := app_public.group_meet_challenge_for_write(p_group_id, p_meet_id, p_challenge_id, _uid, _role);
   if _challenge.removed_at is not null then
     return jsonb_build_object('challenge_id', _challenge.id, 'removed', true);
@@ -532,7 +558,7 @@ create function app_public.group_meet_join(p_group_id uuid, p_meet_id uuid) retu
 language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
 declare _uid uuid := app_public.group_require_app_user(); _meet app_public.group_meets; _now timestamptz;
 begin
-  perform app_public.group_require_member(p_group_id, _uid, true);
+  perform app_public.group_meet_require_member(p_group_id, _uid, true);
   _now := clock_timestamp();
   _meet := app_public.group_meet_for_roster(p_group_id, p_meet_id, _now);
   if _meet.cancelled_at is not null then
@@ -547,7 +573,7 @@ create function app_public.group_meet_leave(p_group_id uuid, p_meet_id uuid) ret
 language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
 declare _uid uuid := app_public.group_require_app_user(); _meet app_public.group_meets;
 begin
-  perform app_public.group_require_member(p_group_id, _uid, true);
+  perform app_public.group_meet_require_member(p_group_id, _uid, true);
   _meet := app_public.group_meet_for_roster(p_group_id, p_meet_id, clock_timestamp());
   delete from app_public.group_meet_roster where meet_id = _meet.id and user_id = _uid;
   return jsonb_build_object('meet_id', _meet.id, 'joined', false);

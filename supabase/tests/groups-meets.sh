@@ -17,11 +17,12 @@
 #   - create/edit/cancel by owner and admin only (member FORBIDDEN); field
 #     validation; an idempotent create retry; a stale version is CONFLICT with
 #     the row unchanged; an edit retry is idempotent; edits refused after the
-#     end; cancel refused after the start; a cancelled meet keeps its audit
+#     end; a started meet's start cannot move later; cancel refused after the start; a cancelled meet keeps its audit
 #     fields, refuses edits, challenges and joins, and leaves the lists;
 #   - challenges: any member adds, the author or an admin edits/removes,
 #     another member is FORBIDDEN; metrics follow the exercise (Hold ⇒ seconds);
-#     DUPLICATE on the same live exercise + metric; a removed challenge leaves
+#     DUPLICATE on the same live exercise + metric; an add retry survives an
+#     archive; an unchanged save is a no-op; a removed challenge leaves
 #     reads and frees its pair; two concurrent different adds both commit;
 #   - join/leave by members until the cutoff (ends_at + 24h), refused after it;
 #   - stream: scheduled and cancelled once each, challenge_changed only after
@@ -101,6 +102,12 @@ expect_json() {
   local context="$1" filter="${!#}"
   set -- "${@:2:$#-2}"
   jq -e "$@" "${filter}" <<<"${BODY}" >/dev/null || fail "${context}"
+}
+# rpc_no_hold: the same call from a client without Hold support.
+rpc_no_hold() {
+  http_call -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer $1" -H "${GROUP_CONTRACT_HEADER}" \
+    -H "Content-Type: application/json" -H "Content-Profile: app_public" \
+    --data "$3" "${API_URL}/rest/v1/rpc/$2"
 }
 new_uuid() { run_psql "select gen_random_uuid();"; }
 now_ms() { run_psql "select floor(extract(epoch from clock_timestamp()) * 1000)::bigint;"; }
@@ -186,6 +193,10 @@ ARCHIVED="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
 rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(jq -nc --arg g "${GROUP}" --arg e "${ARCHIVED}" \
   '{p_group_id:$g, p_exercise_id:$e, p_archived:true}')"
 expect_ok "archive the row exercise"
+rpc "${OWNER_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${GROUP}" \
+  '{p_group_id:$g, p_name:"Meet Squat", p_load_input_mode:"total_load", p_source_exercise_id:null}')"
+expect_ok "squat exercise"
+SQUAT="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
 
 # --- posture -----------------------------------------------------------------------
 
@@ -251,6 +262,7 @@ for call in \
   saved_header="${GROUP_CONTRACT_HEADER}"; GROUP_CONTRACT_HEADER='x-boga-group-contract: 3'
   rpc "${OWNER_TOKEN}" "${name}" "${args}"; expect_error UPDATE_REQUIRED "old contract ${name}"
   GROUP_CONTRACT_HEADER="${saved_header}"
+  rpc_no_hold "${OWNER_TOKEN}" "${name}" "${args}"; expect_error UPDATE_REQUIRED "a client without Hold support ${name}"
   rpc "${STRANGER_TOKEN}" "${name}" "${args}"; expect_error NOT_FOUND "stranger ${name}"
   stranger_body="${BODY}"
   rpc "${FORMER_TOKEN}" "${name}" "${args}"; expect_error NOT_FOUND "former member ${name}"
@@ -258,7 +270,7 @@ for call in \
   rpc "${STRANGER_TOKEN}" "${name}" "$(jq -c --arg g "${MISSING_GROUP}" '.p_group_id = $g' <<<"${args}")"
   [[ "${BODY}" == "${stranger_body}" ]] || fail "a stranger's ${name} differs between a real and a nonexistent group"
 done
-pass "every meet RPC: AUTH_REQUIRED, AGENT_FORBIDDEN, UPDATE_REQUIRED; stranger ≡ former member ≡ nonexistent group"
+pass "every meet RPC: AUTH_REQUIRED, AGENT_FORBIDDEN, UPDATE_REQUIRED (old contract, no Hold support); stranger ≡ former member ≡ nonexistent group"
 
 rpc "${MEMBER_TOKEN}" group_meet_create "${CREATE}"
 expect_error FORBIDDEN "a member cannot schedule a meet"
@@ -275,7 +287,10 @@ for bad in \
   '.p_longitude = null' \
   '.p_latitude = 91' \
   ".p_starts_at_ms = $((NOW - 5 * HOUR)) | .p_ends_at_ms = $((NOW - HOUR))" \
-  ".p_starts_at_ms = $((NOW + 401 * 24 * HOUR)) | .p_ends_at_ms = null"; do
+  ".p_starts_at_ms = $((NOW + 401 * 24 * HOUR)) | .p_ends_at_ms = null" \
+  '.p_starts_at_ms = 9000000000000000000 | .p_ends_at_ms = null' \
+  '.p_ends_at_ms = 9000000000000000000' \
+  '.p_starts_at_ms = -1'; do
   rpc "${OWNER_TOKEN}" group_meet_create "$(jq -c "${bad}" <<<"${CREATE}")"
   expect_error VALIDATION "invalid meet fields (${bad})"
 done
@@ -332,6 +347,8 @@ LIVE_BODY="$(jq -c --argjson s "$(jq '.meet.starts_at_ms' <<<"${BODY}")" --argjs
   '.p_expected_version = 2 | .p_starts_at_ms = $s | .p_ends_at_ms = $e | .p_title = "Live edit"' <<<"${EDIT}")"
 rpc "${OWNER_TOKEN}" group_meet_update "${LIVE_BODY}"
 expect_ok "a live meet can be edited"
+rpc "${OWNER_TOKEN}" group_meet_update "$(jq -c ".p_expected_version = 3 | .p_starts_at_ms = $((NOW + 24 * HOUR)) | .p_ends_at_ms = null" <<<"${LIVE_BODY}")"
+expect_error CONFLICT "a started meet's start cannot move into the future (it would reopen cancel)"
 move_meet "${MEET}" "-$((3 * HOUR))" "-1000"
 rpc "${OWNER_TOKEN}" group_meet_get "$(b_ref "${GROUP}" "${MEET}")"
 expect_json "an ended meet is finalizing" '.meet.state == "finalizing"'
@@ -394,9 +411,23 @@ expect_error DUPLICATE "the same live exercise + metric"
 rpc "${MEMBER_TOKEN}" group_meet_challenge_add "$(b_ch_add "${GROUP}" "${UPCOMING}" "$(new_uuid)" "${PLANK}" seconds)"
 expect_ok "a Hold challenge on a Hold exercise"
 CH_PLANK="$(jq -r '.challenge.challenge_id' <<<"${BODY}")"
+ADD_SQUAT="$(b_ch_add "${GROUP}" "${UPCOMING}" "$(new_uuid)" "${SQUAT}" e1rm)"
+rpc "${MEMBER_TOKEN}" group_meet_challenge_add "${ADD_SQUAT}"
+expect_ok "a squat challenge"
+FIRST="${BODY}"
+rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(jq -nc --arg g "${GROUP}" --arg e "${SQUAT}" \
+  '{p_group_id:$g, p_exercise_id:$e, p_archived:true}')"
+expect_ok "archive the squat exercise"
+rpc "${MEMBER_TOKEN}" group_meet_challenge_add "${ADD_SQUAT}"
+expect_json "an identical add retry after the exercise is archived returns the stored challenge" \
+  --argjson first "${FIRST}" '.challenge == ($first.challenge + {exercise_archived: true})'
+rpc "${MEMBER_TOKEN}" group_meet_challenge_remove "$(b_ch_remove "${GROUP}" "${UPCOMING}" "$(jq -r '.challenge.challenge_id' <<<"${FIRST}")" 1)"
+expect_ok "the author removes the squat challenge"
 
 rpc "${MEMBER_TOKEN}" group_meet_challenge_update "$(b_ch_edit "${GROUP}" "${UPCOMING}" "${CH_A}" 1 "${BENCH}" volume)"
 expect_error FORBIDDEN "another member cannot edit a challenge"
+rpc "${MEMBER_TOKEN}" group_meet_challenge_update "$(b_ch_edit "${GROUP}" "${UPCOMING}" "${CH_A}" 1 "${BENCH}" best)"
+expect_error FORBIDDEN "another member's bad input is still FORBIDDEN (role before input)"
 rpc "${MEMBER_TOKEN}" group_meet_challenge_remove "$(b_ch_remove "${GROUP}" "${UPCOMING}" "${CH_A}" 1)"
 expect_error FORBIDDEN "another member cannot remove a challenge"
 rpc "${AUTHOR_TOKEN}" group_meet_challenge_update "$(b_ch_edit "${GROUP}" "${UPCOMING}" "${CH_A}" 1 "${BENCH}" volume)"
@@ -448,6 +479,8 @@ rpc "${MEMBER_TOKEN}" group_meet_challenge_add "$(b_ch_add "${GROUP}" "${UPCOMIN
 expect_ok "a challenge added after the cutoff"
 rpc "${MEMBER_TOKEN}" group_meet_challenge_update "$(b_ch_edit "${GROUP}" "${UPCOMING}" "${CH_LATE}" 1 "${BENCH}" reps)"
 expect_ok "a challenge edited after the cutoff"
+rpc "${MEMBER_TOKEN}" group_meet_challenge_update "$(b_ch_edit "${GROUP}" "${UPCOMING}" "${CH_LATE}" 2 "${BENCH}" reps)"
+expect_json "saving a challenge unchanged keeps its version" '.challenge.version == 2'
 rpc "${MEMBER_TOKEN}" group_meet_challenge_remove "$(b_ch_remove "${GROUP}" "${UPCOMING}" "${CH_LATE}" 2)"
 expect_ok "a challenge removed after the cutoff"
 rpc "${MEMBER_TOKEN}" group_meet_challenge_remove "$(b_ch_remove "${GROUP}" "${UPCOMING}" "${CH_LATE}" 2)"

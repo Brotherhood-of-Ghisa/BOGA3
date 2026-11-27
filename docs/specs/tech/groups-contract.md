@@ -113,7 +113,8 @@ result. Errors: `raise exception '<TOKEN>: <message>' using errcode =
 'P0001'`; the client matches the prefix. Tokens: `AUTH_REQUIRED`,
 `AGENT_FORBIDDEN`, `NOT_FOUND` (non-member ≡ nonexistent, byte-identical
 bodies), `FORBIDDEN` (role), `VALIDATION`, `USERNAME_REQUIRED`,
-`INVITE_INVALID`, `OWNER_MUST_TRANSFER`, `CONFLICT` (state moved: refresh and
+`INVITE_INVALID`, `OWNER_MUST_TRANSFER`, `DUPLICATE` (that item already
+exists), `CONFLICT` (state moved: refresh and
 retry), `UPDATE_REQUIRED` (client contract too old). Client-only: `NETWORK`,
 `INTERNAL`.
 
