@@ -3,18 +3,15 @@
 ### meets.linking · definition · accepted
 
 A session counts toward a meet only after its member joins that session to the
-meet (the meet's Join only adds them to the roster). It counts while the link
-is live, the session is shared into the meet's group, its member is still in
-the group, the meet is not cancelled, and the session overlaps the window:
-`started_at < ends_at`, and its end (now while running; its start if none was
-recorded) `> starts_at`. A session can count in several groups' meets. The
+meet (the meet's Join only rosters them). It counts while the link
+is live, the session is shared into the meet's group, its member remains in
+it, the meet is not cancelled, and the session overlaps the window:
+`started_at < ends_at`, and its end (now while running) `> starts_at`. A session can count in several groups' meets. The
 roster is the members who joined plus members with a counting link. A session
-that can no longer overlap cannot be attached; a running one that started
-earlier can. The recorder offers Join while its meet's window is open, and a
-finished session's page offers it until the cutoff. Leaving a meet detaches
-every session this device holds, after one sync; a session linked only on
-another device keeps counting until it is left from its own page. Every join
-and leave closes at the [[meets.results]] cutoff.
+that can no longer overlap cannot be attached. Leaving a meet detaches the
+sessions this device holds after one sync; one linked only on another device
+counts until left from its own page. Every join and leave closes at the
+[[meets.results]] cutoff.
 
 Why: results must come from deliberate choices, never from whatever a member
 happened to train that day.
