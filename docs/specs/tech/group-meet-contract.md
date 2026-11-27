@@ -111,8 +111,8 @@ come first, in join order.
 Implements [[meets.results]]. The cutoff snapshot is the accepted exception
 to [groups-contract.md](groups-contract.md)'s "Nothing is copied".
 
-**Scores are the evaluator's.** A set scores on the group exercise its
-exercise is live-linked to in the meet's group. 1RM, Volume and seconds are
+**Scores are the evaluator's** ([[meets.challenge-metrics]]). A set scores
+on the group exercise its exercise is live-linked to in the meet's group. 1RM, Volume and seconds are
 its published counting comparison scores (the TS scorer under the strict
 group policy: effort, units, bodyweight), at the current revision and only
 while they still describe the live set; a rebuilding comparison or an edit not
@@ -123,8 +123,8 @@ set. SQL adds no load, bodyweight or 1RM formula; if changing these, load
 [group-competition-contract.md](group-competition-contract.md).
 
 **Ranking.** Each member's best qualifying set per challenge (a member's own
-ties break in board order); equal full-precision values share a place and the
-next skips. Places 1–3 are trophies.
+ties break in board order), placed on the full-precision value as
+[[meets.results]] says.
 
 **Live, then the snapshot.** Until the snapshot exists, results are computed
 on each read from the counting links. Server finality, never the clock, makes
@@ -164,12 +164,8 @@ kept, and the raw weight is withheld whenever the rule hides kg.
 
 ## Meets leaderboard
 
-Over the group's final (snapshotted, not cancelled) meets, members with a
-trophy rank by gold, then silver, then bronze; equal tuples share a rank,
-ordered by name then ID. Each row lists its trophies with their meet and
-challenge. Former members stay, marked; deleted accounts leave. Rescoring and
-Refresh update it, as it reads the stored standings. The group medal tally
-([[groups.medals]]) is unchanged.
+Implements [[meets.leaderboard]] for current members, reading the stored
+standings, so rescoring, Refresh and deletion update it without a job.
 
 ## Notifications
 
