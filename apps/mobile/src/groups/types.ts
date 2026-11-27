@@ -134,6 +134,7 @@ export const GROUP_SERVER_ERROR_CODES = [
   'OWNER_MUST_TRANSFER',
   /** The state moved on since the caller saw it (certifying a set edited ahead of the evaluator). */
   'CONFLICT',
+  'DUPLICATE',
 ] as const;
 
 export type GroupServerErrorCode = (typeof GROUP_SERVER_ERROR_CODES)[number];

@@ -1,3 +1,4 @@
+import { MeetGroupPreview } from '@/components/groups/meet-group-preview';
 import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
@@ -188,6 +189,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
           testID="group-screen-set-time-zone" onPress={() => router.push(`/group/${groupId}/edit?focusTimeZone=1`)} /> : null}
       </View>
       <CoWGroupPreview key={`${userId}:${groupId}`} groupId={groupId} userId={userId} />
+      <MeetGroupPreview key={`meets:${userId}:${groupId}`} groupId={groupId} userId={userId} role={group.data?.group.my_role ?? 'member'} />
       <GroupExercisesPage
         error={inlineError}
         exercises={exercises}

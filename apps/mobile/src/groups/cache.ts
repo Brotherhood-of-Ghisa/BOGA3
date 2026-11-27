@@ -19,8 +19,10 @@ export type GroupCacheDatabase = BaseSQLiteDatabase<'sync', unknown, typeof sche
 
 export const groupCacheKeys = {
   mine: 'groups:v10:mine',
+  meets: (groupId: string) => `meets:v10:${groupId}:v1`,
+  meet: (groupId: string, meetId: string) => `meet:v10:${groupId}:${meetId}:v1`,
   group: (groupId: string) => `group:v10:${groupId}`,
-  stream: (groupId: string) => `stream:v10:${groupId}:withdrawn-records-v1`,
+  stream: (groupId: string) => `stream:v10:${groupId}:meets-v1`,
   session: (groupId: string, memberUserId: string, sessionId: string) => `session:v10:${groupId}:${memberUserId}:${sessionId}`,
   /** Versioned comparison catalogue; v1 cache entries are not reused. */
   groupExercises: (groupId: string) => `group-exercises:v10:${groupId}`,
@@ -165,7 +167,7 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 export const evictGroup = (database: GroupCacheDatabase, groupId: string): void => {
   const scope = or(inArray(groupCache.cacheKey,[groupCacheKeys.group(groupId),groupCacheKeys.stream(groupId),
     groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),`boards:v10:${groupId}`,groupCacheKeys.weekSummary(groupId),`group-policy:v10:${groupId}`]),
-    like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId)}:%`),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId, true)}:%`),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
+    eq(groupCache.cacheKey, groupCacheKeys.meets(groupId)),like(groupCache.cacheKey, `meet:v10:${groupId}:%`),like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId)}:%`),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId, true)}:%`),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
   const accounts = new Set(database.select({ userId: groupCache.userId }).from(groupCache).where(scope).all().map(row => row.userId));
   database.delete(groupCache).where(scope).run();
   accounts.forEach(invalidateCompetitionMemory);
@@ -201,7 +203,7 @@ export const subscribeCompetitionCache = (listener: () => void): (() => void) =>
 export const evictObsoleteGroupCache = (database: GroupCacheDatabase,userId: string): void => {
   database.delete(groupCache).where(and(eq(groupCache.userId,userId),notLike(groupCache.cacheKey,'%:v10:%'))).run();
   database.delete(groupCache).where(and(eq(groupCache.userId,userId),like(groupCache.cacheKey,'stream:v10:%'),
-    notLike(groupCache.cacheKey,'%:withdrawn-records-v1'))).run();
+    notLike(groupCache.cacheKey,'%:meets-v1'))).run();
 };
 
 export function invalidateCompetitionMemory(userId: string): void {
