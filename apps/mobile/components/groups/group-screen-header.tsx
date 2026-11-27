@@ -9,7 +9,7 @@ import { uiSpace } from '@/components/ui/tokens';
 
 import { GroupSwitchSheet, type GroupSwitchOption } from './group-switch-sheet';
 
-/** The Groups screen's four views of one group, in page order. */
+/** The Groups screen's five views of one group, in page order. */
 export type GroupsSection = 'stream' | 'glance' | 'leaderboards' | 'cows' | 'meets';
 
 export const GROUP_SECTIONS: readonly GroupsSection[] = ['stream', 'glance', 'leaderboards', 'cows', 'meets'];

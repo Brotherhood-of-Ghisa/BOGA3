@@ -32,7 +32,7 @@ function MeetEditor({ groupId, meetId, userId }: { groupId: string; meetId: stri
   else if (!model.zone) body = <GroupStateView testID="meet-state" title="Set the group time zone before scheduling a meet" />;
   else if (!model.draft) body = <GroupMissingDataState error={pickInlineError(model.definition.error)} offline={model.definition.offline} onRetry={() => void model.definition.refresh()} testIDPrefix="meet-form-definition" />;
   else body = <MeetEditorFields model={model} userId={userId} groupId={groupId} onSave={() => void complete()} onCheck={() => void complete(true)} />;
-  return <ScreenScroll keyboardShouldPersistTaps="handled" testID="meet-form-screen"><Stack.Screen options={{ title: meetId ? 'Edit meet' : 'Schedule meet' }} />{body}</ScreenScroll>;
+  return <ScreenScroll keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets testID="meet-form-screen"><Stack.Screen options={{ title: meetId ? 'Edit meet' : 'Schedule meet' }} />{body}</ScreenScroll>;
 }
 const FIELDS: { key: keyof MeetDraft; label: string; limit?: number }[] = [
   { key: 'title', label: 'Title', limit: 80 }, { key: 'date', label: 'Date' }, { key: 'start', label: 'Start (HH:MM)' },

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
 import { ActionButton, ScreenScroll, uiSpace, useUiText } from '@/components/ui';
@@ -25,7 +25,8 @@ export function GroupMeetsPage({ groupId, userId, embedded = false, leaderboard 
   const [base, setBase] = useState(meets.data);
   if (base !== meets.data) { setBase(meets.data); setOlder(null); }
   const refresh = usePullToRefresh(async () => { await Promise.all([meets.refresh(), group.refresh()]); });
-  const currentBase = useRef(meets.data); currentBase.current = meets.data;
+  const currentBase = useRef(meets.data);
+  useLayoutEffect(() => { currentBase.current = meets.data; }, [meets.data]);
   const cursor = older ? older.next_cursor : meets.data?.next_cursor;
   const more = async () => {
     if (!cursor || loading || meets.offline) return;

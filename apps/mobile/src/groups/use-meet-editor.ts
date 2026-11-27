@@ -48,7 +48,8 @@ export function useMeetEditor(groupId: string, meetId: string | null, userId: st
     setStaged([]);
     return written;
   });
-  useEffect(() => { if (createdId && !action.pending) void definition.refresh(); }, [createdId, action.pending, definition.refresh]);
+  const refreshDefinition = definition.refresh;
+  useEffect(() => { if (createdId && !action.pending) void refreshDefinition(); }, [createdId, action.pending, refreshDefinition]);
   const change = (key: keyof MeetDraft, value: string) => {
     if (!draft || !zone) return;
     if (key === 'end' || key === 'endDate') setDefaultEnd(false);

@@ -28,7 +28,7 @@ import {
   type GroupsSection,
 } from '@/components/groups';
 import { GroupCoWsPage } from '@/components/groups/group-cows-page';
-import { Icon, IconButton, ScreenScroll, SwipePages, makeStyles, uiSpace, type SwipePageFrame } from '@/components/ui';
+import { IconButton, ScreenScroll, SwipePages, makeStyles, uiSpace, type SwipePageFrame } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
 import { groupRankSeriesEnd, type GroupHomeMetric } from '@/src/groups/home-periods';
 import { useGroupGlance } from '@/src/groups/use-group-glance';
@@ -53,8 +53,8 @@ const toSection = (value: string | null): GroupsSection | null =>
 
 /**
  * The Groups screen (groups contract): one group at a time, named by the
- * native title and picked from it, in four pages swiped between — Stream,
- * At a glance (where it opens), Leaderboards, CoWs — under tabs naming them.
+ * native title and picked from it, in five pages swiped between — Stream,
+ * At a glance (where it opens), Leaderboards, CoWs, Meets — under tabs naming them.
  * Managing groups (join, create, the group page) lives behind the header's
  * `Manage`. `?groupId=` preselects a group and `?section=` its page.
  */
