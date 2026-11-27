@@ -35,17 +35,13 @@ sequence discovery and atomic merge/recovery RPCs, load
 - **Minimal sync validation.** App sync payloads mirror the client schema.
   Dedicated agent operations validate their own inputs separately; when changing
   workout writes, load [their contract](agent-workout-contract.md).
-  - Allowed CHECKs mirror the client: load-input mode, recording modes,
-    plan-target measurement, settings JSON shapes, and standalone Routine provenance.
+  - Allowed CHECKs mirror the client's.
   - Domain columns are nullable wherever the client may write NULL; only the
     PK, `owner_user_id` and `client_updated_at_ms` are NOT NULL.
   - Provenance guards and merge revision fences add to structural triggers; group triggers: "Out of scope".
-  - No uniqueness beyond the PK, except planning provenance and Routine slot guards
-    (`sessions_owner_source_plan_unique`,
-    `session_exercises_owner_source_block_unique`,
-    `exercise_sets_owner_source_set_unique`; see "Per-entity rules"). Slot and
-    pair uniqueness is otherwise client-enforced (see "Client-enforced
-    constraints") with non-unique btree indexes for speed only.
+  - No uniqueness beyond the PK, except planning provenance and Routine slot guards (see
+    "Per-entity rules"). Slot and pair uniqueness is otherwise client-enforced
+    (see "Client-enforced constraints") with non-unique btree indexes for speed only.
 - **Typed columns only.** No `extras jsonb` blob anywhere: schema, wire or
   drift checker.
 - **Tombstones keep the full row.** A delete sets `deleted_at` and clears
@@ -115,8 +111,7 @@ Drizzle and migrations own columns; drift checks enforce parity. Additional rule
   the member's client writes it; server code (the group evaluator included)
   only reads it. Its id must stay `<group_id>:<exercise_definition_id>`: a local
   CHECK enforces that form, so a pulled row that breaks it fails the layer-1
-  page apply with `INTERNAL` and pull cannot advance past it. Its sync scope and
-  FK-free group columns are owned by `docs/specs/05-data-model.md`.
+  page apply with `INTERNAL` and pull cannot advance past it.
 - **Session planning** adds `training_programmes`, `session_plans`,
   `session_plan_exercises`, `session_plan_sets`, `session_plan_uses`, and performed-domain
   provenance columns (`sessions.source_plan_id`,
@@ -136,9 +131,7 @@ Drizzle and migrations own columns; drift checks enforce parity. Additional rule
 All twenty-four cross-entity FKs
 are `DEFERRABLE INITIALLY DEFERRED`, so checks run at COMMIT. A push may
 write a child before its parent in one transaction, and any unsatisfied FK at
-COMMIT rolls back the whole batch. Migrations define names, targets and delete actions, checked by
-`supabase/tests/sync-v2-deferrable-fk.sh` and
-`supabase/tests/sync-v2-schema-smoke.sh`.
+COMMIT rolls back the whole batch. The `supabase/tests/sync-v2-*` scripts check names, targets and delete actions.
 
 A missing parent is a client batching bug; COMMIT fails the batch.
 
@@ -166,22 +159,11 @@ policy fails the backend gate.
 ## Topological layers
 
 Push batching and pull draining both use the layering in
-`apps/mobile/src/sync/topo-order.ts`:
-
-| Layer | Tables |
-| --- | --- |
-| 0 | `gyms`, `exercise_definitions`, `muscle_groups`, `user_settings`, `training_programmes` |
-| 1 | `session_plans`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links`, `training_notes`, `injuries` |
-| 2 | `session_plan_exercises`, `session_plan_uses` |
-| 3 | `sessions`, `session_plan_sets` |
-| 4 | `session_exercises` |
-| 5 | `exercise_sets`, `session_exercise_tags`, `body_weight_measurements` (an independent root) |
-
-Any order within a layer is safe because no FK joins two tables in one layer
-and every FK points to a strictly earlier layer (or is a self-edge). The drift
-checker asserts both against the live FK graph, and that every entity sits in
-exactly one layer. Adding an entity or FK means updating
-`topo-order.ts` and the `sync_pull` layer mapping together.
+`apps/mobile/src/sync/topo-order.ts`. Any order within a layer is safe because no
+FK joins two tables in one layer and every FK points to a strictly earlier layer
+(or is a self-edge). The drift checker asserts both against the live FK graph,
+and that every entity sits in exactly one layer. Adding an entity or FK means
+updating `topo-order.ts` and the `sync_pull` layer mapping together.
 
 **Adding an entity** ships server-first with no protocol bump ("Unknown
 types"): in an existing layer, which upgraded builds re-pull once, or a new last
@@ -203,9 +185,7 @@ flags and exit codes: its header). It guarantees:
 - The ground rules and universal objects above hold per table.
 - The topological layers match the FK graph.
 
-`apps/mobile/src/data/schema/sync-extras.json` exempts local-only client
-columns and the server-only agent API tokens `session_plans.graph_version`,
-`training_programmes.graph_version` (not in push/pull fields).
+Exemptions live in `apps/mobile/src/data/schema/sync-extras.json`.
 
 ---
 
@@ -225,15 +205,6 @@ fits below 2^53).
 ## Wire envelope
 
 Push requests and pull responses carry rows in one shape:
-
-```json
-{
-  "type": "exercise_sets",
-  "id": "01HXYZ...",
-  "client_updated_at_ms": 1733000000123,
-  "fields": { "session_exercise_id": "01HX...", "order_index": 0, "weight_value": "100", "deleted_at": null }
-}
-```
 
 - `type` is an entity table name (unknown ones: "Unknown types").
 - `id` is client-assigned (a ULID, or a seed slug), stable forever.
@@ -342,53 +313,11 @@ push, LWW reconciles; no modal.
 never branches on it. Only the signed-in account's rows may be local (the wipe:
 `docs/specs/05-data-model.md`, "Sign-out / account-switch wipe").
 
-## The cycle
+## The client cycle, dirty bits and clock
 
-`apps/mobile/src/sync/cycle.ts` runs PULL → PUSH → PULL and repeats until a
-whole round is quiet: both pull legs wrote nothing and the push leg sent
-nothing. Quiet counts rows **applied**, not returned, so an echo of
-rows already held is quiet. The first-sign-in seed decision instead counts rows
-**received**, so a resumed bootstrap is not mistaken for an empty account.
-
-Guarantees:
-
-- Per-batch commits: an interruption leaves the store consistent, and
-  re-running from the same state reaches the same end state.
-- Batch N's ack is applied before batch N+1 is built; otherwise N+1 would
-  re-send the same rows.
-- **No round cap and no cycle deadline.** Only convergence and the per-request
-  timeout (`INTERNAL`) bound a cycle: a cap would report a non-converging spin
-  as converged. A cycle resumes from persisted state, so it may span scheduler
-  ticks.
-
-## Dirty-bit lifecycle
-
-The two local-only columns are defined in `docs/specs/05-data-model.md`
-("Local sync bookkeeping"). `local_dirty = 0` means the server has the row.
-
-| Event | `local_dirty` | `local_updated_at_ms` |
-| --- | --- | --- |
-| Repository write (create, update, soft delete, cascade) | `1` | `nowMonotonic()` |
-| Pull apply, incoming wins | `0` | incoming `client_updated_at_ms` |
-| Pull apply, incoming loses | unchanged | unchanged |
-| Push ack, row unchanged since send | `0` | unchanged |
-| Push ack, row edited since send | stays `1` | unchanged |
-| Push error | unchanged | unchanged |
-
-Every repository write sets the dirty bit in the same transaction as the row;
-there is no "mark dirty later" path.
-
-**Push-in-flight race.** The cycle records each row's `local_updated_at_ms` at
-send time; the ack clears only rows still holding it.
-
-## Clock-monotonicity guard
-
-`nowMonotonic()` (`apps/mobile/src/data/clock.ts`) returns
-`max(Date.now(), last_emitted_ms + 1)` and backs every dirtying write.
-Pull apply raises it to the newest pulled stamp, so local edits out-stamp
-rows stamped ahead of this clock. It persists on `sync_runtime_state` **in the
-same transaction as the row write**; otherwise a crash could emit a timestamp
-LWW rejects. The counter is device-global and survives every wipe.
+The cycle (PULL → PUSH → PULL until quiet), the dirty-bit lifecycle and the
+monotonic clock guard are in [sync-client-cycle.md](sync-client-cycle.md); load
+it when changing `apps/mobile/src/sync/cycle.ts`, dirty-bit writes or the clock.
 
 ## Client-enforced constraints
 
@@ -412,10 +341,8 @@ duplicate reaching the server is a client bug it does not reject.
 ## Out of scope
 
 - Server-side retention or GC of tombstones; they stay ordinary rows.
-- The group domain (`docs/specs/tech/groups-contract.md`). Group tables are
-  server-authoritative, reached only through group RPCs, and have no
-  `owner_user_id`, so the drift checker skips them. Group triggers on Sync v2
-  tables (session share, stream events, evaluator enqueue) must meet four
+- The group domain (`docs/specs/tech/groups-contract.md`). Its triggers on Sync
+  v2 tables (session share, stream events, evaluator enqueue) must meet four
   rules:
   - be failure-isolated, so they can never abort `sync_push`;
   - never write a Sync v2 table;
