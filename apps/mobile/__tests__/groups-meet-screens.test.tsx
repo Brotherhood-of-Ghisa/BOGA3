@@ -19,7 +19,11 @@ jest.mock('expo-router', () => ({ useRouter: () => mockRouter, useLocalSearchPar
 jest.mock('expo-location', () => ({ geocodeAsync: jest.fn(), reverseGeocodeAsync: jest.fn(), getForegroundPermissionsAsync: jest.fn() }));
 jest.mock('@/src/groups/api', () => ({ ...jest.requireActual('@/src/groups/api'), getGroup: jest.fn(), listMeets: jest.fn(), getMeet: jest.fn(), getCoWCalendar: jest.fn(),
   listCompetitionExercises: jest.fn(), createMeet: jest.fn(), updateMeet: jest.fn(), cancelMeet: jest.fn(), setMeetJoined: jest.fn(), saveMeetChallenge: jest.fn(), removeMeetChallenge: jest.fn() }));
+const mockRunSyncCycle = jest.fn();
+jest.mock('@/src/sync/cycle', () => ({ runSyncCycle: () => mockRunSyncCycle() }));
+jest.mock('@/src/sync/write-nudge', () => ({ notifyLocalWrite: jest.fn() }));
 import * as groupApi from '@/src/groups/api';
+import { sessionMeetLinks, sessions } from '@/src/data/schema';
 import * as Location from 'expo-location';
 import { forgetGroupCacheMemory, groupCacheKeys, writeGroupCache } from '@/src/groups/cache';
 import MeetRoute from '@/app/group/[groupId]/meets/[meetId]';
@@ -32,7 +36,7 @@ import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 const api = groupApi as jest.Mocked<typeof groupApi>;
 const online = (value: boolean) => act(() => { mockOnline = value; mockListeners.forEach(listener => listener({ isConnected: value, isInternetReachable: value })); });
 beforeEach(() => {
-  mockFixture = createInMemoryDatabase(); forgetGroupCacheMemory(); jest.clearAllMocks(); mockListeners.clear(); mockOnline = true; mockParams = { groupId: 'g1', meetId: 'm1' };
+  mockFixture = createInMemoryDatabase(); forgetGroupCacheMemory(); jest.clearAllMocks(); mockRunSyncCycle.mockReset().mockResolvedValue('converged'); mockListeners.clear(); mockOnline = true; mockParams = { groupId: 'g1', meetId: 'm1' };
   api.getGroup.mockResolvedValue({ ...competitionGroupDetail, group: { ...competitionGroupDetail.group, my_role: 'owner' } }); api.getMeet.mockResolvedValue(meetDetailFixture());
   api.listMeets.mockResolvedValue({ upcoming: [meetFixture()], past: [], next_cursor: null });
   api.getCoWCalendar.mockResolvedValue({ time_zone: 'Europe/London', revision: 1, next_week_start: '2027-01-04' });
@@ -108,6 +112,41 @@ it('confirms Leave and refuses its online RPC when offline', async () => {
     online(false); fireEvent.press(screen.getByText('Leave meet')); await act(async () => confirm());
     await screen.findByText(/Connect to the internet/); expect(api.setMeetJoined).toHaveBeenCalledTimes(1);
   } finally { alert.mockRestore(); }
+});
+describe('Leave also detaches this member\'s sessions', () => {
+  const seedLinks = () => {
+    const db = mockFixture.database; const at = new Date();
+    for (const id of ['s1', 's2']) db.insert(sessions).values({ id, status: 'completed', startedAt: new Date(1800000000000), completedAt: new Date(1800003600000) }).run();
+    for (const [id, sessionId, meetId] of [['m1:s1', 's1', 'm1'], ['m1:s2', 's2', 'm1'], ['other:s1', 's1', 'other']])
+      db.insert(sessionMeetLinks).values({ id, sessionId, meetId, createdAt: at, updatedAt: at }).run();
+  };
+  const liveIds = () => mockFixture.database.select().from(sessionMeetLinks).all().filter(l => l.deletedAt === null).map(l => l.id);
+  const leave = async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    try {
+      jest.spyOn(Date, 'now').mockReturnValue(1799999000000);
+      renderWithTheme(<MeetRoute />); fireEvent.press(await screen.findByText('Leave meet'));
+      expect(alert.mock.calls.at(-1)![1]).toBe('Your sessions will be removed from this meet.');
+      expect(liveIds()).toHaveLength(3);
+      await act(async () => alert.mock.calls.at(-1)![2]!.find(button => button.text === 'Leave meet')!.onPress!());
+    } finally { alert.mockRestore(); }
+  };
+  afterEach(() => jest.restoreAllMocks());
+  it('tombstones the links this device holds for that meet after the online leave, and no other meet\'s', async () => {
+    seedLinks(); await leave();
+    await waitFor(() => expect(liveIds()).toEqual(['other:s1']));
+    expect(api.setMeetJoined).toHaveBeenCalledWith('g1', 'm1', false); expect(mockRunSyncCycle).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('meet-leave-note')).toBeNull();
+  });
+  it('still detaches what is here when the pull fails, and says other devices\' sessions may still count', async () => {
+    seedLinks(); mockRunSyncCycle.mockRejectedValue(new Error('offline')); await leave();
+    await waitFor(() => expect(liveIds()).toEqual(['other:s1']));
+    expect(await screen.findByTestId('meet-leave-note')).toHaveTextContent(/another device may still count/);
+  });
+  it('leaves the links alone when the online leave is refused', async () => {
+    seedLinks(); api.setMeetJoined.mockRejectedValue(new groupApi.GroupApiError('CONFLICT', 'changed')); await leave();
+    await screen.findByText(/This meet changed/); expect(liveIds()).toHaveLength(3); expect(mockRunSyncCycle).not.toHaveBeenCalled();
+  });
 });
 it('retires each saved staged challenge after partial failure and reconciles uncertain rows before retry', async () => {
   mockParams = { groupId: 'g1' };

@@ -7,6 +7,7 @@ import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { statusStripGround } from '@/components/navigation/navigation-theme';
 import { useOpenMainTabFromPage } from '@/components/navigation/use-open-main-tab';
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
+import { SessionMeetBanner } from '@/components/session-recorder/session-meet-banner';
 import { useTitleBarTimer } from '@/components/session-recorder/title-bar-timer';
 import type { Session } from '@/components/session-recorder/types';
 import { SessionExerciseCard } from '@/components/session-view/session-exercise-card';
@@ -19,6 +20,8 @@ import { FormError } from '@/components/ui/form-section';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
 import { makeStyles } from '@/components/ui/theme-context';
+import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { useSessionChallengeExercises } from '@/src/groups/use-session-meets';
 import { sessionAddExerciseHref, sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { GYMS_ROUTE } from '@/src/navigation/routes';
 import { findNearbyGymSuggestions } from '@/src/location/gym-location-reads';
@@ -133,13 +136,15 @@ export type SessionViewScreenProps = {
   | { placement: 'page' }
 );
 
-function SessionViewBody({ state, sessionId, model, times, control, reload, endWorkout, openGymPicker, router, notice }: {
+function SessionViewBody({ state, sessionId, model, times, control, reload, endWorkout, openGymPicker, router, notice, challengeExerciseIds }: {
   state: ReturnType<typeof useSessionView>['state']; sessionId: string | null;
   model: ReturnType<typeof buildSessionViewModel> | null;
   times: ReturnType<typeof useCompletedSessionTimes>;
   control: Pick<ReturnType<typeof useWorkoutControl>, 'blocked'>;
   reload: () => Promise<void>; endWorkout: () => void; openGymPicker: () => void;
   router: ReturnType<typeof useRouter>; notice: string | null;
+  // Session exercise ids that are challenge exercises of a meet this session is joined to.
+  challengeExerciseIds: ReadonlySet<string>;
 }): ReactNode {
   let body: ReactNode;
   if (state.status === 'loading') {
@@ -185,9 +190,16 @@ function SessionViewBody({ state, sessionId, model, times, control, reload, endW
           }
           volume={model.volume}
         />
+        {data.status === 'active' ? (
+          <SessionMeetBanner
+            sessionId={data.sessionId}
+            times={{ status: 'active', startedAt: data.startedAt, completedAt: null }}
+          />
+        ) : null}
         {model.cards.map((card) => (
           <SessionExerciseCard
             card={card}
+            challenge={challengeExerciseIds.has(card.id)}
             key={card.id}
             onPress={control.blocked ? undefined : () => router.push(sessionExerciseHref(data.sessionId, card.id))}
           />
@@ -272,6 +284,18 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
 
   const sessionExercises = state.status === 'ready' ? state.data.session.exercises : undefined;
   const injuryWarnings = useSessionInjuryWarnings(sessionId, sessionExercises);
+  const userId = useGroupLinkingUserId();
+  const challengeDefinitionIds = useMemo(
+    () => [...new Set((sessionExercises ?? []).map((exercise) => exercise.exerciseDefinitionId))],
+    [sessionExercises]
+  );
+  const challengedDefinitions = useSessionChallengeExercises(userId, sessionId, challengeDefinitionIds);
+  const challengeExerciseIds = useMemo(
+    () => new Set((sessionExercises ?? [])
+      .filter((exercise) => challengedDefinitions.has(exercise.exerciseDefinitionId))
+      .map((exercise) => exercise.id)),
+    [sessionExercises, challengedDefinitions]
+  );
 
   const model = useMemo(
     () =>
@@ -553,7 +577,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
           view={restTimer.view}
         />
       ) : null}
-      <SessionViewBody control={control} endWorkout={endWorkout} model={model} notice={notice}
+      <SessionViewBody challengeExerciseIds={challengeExerciseIds} control={control} endWorkout={endWorkout} model={model} notice={notice}
         openGymPicker={openGymPicker} reload={reload} router={router} sessionId={sessionId} state={state} times={times} />
       {/* On the tab, the tab layout draws the bar. A completed session is
           history, which lives under Progress. */}

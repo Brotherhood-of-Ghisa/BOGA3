@@ -97,6 +97,20 @@ now; a completed session without one ends where it started. No trigger reacts
 to a link, so a link that does not count never fails `sync_push`; it is kept
 and ignored. Scoring reuses the same helper.
 
+**Client Join and Leave.** The recorder banner and View Session's meet row read
+only the cached meet lists (`meets` keys of every cached group) and the local
+links, so they work offline and never block the recorder. The recorder offers a
+meet while now is inside its window, the session page until its cutoff, both
+only when the session can overlap (`sessionCanOverlapMeet`). Join and Leave
+there write only that session's link and never call the online RPC; the roster
+union puts the member on the roster. The meet page's Leave is the online RPC,
+then one sync pull, then `leaveMeetSessions`: links that exist only on another
+device and have not synced here by then keep counting until removed from their
+session's page, and a link first synced here after the leave is not touched
+(`apps/mobile/__tests__/session-meets.test.ts`). `Challenge` tags read the
+cached meet detail for the session's joined meets: an exercise is tagged when
+its live group link names a live challenge's group exercise in that meet's group.
+
 **Roster.** The meet read lists joined members ∪ members with a counting link
 (`group_meet_roster_members`): `joined` and `joined_at_ms` are the explicit
 join (null for a member there by a link only), `linked` marks a counting link,
