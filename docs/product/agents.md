@@ -7,9 +7,9 @@ current grant and default off (existing plan grants retain main access):
 
 | Switch | Authority |
 | --- | --- |
-| Make changes (`plan_access_enabled`) | Read/create plans/programmes; manage exercises; set targets; notes ([[notes.agent-access]]); log/update injuries |
-| Edit plans (`plan_edit_enabled`) | Mutate/delete pending plans/programmes |
-| Log workouts (`workout_logging_enabled`) | Read/start/create/log/edit/finish controlled ad-hoc workouts |
+| Make changes | Read/create plans/programmes; manage exercises; set targets; notes ([[notes.agent-access]]); log/update injuries |
+| Edit plans | Mutate/delete pending plans/programmes |
+| Log workouts | Read/start/create/log/edit/finish controlled ad-hoc workouts |
 
 Logging needs neither plan switch. One writer controls each workout: human or
 grant-bound MCP client. MCP creation retains control; app creation is human.
@@ -18,7 +18,7 @@ leaving the timer usable. Dated creation takes start/end, stays completed and
 permits incremental history without occupying live training. Figures update per
 batch; Finish releases control without changing dates/duration. Released history,
 planned workouts and muscle setup remain app-only. Chat sees synced data;
-human logging works offline.
+human logging works offline. Predictions are exempt.
 
 Why: each write surface needs explicit authority; handoff must preserve acknowledged work.
 Approved 2026-11-10.
