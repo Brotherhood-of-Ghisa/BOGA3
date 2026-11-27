@@ -73,7 +73,7 @@ Code: start checkpoint and retained baseline in `supabase/migrations/20261030062
 
 CoW uses a validated group IANA zone, defaulted from its creator, with immutable
 UTC Monday-to-Monday half-open bounds respecting DST. Zone changes never move
-a published CoW. Admins schedule next week only, before start, with one
+a published CoW. Admins, or a member's coach under [[agents.group-predictions]], schedule next week only, before start, with one
 non-cancelled published CoW per group/week and no overlapping windows across
 zone changes. Exercise/metric edits and cancellation are pre-start only.
 Cancellation retains audit and releases the slot for replacement. Every current

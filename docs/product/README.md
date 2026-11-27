@@ -18,7 +18,7 @@ facts as needed. Authoring: load `docs/procedures/product-facts-authoring.md`.
 | `meets.md` | group meets: joining a session to a meet, roster, results cutoff and snapshot, challenges, meet leaderboard |
 | `notifications.md` | which notifications are sent, to whom, with what counts |
 | `timer.md` | rest timer rules |
-| `agents.md` | what a coaching agent (MCP) may read or change |
+| `agents.md` | what a coaching agent (MCP) may read or change, including acting in groups with predictions on |
 | `planner.md` | session plans, programmes, block completion or consumption |
 | `notes.md` | training notes, in the app or through a coaching agent |
 | `injury.md` | injuries, discomfort, rehab or tissue reloading |

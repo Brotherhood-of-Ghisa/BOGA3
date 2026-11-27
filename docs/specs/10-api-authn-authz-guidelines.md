@@ -45,9 +45,9 @@ This is the shortest operational summary. Use the "Further reading" section when
     their parent reads, locks and bumps obey the caller's RLS. Only service-role-only agent RPCs may set
     an owner context, from their validated `p_owner` argument
     (`supabase/tests/sync-v2-plan-graph-identity.sh`).
-15. Group domain authorization (`docs/specs/tech/groups-contract.md`; as-built and proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
+15. Group domain authorization (`docs/specs/tech/groups-contract.md`; as-built and proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs. The one exception is the service-role `app_public.agent_group_prediction_*` RPCs, callable only by `agent-api`, which take a validated `p_owner` and `p_client_id` and re-check membership and the group's Predictions setting ([`tech/group-predictions-contract.md`](tech/group-predictions-contract.md)).
 16. **RLS recursion prevention.** Group membership and role lookups MUST use `SECURITY DEFINER` helpers with `SET search_path = app_public, pg_temp`. If a later phase adds RLS policies on group tables (for example for Realtime), those policies must call the helpers. Direct subqueries on `group_memberships` inside `group_memberships` policies are prohibited (Postgres `42P17`).
-17. Every group RPC and `SECURITY DEFINER` group helper must independently reject non-null OAuth `client_id` claims (rule 14; error `AGENT_FORBIDDEN`), which preserves the agent access boundary: agent tokens get no group access.
+17. Every group RPC and `SECURITY DEFINER` group helper must independently reject non-null OAuth `client_id` claims (rule 14; error `AGENT_FORBIDDEN`), which preserves the agent access boundary: agent tokens get no group access. The exception is rule 15's service-role `agent_group_prediction_*` RPCs: they are never granted to clients, and their `p_client_id` is the validated grant of the calling agent, not a user's claim.
 18. Group non-membership and nonexistence must be indistinguishable to the caller (`NOT_FOUND`). A member whose role disallows an action gets `FORBIDDEN`.
 19. **Certification authz** implements [[groups.certification]]. The RPCs enforce current membership, another member's eligible record set and a live comparison (`VALIDATION`/`NOT_FOUND`). They enforce certifier-only withdrawal and owner/admin cancellation (`FORBIDDEN`). RPCs create witnesses; the evaluator and failure-isolated source-mode trigger perform server corrections. Certification tables have no client privileges.
 
@@ -119,6 +119,12 @@ only through `agent-api` under the base read grant ([[agents.health-activities]]
 and only the owner's app session writes them, through a `SECURITY DEFINER` RPC
 that rejects OAuth `client_id`s. When changing either path, load
 [`tech/health-activities-contract.md`](tech/health-activities-contract.md).
+
+Group prediction writes are the exception to the per-agent permission row below
+([[agents.group-predictions]]).
+An agent's offers, withdrawals and CoW scheduling are gated by the group's
+Predictions setting and by membership, not by `public.agent_plan_permissions`.
+Load [`tech/group-predictions-contract.md`](tech/group-predictions-contract.md).
 
 The base OAuth grant stays read-only. A coaching client may read the upcoming
 plan queue, create new plans/programmes, edit exercises and set weekly muscle

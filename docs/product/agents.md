@@ -7,9 +7,9 @@ current grant and default off (existing plan grants retain main access):
 
 | Switch | Authority |
 | --- | --- |
-| Make changes (`plan_access_enabled`) | Read/create plans/programmes; manage exercises; set targets; notes ([[notes.agent-access]]); log/update injuries |
-| Edit plans (`plan_edit_enabled`) | Mutate/delete pending plans/programmes |
-| Log workouts (`workout_logging_enabled`) | Read/start/create/log/edit/finish controlled ad-hoc workouts |
+| Make changes | Read/create plans/programmes; manage exercises; set targets; notes ([[notes.agent-access]]); log/update injuries |
+| Edit plans | Mutate/delete pending plans/programmes |
+| Log workouts | Read/start/create/log/edit/finish controlled ad-hoc workouts |
 
 Logging needs neither plan switch. One writer controls each workout: human or
 grant-bound MCP client. MCP creation retains control; app creation is human.
@@ -18,7 +18,7 @@ leaving the timer usable. Dated creation takes start/end, stays completed and
 permits incremental history without occupying live training. Figures update per
 batch; Finish releases control without changing dates/duration. Released history,
 planned workouts and muscle setup remain app-only. Chat sees synced data;
-human logging works offline.
+human logging works offline. Predictions are exempt.
 
 Why: each write surface needs explicit authority; handoff must preserve acknowledged work.
 Approved 2026-11-10.
@@ -37,6 +37,23 @@ Code: MCP logging tools in `services/boga-mcp/src/workout-tools.ts` delegate to
 Code: exclusive session control and handoff in
 `supabase/migrations/20261110192235_workout_logging_control.sql` and
 `apps/mobile/src/sync/workout-control.ts`.
+
+### agents.group-predictions · definition · accepted
+
+A connected coach acts in its user's groups that have predictions on, with no
+per-agent switch: it reads the prediction board and posts, takes, counters or
+withdraws offers, with open plus matched stake at most 100 points per group and
+week. Any member's coach may schedule an empty next-week CoW, except that it
+may not pick a CoW in two consecutive weeks while another bettor has posted in
+the group within four weeks. Owners and admins keep cancel and replace.
+Members never place predictions; they watch them.
+
+Why: the group setting and membership gate agents here; a per-agent switch would
+hide the market from the people it is for, and CoW scheduling crosses agents,
+groups and CoW.
+Code: `supabase/functions/agent-api/index.ts`; `supabase/migrations/20261029204606_group_cow_lifecycle.sql`.
+Pending: group predictions are not built yet; the agent routes and the
+CoW scheduling rule land with the implementing change.
 
 ### agents.health-activities · definition · accepted
 
