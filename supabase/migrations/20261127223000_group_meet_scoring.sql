@@ -411,8 +411,8 @@ $$;
 -- a meet or group another transaction holds is skipped this call. A deferred
 -- snapshot waits a minute; a failure rolls the meet back, logs a sanitized
 -- row and backs off (2 s doubling to 5 min), so neither starves other meets;
--- after the evaluator's attempt cap the meet is parked (logged) until an
--- operator resets transition_attempts.
+-- after the evaluator's attempt cap the meet is parked (logged) until
+-- group_eval_retry_parked() revives it.
 create function app_public.group_meet_eval_advance() returns jsonb
 language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
 declare _picked record; _meet app_public.group_meets; _now timestamptz; _done text[] := '{}'; _code text;
@@ -456,7 +456,7 @@ begin
 end $$;
 
 -- Operators revive parked work with one call (RUNBOOK "Group evaluator
--- triage"): it now also clears parked meets' attempts and backoff.
+-- triage"): it resets parked jobs in both queues and parked meets.
 create or replace function app_public.group_eval_retry_parked() returns integer
 language plpgsql security definer set search_path = app_public, pg_temp as $$
 declare
