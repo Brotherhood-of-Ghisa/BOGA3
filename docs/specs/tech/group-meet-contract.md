@@ -104,7 +104,7 @@ meet while now is inside its window, the session page until its cutoff, both
 only when the session can overlap (`sessionCanOverlapMeet`). Join and Leave
 there write only that session's link and never call the online RPC; the roster
 union puts the member on the roster. The meet page's Leave is the online RPC,
-then one sync pull, then `leaveMeetSessions`: links that exist only on another
+then one sync pull, then `leaveMeetSessions`, then a sync that pushes the tombstones: links that exist only on another
 device and have not synced here by then keep counting until removed from their
 session's page, and a link first synced here after the leave is not touched
 (`apps/mobile/__tests__/session-meets.test.ts`). `Challenge` tags read the

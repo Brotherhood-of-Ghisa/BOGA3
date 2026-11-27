@@ -35,6 +35,7 @@ import { ViewSessionScreen } from '@/components/view-session';
 import { exerciseDefinitions, exerciseGroupLinks, sessionMeetLinks, sessions } from '@/src/data/schema';
 import { forgetGroupCacheMemory, groupCacheKeys, writeGroupCache } from '@/src/groups/cache';
 import type { MeetWire } from '@/src/groups/meet-wire';
+import * as sessionMeets from '@/src/groups/session-meets';
 
 const HOUR = 3_600_000;
 const NOW = Date.now();
@@ -99,6 +100,36 @@ describe('recorder meet banner', () => {
     fireEvent.press(screen.getByTestId('session-meet-banner-live-join'));
     await screen.findByText('In Saturday lifts');
     expect(mockFixture.database.select().from(sessionMeetLinks).all()).toHaveLength(1);
+  });
+
+  it('starts one write at a time: a second tap before the first settles does nothing', async () => {
+    seedMeets({ g1: { name: 'Crew', meets: [liveMeet()] } });
+    const join = jest.spyOn(sessionMeets, 'joinMeetFromSession');
+    renderWithTheme(<SessionMeetBanner sessionId="s1" times={running} />);
+    const button = await screen.findByTestId('session-meet-banner-live-join');
+    fireEvent.press(button);
+    fireEvent.press(button);
+    await screen.findByText('In Saturday lifts');
+    expect(join).toHaveBeenCalledTimes(1);
+    join.mockRestore();
+  });
+
+  it('applies only the newest read when reads finish out of order', async () => {
+    seedMeets({ g1: { name: 'Crew', meets: [liveMeet()] } });
+    const real = sessionMeets.joinedMeetIds;
+    const pending: ((ids: Set<string>) => void)[] = [];
+    const reads = jest.spyOn(sessionMeets, 'joinedMeetIds').mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    renderWithTheme(<SessionMeetBanner sessionId="s1" times={running} />);
+    await waitFor(() => expect(pending).toHaveLength(1)); // the mount read, left hanging
+    reads.mockImplementation(real);
+    // A newer read (the change signal) lands first with the session joined...
+    mockFixture.database.insert(sessionMeetLinks).values({ id: 'live:s1', sessionId: 's1', meetId: 'live', createdAt: new Date(), updatedAt: new Date() }).run();
+    await act(async () => { await sessionMeets.joinMeetFromSession('s1', liveMeet()); });
+    expect(await screen.findByText('In Saturday lifts')).toBeTruthy();
+    // ...then the older read finishes with nothing joined and must not win.
+    await act(async () => pending[0](new Set()));
+    expect(screen.getByText('In Saturday lifts')).toBeTruthy();
+    reads.mockRestore();
   });
 
   it('shows a joined row from the local link alone', async () => {

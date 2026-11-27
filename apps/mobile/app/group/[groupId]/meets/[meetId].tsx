@@ -29,6 +29,7 @@ function MeetPage({ groupId, meetId, userId }: { groupId: string; meetId: string
   const now = useMeetClock(); const [options, setOptions] = useState(false); const [confirmCancel, setConfirmCancel] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [leaveNote, setLeaveNote] = useState<string | null>(null);
+  const [detaching, setDetaching] = useState(false);
   const [mustRefresh, setMustRefresh] = useState(false);
   const action = useGroupAction(async (command: 'join' | 'leave' | 'cancel') => command === 'cancel'
     ? cancelMeet(groupId, meetId, resource.data!.meet.version) : setMeetJoined(groupId, meetId, command === 'join'));
@@ -40,11 +41,15 @@ function MeetPage({ groupId, meetId, userId }: { groupId: string; meetId: string
     else if (!detached.pulled) setLeaveNote('You left the meet. Sessions from another device may still count until you remove them there.');
   };
   const run = async (command: 'join' | 'leave' | 'cancel') => {
-    if (action.pending || mustRefresh) return;
+    if (action.pending || detaching || mustRefresh) return;
     setLeaveNote(null);
     const result = await action.run(command);
     setMessage(result.ok ? null : meetWriteMessage(result.error.code, action.offline));
-    if (result.ok && command === 'leave') await detachSessions();
+    if (result.ok && command === 'leave') {
+      setDetaching(true);
+      await detachSessions();
+      setDetaching(false);
+    }
     if (!result.ok && !action.offline && ['CONFLICT', 'NETWORK', 'INTERNAL'].includes(result.error.code)) setMustRefresh(true);
     await resource.refresh();
   };
@@ -67,7 +72,7 @@ function MeetPage({ groupId, meetId, userId }: { groupId: string; meetId: string
       <ActionButton label="Open in Maps" variant="text" onPress={() => { void openMeetMaps({ address: meet.address ?? meet.venue_name, latitude: meet.latitude, longitude: meet.longitude }).catch(() => setMessage("Couldn't open Maps. Try again.")); }} />
       {meet.entry_note ? <Text allowFontScaling={false} style={text.body}>{meet.entry_note}</Text> : null}
     </Card>
-    {permissions.join ? <ActionButton variant="primary" label={viewer.joined ? 'Leave meet' : 'Join meet'} disabled={action.pending || mustRefresh} testID="meet-join-leave" onPress={() => viewer.joined
+    {permissions.join ? <ActionButton variant="primary" label={viewer.joined ? 'Leave meet' : 'Join meet'} disabled={action.pending || detaching || mustRefresh} testID="meet-join-leave" onPress={() => viewer.joined
       ? Alert.alert('Leave meet?', 'Your sessions will be removed from this meet.', [{ text: 'Stay', style: 'cancel' }, { text: 'Leave meet', style: 'destructive', onPress: () => void run('leave') }])
       : void run('join')} /> : null}
     {message ? <GroupWriteNotice testID="meet-write-notice" tone="error" message={message} /> : null}

@@ -214,6 +214,13 @@ describe('leaveMeetLinks (the meet page\'s Leave)', () => {
     expect((await joinedMeetIds('s4')).has('m1')).toBe(true);
   });
 
+  it('skips the push when there was nothing to tombstone', async () => {
+    await leaveMeetLinks(meet(), at);
+    mockRunSyncCycle.mockClear();
+    expect(await leaveMeetLinks(meet(), at)).toEqual({ left: 0, pulled: true });
+    expect(mockRunSyncCycle).toHaveBeenCalledTimes(1); // the pull only
+  });
+
   it('refuses once the meet has closed', async () => {
     await expect(leaveMeetLinks(meet(), new Date(STARTS + 27 * HOUR))).rejects.toThrow('has closed');
     expect(links().filter((l) => l.deletedAt === null)).toHaveLength(3);
