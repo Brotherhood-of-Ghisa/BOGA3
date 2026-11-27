@@ -119,7 +119,9 @@ while they still describe the live set; a rebuilding comparison or an edit not
 yet evaluated scores nothing yet. Weight is that Volume per rep: the
 total-load kg halved for a per-side comparison or, normalized, the added load
 %BW the set display shows. Max reps are the set facts' for a performed working
-set. SQL adds no load, bodyweight or 1RM formula; if changing these, load
+set. SQL computes no load, bodyweight or 1RM from raw values: its only
+arithmetic is that per-rep derivation from the published Volume, as
+`group_competition_set_display` derives added load; if changing these, load
 [group-competition-contract.md](group-competition-contract.md).
 
 **Ranking.** Each member's best qualifying set per challenge (a member's own
@@ -128,17 +130,24 @@ ties break in board order), placed on the full-precision value as
 
 **Live, then the snapshot.** Until the snapshot exists, results are computed
 on each read from the counting links. Server finality, never the clock, makes
-them final.
+them final: the results read's own state says so, while the embedded meet's
+clock-derived state can already read final.
+
+**✓** is a set's active certification of the score being ranked: live, pinned
+to its current score; final, as the snapshot took it, so a later edit or
+withdrawal changes it only through Refresh.
 
 **Timed transitions.** Each group-eval run, after its queues, fires what is
 due: the `on` item at `starts_at`, `results` at `ends_at`, the snapshot at the
 cutoff. The kick or the hourly sweep starts the run, so a transition can lag
-by up to an hour; items sort at their boundary. Each meet commits alone under
-its group then meet row locks, with a marker on the meet: a crash or failure
-rolls back and retries, a concurrent run waits or skips, and nothing fires
-twice. A cancelled meet or deleted group fires nothing. The snapshot waits
-while the evaluator still has unparked work for a counting session, a
-counting member's targets or the group's comparisons.
+by up to an hour; items sort at their boundary. The worker advances one meet
+per call, so each meet commits in its own transaction under its group then
+meet row locks, with a marker on the meet: a crash or failure rolls back and
+retries after a backoff, a concurrent run skips a meet or group another holds,
+and nothing fires twice. A cancelled meet or deleted group fires nothing. The
+snapshot waits (a minute at a time) while the evaluator still has unparked
+work for a counting session, a counting member's targets or the group's
+comparisons, checked again after it is taken.
 
 **The snapshot** copies every live set of every counting session (all
 exercises; unlinked ones keep a null mapping) with its raw values, mapping and

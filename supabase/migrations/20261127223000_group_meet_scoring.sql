@@ -21,10 +21,14 @@
 -- 1. Transition markers and storage.
 -- ---------------------------------------------------------------------------
 
+-- on_at / results_at / finalized_at mark each transition fired; a deferred or
+-- failed advance backs off until transition_available_at.
 alter table app_public.group_meets
   add column on_at timestamptz,
   add column results_at timestamptz,
-  add column finalized_at timestamptz;
+  add column finalized_at timestamptz,
+  add column transition_attempts integer not null default 0 check (transition_attempts >= 0),
+  add column transition_available_at timestamptz;
 -- The meets a transition may still be due for: what the sweep and the worker probe.
 create index group_meets_pending on app_public.group_meets(starts_at, id)
   where cancelled_at is null and finalized_at is null;
@@ -77,6 +81,8 @@ create table app_public.group_meet_snapshot_scores (
   metric text not null,
   value numeric not null check (value > 0 and value < 'Infinity'::numeric),
   unit text not null,
+  -- The set held an active certification of that score at the snapshot.
+  certified boolean not null,
   primary key (meet_id, member_user_id, set_id, metric),
   foreign key (meet_id, member_user_id, set_id)
     references app_public.group_meet_snapshot_sets(meet_id, member_user_id, set_id) on delete cascade,
@@ -95,6 +101,7 @@ create table app_public.group_meet_standings (
   set_id text not null,
   value numeric not null,
   unit text not null,
+  certified boolean not null,
   primary key (challenge_id, member_user_id),
   foreign key (meet_id, member_user_id, set_id)
     references app_public.group_meet_snapshot_sets(meet_id, member_user_id, set_id) on delete cascade
@@ -137,43 +144,53 @@ $$;
 
 -- The qualifying scores of one live set under its group exercise's current
 -- published rules. e1rm, Volume and seconds are the evaluator's counting
--- scores, used only while they still describe the live set (an edit not yet
--- evaluated has none); Weight is that Volume per rep, as a total-load kg in the
--- comparison's entry mode or, normalized, the added load %BW the set display
--- shows; reps are the set facts' for a performed working set.
+-- scores, used only while they still describe the live set, as the set display
+-- checks them (an edit not yet evaluated has none); Weight is that Volume per
+-- rep, as a total-load kg in the comparison's entry mode or, normalized, the
+-- added load %BW the set display derives; reps are the set facts' for a
+-- performed working set. `certified`: an active certification of the set
+-- pinned to one of those scores (one witness covers the set).
 create function app_public.group_meet_set_scores(p_member uuid, p_set_id text, p_group_exercise uuid,
-  p_session_exercise_id text, p_definition text, p_performance jsonb, p_fingerprint text)
-returns table(metric text, value numeric, unit text)
+  p_session_id text, p_session_exercise_id text, p_definition text, p_performance jsonb, p_fingerprint text)
+returns table(metric text, value numeric, unit text, certified boolean)
 language sql stable set search_path = app_public, pg_temp as $$
   with ge as (
     select x.* from app_public.group_exercises x
      where x.id = p_group_exercise and x.published_rules_revision = x.rules_revision
   ), scored as (
     select sc.metric, sc.value, sc.unit, (sc.performance->>'reps')::numeric as reps, ge.load_input_mode,
-      ge.bodyweight_contribution
+      ge.bodyweight_contribution,
+      (app_public.group_metric_certification_matching(ge.id, p_member, p_set_id, sc.metric, sc.fingerprint)).id
+        is not null as certified
       from ge join app_public.group_metric_set_scores sc
         on sc.group_exercise_id = ge.id and sc.rules_revision = ge.rules_revision
        and sc.member_user_id = p_member and sc.set_id = p_set_id
+      join app_public.exercise_definitions ed on ed.owner_user_id = p_member and ed.id = p_definition
      where sc.counting and sc.metric in ('e1rm', 'volume', 'seconds')
+       and sc.performance->>'session_id' = p_session_id
        and sc.performance->>'session_exercise_id' = p_session_exercise_id
-       and sc.performance->>'exercise_definition_id' is not distinct from p_definition
+       and sc.performance->>'exercise_definition_id' = p_definition
+       and sc.performance->>'source_load_input_mode' = ed.load_input_mode
+       and sc.source_mode_generation = app_public.group_source_mode_generation(p_member, p_definition)
        and sc.performance->>'weight_value' = p_performance->>'weight_value'
        and sc.performance->>'reps_value' = p_performance->>'reps_value'
        and (sc.performance->>'duration_sec') is not distinct from (p_performance->>'duration_sec')
        and (sc.performance->>'performance_status') is not distinct from (p_performance->>'performance_status')
+  ), witnessed as (
+    select coalesce(bool_or(scored.certified), false) as certified from scored
   )
-  select metric, value, unit from scored
+  select scored.metric, scored.value, scored.unit, witnessed.certified from scored, witnessed
   union all
-  select 'weight', w.value, w.unit
-    from scored, lateral (select
+  select 'weight', w.value, w.unit, witnessed.certified
+    from scored cross join witnessed cross join lateral (select
       trim_scale(case when scored.unit = 'percent_bw_reps'
         then greatest(0, scored.value / scored.reps - 100 * scored.bodyweight_contribution::numeric)
         else scored.value / scored.reps / case when scored.load_input_mode = 'per_side_load' then 2 else 1 end end) as value,
       case when scored.unit = 'percent_bw_reps' then 'percent_bw' else 'kg' end as unit) w
    where scored.metric = 'volume' and scored.reps > 0 and w.value > 0
   union all
-  select 'reps', f.reps, 'reps'
-    from app_public.group_set_facts f
+  select 'reps', f.reps, 'reps', witnessed.certified
+    from app_public.group_set_facts f cross join witnessed
    where p_group_exercise is not null and f.member_user_id = p_member and f.set_id = p_set_id
      and f.fingerprint = p_fingerprint and f.live and f.performed and f.working is not false and f.reps > 0;
 $$;
@@ -184,19 +201,19 @@ create function app_public.group_meet_scored_sets(p_meet app_public.group_meets,
   p_from_snapshot boolean)
 returns table(member_user_id uuid, session_id text, set_id text, exercise_definition_id text,
   group_exercise_id uuid, session_started_at_ms bigint, exercise_order_index integer, set_order_index integer,
-  set_created_at_ms bigint, performance jsonb, metric text, value numeric, unit text)
+  set_created_at_ms bigint, performance jsonb, metric text, value numeric, unit text, certified boolean)
 language sql stable set search_path = app_public, pg_temp as $$
   select l.member_user_id, l.session_id, l.set_id, l.exercise_definition_id, l.group_exercise_id,
     l.session_started_at_ms, l.exercise_order_index, l.set_order_index, l.set_created_at_ms, l.performance,
-    sc.metric, sc.value, sc.unit
+    sc.metric, sc.value, sc.unit, sc.certified
     from app_public.group_meet_live_sets(p_meet, p_now) l
     cross join lateral app_public.group_meet_set_scores(l.member_user_id, l.set_id, l.group_exercise_id,
-      l.session_exercise_id, l.exercise_definition_id, l.performance, l.fingerprint) sc
+      l.session_id, l.session_exercise_id, l.exercise_definition_id, l.performance, l.fingerprint) sc
    where not p_from_snapshot and l.group_exercise_id is not null
   union all
   select ss.member_user_id, ss.session_id, ss.set_id, ss.exercise_definition_id, ss.group_exercise_id,
     se.started_at_ms, ss.exercise_order_index, ss.set_order_index, ss.set_created_at_ms, ss.performance,
-    sc.metric, sc.value, sc.unit
+    sc.metric, sc.value, sc.unit, sc.certified
     from app_public.group_meet_snapshot_sets ss
     join app_public.group_meet_snapshot_sessions se
       on se.meet_id = ss.meet_id and se.member_user_id = ss.member_user_id and se.session_id = ss.session_id
@@ -211,7 +228,7 @@ $$;
 create function app_public.group_meet_rankings(p_meet app_public.group_meets, p_now timestamptz,
   p_from_snapshot boolean, p_challenge uuid default null)
 returns table(challenge_id uuid, member_user_id uuid, place integer, set_id text, session_id text,
-  exercise_definition_id text, performance jsonb, value numeric, unit text)
+  exercise_definition_id text, performance jsonb, value numeric, unit text, certified boolean)
 language sql stable set search_path = app_public, pg_temp as $$
   with best as (
     select distinct on (c.id, s.member_user_id) c.id as challenge_id, s.*
@@ -224,7 +241,7 @@ language sql stable set search_path = app_public, pg_temp as $$
   )
   select b.challenge_id, b.member_user_id,
     (rank() over (partition by b.challenge_id order by b.value desc))::integer,
-    b.set_id, b.session_id, b.exercise_definition_id, b.performance, b.value, b.unit
+    b.set_id, b.session_id, b.exercise_definition_id, b.performance, b.value, b.unit, b.certified
     from best b;
 $$;
 
@@ -237,11 +254,12 @@ begin
   end if;
   delete from app_public.group_meet_standings
    where meet_id = p_meet.id and (p_challenge is null or challenge_id = p_challenge);
-  insert into app_public.group_meet_standings(meet_id, challenge_id, member_user_id, place, set_id, value, unit)
-  select p_meet.id, r.challenge_id, r.member_user_id, r.place, r.set_id, r.value, r.unit
+  insert into app_public.group_meet_standings(meet_id, challenge_id, member_user_id, place, set_id, value, unit, certified)
+  select p_meet.id, r.challenge_id, r.member_user_id, r.place, r.set_id, r.value, r.unit, r.certified
     from app_public.group_meet_rankings(p_meet, clock_timestamp(), true, p_challenge) r
   on conflict (challenge_id, member_user_id) do update
-    set place = excluded.place, set_id = excluded.set_id, value = excluded.value, unit = excluded.unit;
+    set place = excluded.place, set_id = excluded.set_id, value = excluded.value, unit = excluded.unit,
+      certified = excluded.certified;
 end $$;
 
 -- The evaluator has caught up with the meet's sources: no queued (unparked)
@@ -298,11 +316,11 @@ begin
       from live l
     returning 1
   )
-  insert into app_public.group_meet_snapshot_scores(meet_id, member_user_id, set_id, metric, value, unit)
-  select p_meet.id, l.member_user_id, l.set_id, sc.metric, sc.value, sc.unit
+  insert into app_public.group_meet_snapshot_scores(meet_id, member_user_id, set_id, metric, value, unit, certified)
+  select p_meet.id, l.member_user_id, l.set_id, sc.metric, sc.value, sc.unit, sc.certified
     from live l
     cross join lateral app_public.group_meet_set_scores(l.member_user_id, l.set_id, l.group_exercise_id,
-      l.session_exercise_id, l.exercise_definition_id, l.performance, l.fingerprint) sc
+      l.session_id, l.session_exercise_id, l.exercise_definition_id, l.performance, l.fingerprint) sc
    where l.group_exercise_id is not null;
   perform app_public.group_meet_rescore(p_meet);
   perform set_config('app.group_meet_snapshotting', '', true);
@@ -312,7 +330,9 @@ end $$;
 -- row locks: the `on` item at the start, the `results` item at the end, the
 -- snapshot at the cutoff once the evaluator has caught up (Refresh results,
 -- p_refreshed_by, takes it again). Each fires once: its marker commits with
--- it. Returns what it did.
+-- it. The fence is checked again after the snapshot: a source write that
+-- committed in between rolls the snapshot back and defers it. Returns what it
+-- did.
 create function app_public.group_meet_advance_meet(p_meet app_public.group_meets, p_now timestamptz,
   p_refreshed_by uuid default null) returns text[]
 language plpgsql set search_path = app_public, pg_temp as $$
@@ -332,16 +352,22 @@ begin
     _done := _done || 'results'::text;
   end if;
   if (p_meet.finalized_at is null or p_refreshed_by is not null) and app_public.group_meet_cutoff(p_meet) <= p_now then
-    if app_public.group_meet_sources_settled(p_meet, p_now) then
+    begin
+      if not app_public.group_meet_sources_settled(p_meet, p_now) then
+        raise exception 'meet sources not settled' using errcode = 'MEET1';
+      end if;
       if p_refreshed_by is not null
          or not exists (select 1 from app_public.group_meet_snapshots where meet_id = p_meet.id) then
         perform app_public.group_meet_take_snapshot(p_meet, p_now, p_refreshed_by);
+        if not app_public.group_meet_sources_settled(p_meet, clock_timestamp()) then
+          raise exception 'meet sources moved during the snapshot' using errcode = 'MEET1';
+        end if;
       end if;
       update app_public.group_meets set finalized_at = coalesce(finalized_at, p_now) where id = p_meet.id;
       _done := _done || 'snapshot'::text;
-    else
+    exception when sqlstate 'MEET1' then
       _done := _done || 'deferred'::text;
-    end if;
+    end;
   end if;
   return _done;
 end $$;
@@ -360,43 +386,49 @@ $$;
 -- 3. The worker's entry point and the sweep.
 -- ---------------------------------------------------------------------------
 
--- Runs every due transition, each meet in its own subtransaction: a failure
--- logs a sanitized row and leaves that meet for the next run. A meet another
--- run holds is skipped; that run fires it. Group row then meet row, the order
--- the meet RPCs lock in.
-create function app_public.group_meet_eval_advance(p_limit integer default 50) returns jsonb
+-- Advances one due meet per call, so each meet commits on its own and holds
+-- one group's lock for one meet's work; the worker calls it until it reports
+-- nothing advanced. Group row then meet row, the order the meet RPCs lock in;
+-- a meet or group another transaction holds is skipped this call. A deferred
+-- snapshot waits a minute; a failure rolls the meet back, logs a sanitized
+-- row and backs off (2 s doubling to 5 min), so neither starves other meets.
+create function app_public.group_meet_eval_advance() returns jsonb
 language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
-declare _picked record; _meet app_public.group_meets; _now timestamptz; _done text[];
-  _on integer := 0; _results integer := 0; _snapshots integer := 0; _deferred integer := 0; _failed integer := 0;
-  _code text;
+declare _picked record; _meet app_public.group_meets; _now timestamptz; _done text[] := '{}'; _code text;
 begin
-  if p_limit is null or p_limit not between 1 and 200 then
-    raise exception 'VALIDATION: invalid meet advance limit' using errcode = 'P0001';
-  end if;
+  perform app_public.group_cow_reject_agent();
   for _picked in select m.id, m.group_id from app_public.group_meets m
       where m.cancelled_at is null and m.finalized_at is null and m.starts_at <= clock_timestamp()
+        and (m.transition_available_at is null or m.transition_available_at <= clock_timestamp())
         and app_public.group_meet_transition_due(m, clock_timestamp())
-      order by m.starts_at, m.id limit p_limit loop
+      order by coalesce(m.transition_available_at, '-infinity'::timestamptz), m.starts_at, m.id limit 20 loop
+    perform 1 from app_public.groups g where g.id = _picked.group_id and g.deleted_at is null
+      for no key update skip locked;
+    if not found then continue; end if;
+    select * into _meet from app_public.group_meets where id = _picked.id for update skip locked;
+    if not found then continue; end if;
+    _now := clock_timestamp();
+    if not app_public.group_meet_transition_due(_meet, _now)
+       or _meet.transition_available_at > _now then
+      continue;
+    end if;
     begin
-      perform 1 from app_public.groups g where g.id = _picked.group_id and g.deleted_at is null for no key update;
-      if not found then continue; end if;
-      select * into _meet from app_public.group_meets where id = _picked.id for update skip locked;
-      if not found then continue; end if;
-      _now := clock_timestamp();
       _done := app_public.group_meet_advance_meet(_meet, _now);
-      _on := _on + case when 'on' = any(_done) then 1 else 0 end;
-      _results := _results + case when 'results' = any(_done) then 1 else 0 end;
-      _snapshots := _snapshots + case when 'snapshot' = any(_done) then 1 else 0 end;
-      _deferred := _deferred + case when 'deferred' = any(_done) then 1 else 0 end;
+      update app_public.group_meets set transition_attempts = 0,
+        transition_available_at = case when 'deferred' = any(_done) then _now + interval '1 minute' end
+       where id = _meet.id;
     exception when others then
       get stacked diagnostics _code = returned_sqlstate;
-      _failed := _failed + 1;
+      update app_public.group_meets set transition_attempts = transition_attempts + 1,
+        transition_available_at = _now + make_interval(secs => least(300, power(2, least(transition_attempts + 1, 9))))
+       where id = _meet.id;
       perform app_public.group_eval_log_failure('group.meet_advance_failed', null,
-        jsonb_build_object('meet_id', _picked.id, 'group_id', _picked.group_id, 'sqlstate', _code));
+        jsonb_build_object('meet_id', _meet.id, 'group_id', _meet.group_id, 'sqlstate', _code));
+      return jsonb_build_object('advanced', true, 'meet_id', _meet.id, 'done', '[]'::jsonb, 'failed', true);
     end;
+    return jsonb_build_object('advanced', true, 'meet_id', _meet.id, 'done', to_jsonb(_done), 'failed', false);
   end loop;
-  return jsonb_build_object('on', _on, 'results', _results, 'snapshots', _snapshots,
-    'deferred', _deferred, 'failed', _failed);
+  return jsonb_build_object('advanced', false);
 end $$;
 
 -- The hourly backstop also kicks when a meet transition is due.
@@ -408,7 +440,8 @@ begin
     and not exists(select 1 from app_public.group_eval_queue where available_at<=now() and (claimed_until is null or claimed_until<now()))
     and not exists(select 1 from app_public.group_metric_eval_queue where available_at<=now() and (claimed_until is null or claimed_until<now()))
     and not exists(select 1 from app_public.group_meets m where m.cancelled_at is null and m.finalized_at is null
-      and m.starts_at<=now() and app_public.group_meet_transition_due(m, now()))
+      and m.starts_at<=now() and (m.transition_available_at is null or m.transition_available_at<=now())
+      and app_public.group_meet_transition_due(m, now()))
     and not exists(select 1 from app_public.group_eval_rules_state s where
       (select min(f.rules_version) from app_public.group_set_facts f)<s.rules_version
       and exists(select 1 from app_public.group_eval_rules_stale(s.rules_version,1))) then return false; end if;
@@ -496,10 +529,11 @@ language sql stable set search_path = app_public, pg_temp as $$
 $$;
 
 -- One standings row as the readers return it: the place stands even when the
--- figures are hidden.
+-- figures are hidden. ✓ is the scored set's (live: pinned to its current
+-- score; final: as the snapshot took it).
 create function app_public.group_meet_standing_json(p_group uuid, p_group_exercise uuid, p_member uuid,
   p_place integer, p_set_id text, p_session_id text, p_definition text, p_performance jsonb,
-  p_value numeric, p_unit text) returns jsonb
+  p_value numeric, p_unit text, p_certified boolean) returns jsonb
 language sql stable set search_path = app_public, pg_temp as $$
   with rule as (select app_public.group_meet_hides_kg(p_group, p_member, p_definition, p_group_exercise) as hides)
   select jsonb_build_object('place', p_place, 'member', app_public.group_member_ref_json(p_member),
@@ -511,9 +545,7 @@ language sql stable set search_path = app_public, pg_temp as $$
       'reps_value', p_performance->>'reps_value',
       'duration_sec', p_performance->'duration_sec',
       'weight_value', case when rule.hides then null else p_performance->>'weight_value' end),
-    'certified', exists (select 1 from app_public.group_metric_certifications gc
-      where gc.group_exercise_id = p_group_exercise and gc.member_user_id = p_member and gc.set_id = p_set_id
-        and gc.ended_at is null))
+    'certified', p_certified)
   from rule;
 $$;
 
@@ -559,7 +591,7 @@ begin
     select coalesce(jsonb_object_agg(x.challenge_id, x.rows), '{}'::jsonb) into _rows from (
       select st.challenge_id, jsonb_agg(app_public.group_meet_standing_json(p_meet.group_id, ss.group_exercise_id,
           st.member_user_id, st.place, st.set_id, ss.session_id, ss.exercise_definition_id, ss.performance,
-          st.value, st.unit)
+          st.value, st.unit, st.certified)
         order by st.place, (select p.username from app_public.user_profiles p where p.id = st.member_user_id) collate "C" nulls last,
           st.member_user_id) as rows
         from app_public.group_meet_standings st
@@ -574,7 +606,8 @@ begin
   else
     select coalesce(jsonb_object_agg(x.challenge_id, x.rows), '{}'::jsonb) into _rows from (
       select r.challenge_id, jsonb_agg(app_public.group_meet_standing_json(p_meet.group_id, c.group_exercise_id,
-          r.member_user_id, r.place, r.set_id, r.session_id, r.exercise_definition_id, r.performance, r.value, r.unit)
+          r.member_user_id, r.place, r.set_id, r.session_id, r.exercise_definition_id, r.performance, r.value, r.unit,
+          r.certified)
         order by r.place, (select p.username from app_public.user_profiles p where p.id = r.member_user_id) collate "C" nulls last,
           r.member_user_id) as rows
         from app_public.group_meet_rankings(p_meet, p_now, false) r

@@ -269,7 +269,10 @@ for call in \
   "group_meet_challenge_update|$(b_ch_edit "${GROUP}" "${MEET}" "${CH_PROBE}" 1 "${BENCH}" volume)" \
   "group_meet_challenge_remove|$(b_ch_remove "${GROUP}" "${MEET}" "${CH_PROBE}" 1)" \
   "group_meet_join|$(b_ref "${GROUP}" "${MEET}")" \
-  "group_meet_leave|$(b_ref "${GROUP}" "${MEET}")"; do
+  "group_meet_leave|$(b_ref "${GROUP}" "${MEET}")" \
+  "group_meet_results|$(b_ref "${GROUP}" "${MEET}")" \
+  "group_meet_refresh_results|$(b_ref "${GROUP}" "${MEET}")" \
+  "group_meet_leaderboard|$(jq -nc --arg g "${GROUP}" '{p_group_id:$g}')"; do
   name="${call%%|*}"; args="${call#*|}"
   rpc "${ANON_KEY}" "${name}" "${args}"; expect_error AUTH_REQUIRED "anonymous ${name}"
   rpc "$(mint_token "${OWNER_TOKEN}" meet-probe)" "${name}" "${args}"; expect_error AGENT_FORBIDDEN "OAuth ${name}"

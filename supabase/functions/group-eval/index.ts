@@ -155,7 +155,8 @@ const processMetricJob = async (db: SupabaseClient, job: MetricJob): Promise<Met
 };
 
 type CoWJob = { cow_id: string; generation: number; claim_id: string };
-// What `group_meet_eval_advance` fired this run; `deferred` cutoffs wait for the evaluator.
+// One `group_meet_eval_advance` call: the meet it advanced (if any) and what fired.
+type MeetStep = { advanced: boolean; done?: ('on' | 'results' | 'snapshot' | 'deferred')[]; failed?: boolean };
 type MeetAdvance = { on: number; results: number; snapshots: number; deferred: number; failed: number };
 type CoWJobResult = CoWJob & { outcome: 'completed' | 'requeued' | 'failed'; sqlstate: string | null };
 const processCoWJob = async (db: SupabaseClient, job: CoWJob): Promise<CoWJobResult> => {
@@ -227,9 +228,19 @@ export const handleRequest = async (request: Request): Promise<Response> => {
       for (const job of claimed) cowJobs.push(await processCoWJob(db, job));
     }
     // Meet transitions (start and end stream items, the cutoff snapshot) run
-    // last, so the snapshot reads scores this run has just published. Each
-    // meet commits on its own in SQL; a failure leaves it for the next run.
-    const meets = await rpc<MeetAdvance>(db, 'group_meet_eval_advance', { p_limit: MEET_ADVANCE_LIMIT });
+    // last, so the snapshot reads scores this run has just published. One meet
+    // per call, so each commits on its own; a failed or deferred meet backs off.
+    const meets: MeetAdvance = { on: 0, results: 0, snapshots: 0, deferred: 0, failed: 0 };
+    for (let call = 0; call < MEET_ADVANCE_LIMIT; call += 1) {
+      const step = await rpc<MeetStep>(db, 'group_meet_eval_advance', {});
+      if (!step.advanced) break;
+      const done = step.done ?? [];
+      meets.on += done.includes('on') ? 1 : 0;
+      meets.results += done.includes('results') ? 1 : 0;
+      meets.snapshots += done.includes('snapshot') ? 1 : 0;
+      meets.deferred += done.includes('deferred') ? 1 : 0;
+      meets.failed += step.failed ? 1 : 0;
+    }
     const count = (outcome: JobResult['outcome']) =>
       [...jobs, ...metricJobs, ...cowJobs].filter(job => job.outcome === outcome).length;
     const meetTransitions = meets.on + meets.results + meets.snapshots;

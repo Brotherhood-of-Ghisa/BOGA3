@@ -451,41 +451,62 @@ run_psql "begin; set local session_replication_role = replica;
   commit;" >/dev/null
 run_psql "alter table app_public.group_meet_snapshot_scores add constraint ${FAULT_CONSTRAINT}
   check (meet_id <> '${FAULT}') not valid;" >/dev/null
-# The evaluator is behind on A's session for BEHIND only while its queue
-# holds a job: A's main session is queued, unclaimed.
+# advance_all [n]: the worker's loop, n calls in one SQL statement; prints one
+# compact result per call that advanced a meet.
+advance_all() {
+  run_psql "select coalesce(string_agg(r::text, ' ' order by i), '') from (
+    select i, app_public.group_meet_eval_advance() as r from generate_series(1, ${1:-10}) i) x
+    where (r->>'advanced')::boolean;"
+}
+# The evaluator is behind while its queue holds an unparked job for a counting
+# session: A's main session is queued, unclaimed.
 run_psql "insert into app_public.group_eval_queue(kind, member_user_id, session_id, causes)
   values ('session', '${A_UID}', '${A_MAIN}', array['set']) on conflict do nothing;" >/dev/null
-ADVANCE="$(run_psql "select app_public.group_meet_eval_advance(50)::text;")"
-jq -e '.snapshots == 0 and .deferred == 4 and .failed == 0' <<<"${ADVANCE}" >/dev/null ||
-  fail "every cutoff waits while a counting session's evaluation is queued: ${ADVANCE}"
-expect_sql "no snapshot while the evaluator is behind" \
-  "select count(*) from app_public.group_meet_snapshots where meet_id in ('${MEET}','${RACE}','${FAULT}','${BEHIND}');" 0
-run_psql "delete from app_public.group_eval_queue where member_user_id = '${A_UID}' and session_id = '${A_MAIN}';" >/dev/null
+STEPS="$(advance_all)"
+[[ "$(jq -s 'map(select(.done == ["deferred"])) | length' <<<"${STEPS}")" == 4 &&
+   "$(jq -s 'length' <<<"${STEPS}")" == 4 ]] ||
+  fail "every cutoff waits while a counting session's evaluation is queued, each meet once: ${STEPS}"
+expect_sql "no snapshot while the evaluator is behind; each deferred meet backs off" \
+  "select (select count(*) from app_public.group_meet_snapshots where meet_id in ('${MEET}','${RACE}','${FAULT}','${BEHIND}'))
+     || '|' || (select count(*) from app_public.group_meets where id in ('${MEET}','${RACE}','${FAULT}','${BEHIND}')
+       and transition_available_at > clock_timestamp());" "0|4"
+[[ -z "$(advance_all)" ]] || fail "a deferred meet is not retried before its backoff"
+rpc "${OWNER_TOKEN}" group_meet_refresh_results "$(jq -nc --arg g "${GID}" --arg m "${MEET}" '{p_group_id:$g,p_meet_id:$m}')"
+expect_error CONFLICT "Refresh while the evaluator is behind"
+run_psql "delete from app_public.group_eval_queue where member_user_id = '${A_UID}' and session_id = '${A_MAIN}';
+  update app_public.group_meets set transition_available_at = null where id in ('${MEET}','${RACE}','${FAULT}','${BEHIND}');" >/dev/null
 
-# Two advances at once: each meet is snapshotted by exactly one.
+# Two worker loops at once: each meet is snapshotted by exactly one, each in
+# its own transaction; the faulted meet fails alone and backs off.
 PIDS=()
 for i in 1 2; do
   docker exec -i "${DB_CONTAINER}" psql -U postgres -d postgres -X -qAt -v ON_ERROR_STOP=1 \
-    -c "select app_public.group_meet_eval_advance(50)::text;" >"${TMPDIR:-/tmp}/ms-${RUN_TAG}-${i}.out" 2>&1 &
+    -c "select app_public.group_meet_eval_advance()::text from generate_series(1, 10);" \
+    >"${TMPDIR:-/tmp}/ms-${RUN_TAG}-${i}.out" 2>&1 &
   PIDS+=("$!")
 done
 for pid in "${PIDS[@]}"; do wait "${pid}" || fail "a concurrent advance failed"; done
-SUM="$(cat "${TMPDIR:-/tmp}/ms-${RUN_TAG}-1.out" "${TMPDIR:-/tmp}/ms-${RUN_TAG}-2.out" | jq -s '{snapshots: (map(.snapshots) | add), failed: (map(.failed) | add)}')"
+SUM="$(cat "${TMPDIR:-/tmp}/ms-${RUN_TAG}-1.out" "${TMPDIR:-/tmp}/ms-${RUN_TAG}-2.out" | jq -sc \
+  '{snapshots: map(select(.done // [] | index("snapshot"))) | length, failed: map(select(.failed == true)) | length}')"
 rm -f "${TMPDIR:-/tmp}/ms-${RUN_TAG}-1.out" "${TMPDIR:-/tmp}/ms-${RUN_TAG}-2.out"
-jq -e '.snapshots == 3 and .failed >= 1' <<<"${SUM}" >/dev/null ||
-  fail "concurrent advances snapshot each meet once and the faulted one fails: ${SUM}"
-expect_sql "one snapshot per meet; the failed attempt left nothing behind" \
+[[ "${SUM}" == "$(jq -nc '{snapshots: 3, failed: 1}')" ]] ||
+  fail "concurrent advances snapshot each meet once and the faulted one fails once: ${SUM}"
+expect_sql "one snapshot per meet; the failed attempt left nothing behind and backs off" \
   "select string_agg(case when m.id = '${FAULT}' then 'fault' else 'ok' end || ':' || (select count(*) from app_public.group_meet_snapshots s
-      where s.meet_id = m.id) || ':' || (m.finalized_at is not null), ',' order by m.id = '${FAULT}', m.id)
+      where s.meet_id = m.id) || ':' || (m.finalized_at is not null) || ':' || m.transition_attempts,
+      ',' order by m.id = '${FAULT}', m.id)
      from app_public.group_meets m where m.id in ('${MEET}','${RACE}','${FAULT}','${BEHIND}');" \
-  "ok:1:true,ok:1:true,ok:1:true,fault:0:false"
+  "ok:1:true:0,ok:1:true:0,ok:1:true:0,fault:0:false:1"
 expect_sql "the failure logged ids and sqlstate only" \
-  "select count(*) >= 1 and bool_and(context ? 'sqlstate' and not (context ? 'message')) from public.app_logs
+  "select count(*) = 1 and bool_and(context ? 'sqlstate' and not (context ? 'message')) from public.app_logs
     where event = 'group.meet_advance_failed' and context->>'meet_id' = '${FAULT}';" t
-run_psql "alter table app_public.group_meet_snapshot_scores drop constraint ${FAULT_CONSTRAINT};" >/dev/null
+run_psql "alter table app_public.group_meet_snapshot_scores drop constraint ${FAULT_CONSTRAINT};
+  update app_public.group_meets set transition_available_at = null where id = '${FAULT}';" >/dev/null
 TAKEN="$(run_psql "select taken_at from app_public.group_meet_snapshots where meet_id = '${MEET}';")"
 drain "a retry after the failure"
 check "the retry snapshots the failed meet" '.meets.snapshots == 1 and .meets.failed == 0'
+expect_sql "a success clears the backoff" \
+  "select transition_attempts || '|' || (transition_available_at is null) from app_public.group_meets where id = '${FAULT}';" "0|true"
 drain "a second retry"
 check "nothing is due any more" '.meets == {on: 0, results: 0, snapshots: 0, deferred: 0, failed: 0}'
 expect_sql "the snapshot is written once: a retry never rewrites it" \
@@ -503,17 +524,33 @@ check "final caption" '.results.state == "final" and .results.refreshed_at_ms ==
 [[ "$(jq -c '[.challenges[] | {c: .challenge.challenge_id, s: [.standings[] | [.member.user_id, .place, .value, .unit, .set.set_id]]}]' <<<"${BODY}")" == \
    "$(jq -c '[.challenges[] | {c: .challenge.challenge_id, s: [.standings[] | [.member.user_id, .place, .value, .unit, .set.set_id]]}]' <<<"${LIVE_BODY}")" ]] ||
   fail "the snapshot ranks exactly what the live standings showed"
+check "the snapshot keeps the ✓ it saw" \
+  '[.challenges[] | .standings[] | select(.member.user_id == $u) | .certified] == [true, true, true, true, false, false, false]' \
+  --arg u "${B_UID}"
 check "final sessions come from the snapshot" '[.sessions[].session_id] | length == 4'
 pass "snapshot: once at the cutoff (retry, concurrent advance, failure, evaluator fence), every set, same standings"
 
 # --- after the cutoff: edits, Refresh, rescoring ------------------------------------
 
+# After the cutoff: A's bench goes up; B re-enters the certified set's weight
+# (same value, new raw text, so its certification ends); A links Curl, which
+# the snapshot holds unlinked, to Squat.
 next_cuam
-push "${A_TOKEN}" "A's bench edited after the cutoff" \
-  "$(e_set "${A_MAIN}-bench-1" "${A_MAIN}-bench" 0 120 5 '' "${CUAM}" null rir_0)"
-drain "the edit"
+push "${A_TOKEN}" "A's bench edited and Curl linked after the cutoff" \
+  "$(e_set "${A_MAIN}-bench-1" "${A_MAIN}-bench" 0 120 5 '' "${CUAM}" null rir_0)" \
+  "$(e_link "${T}-A-curl" "${GID}" "${SQUAT}" "${CUAM}")"
+next_cuam
+push "${B_TOKEN}" "B's certified set edited after the cutoff" \
+  "$(e_set "${B_MAIN}-bench-1" "${B_MAIN}-bench" 0 100.0 5 '' "${CUAM}" null rir_0)"
+drain "the edits"
+expect_sql "the edit ended B's certification" \
+  "select count(*) from app_public.group_metric_certifications where set_id = '${B_MAIN}-bench-1' and ended_at is null;" 0
 results "${A_TOKEN}" "${MEET}"
 expect_places "${CH_E1RM}" "A=1,B=1,C=3,D=4" "a set edit after the cutoff changes nothing until Refresh"
+check "the final ✓ stays on the figures it witnessed" \
+  '[.challenges[] | select(.challenge.challenge_id == $c) | .standings[] | select(.member.user_id == $u)
+     | [.certified, .set.weight_value]] == [[true, "100"]]' --arg c "${CH_E1RM}" --arg u "${B_UID}"
+expect_places "${CH_SQUAT}" "" "the snapshot keeps the mapping it took: a later link changes nothing until Refresh"
 
 rpc "${B_TOKEN}" group_meet_refresh_results "$(jq -nc --arg g "${GID}" --arg m "${MEET}" '{p_group_id:$g,p_meet_id:$m}')"
 expect_error FORBIDDEN "a member cannot refresh results"
@@ -523,6 +560,10 @@ check "refreshed caption" '.results.state == "refreshed" and .results.refreshed_
   and .results.refreshed_by.user_id == $o' --arg o "${OWNER_UID}"
 expect_places "${CH_E1RM}" "A=1,B=2,C=3,D=4" "Refresh re-snapshots the sessions as they stand now"
 expect_places "${CH_VOLUME}" "D=1,A=2,C=3,B=4" "Refresh reranks every challenge"
+expect_places "${CH_SQUAT}" "A=1" "Refresh takes the mapping as it stands now"
+check "Refresh takes the ✓ as it stands now" \
+  '[.challenges[] | select(.challenge.challenge_id == $c) | .standings[] | select(.member.user_id == $u)
+     | [.certified, .set.weight_value]] == [[false, "100.0"]]' --arg c "${CH_E1RM}" --arg u "${B_UID}"
 [[ "$(meet_items "${MEET}" results_refreshed)" == 1 ]] || fail "Refresh writes one stream item"
 rpc "${OWNER_TOKEN}" group_meet_refresh_results "$(jq -nc --arg g "${GID}" --arg m "${MEET}" '{p_group_id:$g,p_meet_id:$m}')"
 expect_ok "Refresh again"
@@ -530,10 +571,24 @@ expect_ok "Refresh again"
 expect_sql "Refresh counts" "select refresh_count from app_public.group_meet_snapshots where meet_id = '${MEET}';" 2
 pass "after the cutoff: edits wait for Refresh, which re-snapshots, reranks and writes one item per call"
 
+leaderboard() {
+  rpc "${1:-${A_TOKEN}}" group_meet_leaderboard "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
+}
+# tally: "<label>:<rank>:<gold>/<silver>/<bronze>:<current>" in reading order.
+tally() {
+  jq -r --argjson who "${WHO}" '[.rows[] | "\($who[.member.user_id]):\(.rank):\(.gold)/\(.silver)/\(.bronze):\(.current_member)"] | join(",")' <<<"${BODY}"
+}
+expect_tally() {
+  local got
+  got="$(tally)"
+  [[ "${got}" == "$1" ]] || fail "$2: expected [$1], got [${got}]"
+}
 # A challenge added, edited or removed after the cutoff rescores from the snapshot.
 CH_NEW="$(challenge "${MEET}" "${PRESS}" e1rm)"
 results "${A_TOKEN}" "${MEET}"
 expect_places "${CH_NEW}" "B=1,A=2" "an added challenge ranks from the snapshot"
+leaderboard
+expect_tally "A:1:5/4/1:true,B:2:2/3/2:true,D:3:2/0/0:true,C:4:1/1/3:true" "an added challenge's trophies count at once"
 rpc "${A_TOKEN}" group_meet_challenge_update "$(jq -nc --arg g "${GID}" --arg m "${MEET}" --arg c "${CH_NEW}" --arg x "${BENCH}" \
   '{p_group_id:$g,p_meet_id:$m,p_challenge_id:$c,p_expected_version:1,p_group_exercise_id:$x,p_metric:"weight"}')"
 expect_error DUPLICATE "an edit onto an existing pair"
@@ -551,28 +606,17 @@ expect_sql "a removed challenge keeps no standings" \
   "select count(*) from app_public.group_meet_standings where challenge_id = '${CH_NEW}';" 0
 results "${A_TOKEN}" "${MEET}"
 check "a removed challenge leaves the results" '[.challenges[].challenge.challenge_id] | index($c) == null' --arg c "${CH_NEW}"
-expect_places "${CH_SQUAT}" "" "a challenge on an exercise nobody had linked at the cutoff is empty"
-pass "rescoring: add, edit and remove after the cutoff"
+leaderboard
+expect_tally "A:1:5/3/1:true,D:2:2/0/0:true,B:3:1/3/2:true,C:4:1/1/3:true" "a removed challenge's trophies leave"
+pass "rescoring: add, edit and remove after the cutoff, and the leaderboard with them"
 
 # --- the Meets leaderboard ------------------------------------------------------------
 
-leaderboard() {
-  rpc "${1:-${A_TOKEN}}" group_meet_leaderboard "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
-}
-# tally: "<label>:<rank>:<gold>/<silver>/<bronze>:<current>" in reading order.
-tally() {
-  jq -r --argjson who "${WHO}" '[.rows[] | "\($who[.member.user_id]):\(.rank):\(.gold)/\(.silver)/\(.bronze):\(.current_member)"] | join(",")' <<<"${BODY}"
-}
-expect_tally() {
-  local got
-  got="$(tally)"
-  [[ "${got}" == "$1" ]] || fail "$2: expected [$1], got [${got}]"
-}
 # After Refresh: 1RM A B C D · Weight A B C D · reps D C A=B · Volume D A C B ·
-# press Weight B A · Plank C A B · pull-up reps A B · pull-up Weight A.
+# press Weight B A · Plank C A B · pull-up reps A B · pull-up Weight A · Squat A.
 leaderboard
 expect_ok "leaderboard"
-expect_tally "A:1:4/3/1:true,D:2:2/0/0:true,B:3:1/3/2:true,C:4:1/1/3:true" "medal tally across final meets"
+expect_tally "A:1:5/3/1:true,D:2:2/0/0:true,B:3:1/3/2:true,C:4:1/1/3:true" "medal tally across final meets"
 check "trophies link their meets" \
   '[.rows[] | select(.member.user_id == $d) | .trophies[] | [.meet_id, .place, .metric]] | sort == [[$m, 1, "reps"], [$m, 1, "volume"]]' \
   --arg d "${D_UID}" --arg m "${MEET}"
@@ -581,7 +625,7 @@ check "trophies link their meets" \
 rpc "${D_TOKEN}" group_leave "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
 expect_ok "D leaves the group"
 leaderboard
-expect_tally "A:1:4/3/1:true,D:2:2/0/0:false,B:3:1/3/2:true,C:4:1/1/3:true" "a former member is kept and marked"
+expect_tally "A:1:5/3/1:true,D:2:2/0/0:false,B:3:1/3/2:true,C:4:1/1/3:true" "a former member is kept and marked"
 results "${A_TOKEN}" "${MEET}"
 check "final standings mark a former member" \
   '[.challenges[] | .standings[] | select(.member.user_id == $d) | .current_member] | all(. == false) and length == 4' --arg d "${D_UID}"
@@ -599,8 +643,16 @@ for fn in group_meet_results group_meet_refresh_results; do
 done
 leaderboard "${OUTSIDER_TOKEN}"; expect_error NOT_FOUND "leaderboard: a non-member"
 leaderboard "${ANON_KEY}"; expect_error AUTH_REQUIRED "leaderboard: anon"
-rpc "${A_TOKEN}" group_meet_eval_advance '{"p_limit":1}'
+rpc "${A_TOKEN}" group_meet_eval_advance '{}'
 [[ "${STATUS}" != 200 ]] || fail "the worker's entry point is not client-executable"
+expect_sql "the worker's entry point refuses an OAuth agent's claims" \
+  "do \$\$ begin
+     perform set_config('request.jwt.claims', json_build_object('sub', '${A_UID}', 'client_id', 'probe')::text, true);
+     perform app_public.group_meet_eval_advance();
+     raise exception 'not refused';
+   exception when others then
+     if sqlerrm not like 'AGENT_FORBIDDEN:%' then raise; end if;
+   end \$\$; select 'refused';" refused
 expect_sql "snapshot tables are closed to clients" \
   "select count(*) from information_schema.role_table_grants where table_schema = 'app_public'
      and table_name like 'group_meet_s%' and grantee in ('anon','authenticated','service_role');" 0
@@ -655,8 +707,8 @@ expect_places "${CH_PLANK}" "A=1,B=2" "the remaining members rerank"
 expect_places "${CH_E1RM}" "A=1,B=2,D=3" "a deleted member's place is freed"
 leaderboard
 # Now 1RM A B D · Weight A B D · reps D A=B · Volume D A B · press Weight B A ·
-# Plank A B · pull-up reps A B · pull-up Weight A.
-expect_tally "A:1:5/3/0:true,D:2:2/0/2:false,B:3:1/5/1:true" "the leaderboard after an account deletion"
+# Plank A B · pull-up reps A B · pull-up Weight A · Squat A.
+expect_tally "A:1:6/3/0:true,D:2:2/0/2:false,B:3:1/5/1:true" "the leaderboard after an account deletion"
 
 # dev_wipe_my_data removes B's the same way.
 run_psql "begin;
@@ -669,6 +721,16 @@ expect_sql "B's snapshot rows and standings are gone" \
      + (select count(*) from app_public.group_meet_standings where member_user_id = '${B_UID}');" 0
 results "${A_TOKEN}" "${MEET}"
 expect_places "${CH_PRESS}" "A=1" "a wiped member's places are freed"
+
+# Removing A's five sole golds leaves A and D on 2/2/0: an equal tuple shares
+# a rank, ordered by name then ID.
+for ch in "${CH_PRESS}" "${CH_PLANK}" "${CH_PULL}" "${CH_PULL_WEIGHT}" "${CH_SQUAT}"; do
+  rpc "${A_TOKEN}" group_meet_challenge_remove "$(jq -nc --arg g "${GID}" --arg m "${MEET}" --arg c "${ch}" \
+    '{p_group_id:$g,p_meet_id:$m,p_challenge_id:$c,p_expected_version:1}')"
+  expect_ok "remove challenge ${ch}"
+done
+leaderboard
+expect_tally "A:1:2/2/0:true,D:1:2/2/0:false" "an equal tuple shares a rank, ordered by name"
 pass "deletion: account deletion and dev_wipe_my_data remove snapshot rows and trophies"
 
 COMPLETED=1

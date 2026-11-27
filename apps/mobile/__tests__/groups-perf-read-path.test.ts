@@ -168,6 +168,7 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
     'group_competition_period_totals', 'group_competition_week_summary', 'group_competition_podiums', 'group_competition_board',
     'group_competition_records_history', 'group_competition_session_detail_v2', 'group_competition_session_detail', 'group_competition_session_records',
     'group_cow_summary', 'group_cow_previous_summary', 'group_cow_calendar_get',
+    'group_meet_results', 'group_meet_leaderboard',
     'group_list_mine', 'group_get', 'group_competition_exercise_list',
     'group_metric_eval_publish', 'group_metric_eval_prepare', 'group_eval_complete',
     'notification_workout_enqueue', 'notification_workout_prepare', 'notification_begin_send', 'notification_confirm_completion',

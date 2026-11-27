@@ -148,17 +148,38 @@ test('a failure that cannot be recorded is reported and the drain goes on, as th
   expect(calls.filter((call) => call.name === 'group_metric_eval_claim')).toHaveLength(2);
 });
 
-test('meet transitions run once, after every queue, and count what fired and failed', async () => {
+test('meet transitions run last, one meet per call until none advances, and count what fired and failed', async () => {
   const calls: Call[] = [];
   const rpc = fakeRpc({
-    group_meet_eval_advance: [{ on: 2, results: 1, snapshots: 1, deferred: 3, failed: 1 }],
+    group_meet_eval_advance: [
+      { advanced: true, done: ['on', 'results'], failed: false },
+      { advanced: true, done: ['snapshot'], failed: false },
+      { advanced: true, done: ['deferred'], failed: false },
+      { advanced: true, done: [], failed: true },
+      { advanced: false },
+    ],
   }, calls);
 
   const summary = await runGroupEval(rpc);
 
   const advances = calls.filter((call) => call.name === 'group_meet_eval_advance');
-  expect(advances).toEqual([{ name: 'group_meet_eval_advance', args: { p_limit: MEET_ADVANCE_LIMIT } }]);
+  expect(advances).toHaveLength(5);
+  expect(advances.every((call) => Object.keys(call.args).length === 0)).toBe(true);
   expect(calls[calls.length - 1].name).toBe('group_meet_eval_advance');
   // Deferred cutoffs are not transitions: they wait for the evaluator.
-  expect(summary).toMatchObject({ meetTransitions: 4, meetFailed: 1 });
+  expect(summary).toMatchObject({ meetTransitions: 3, meetFailed: 1 });
+});
+
+test('meet advances stop at their call limit', async () => {
+  const calls: Call[] = [];
+  const rpc = (async (name: string, args: Record<string, unknown>) => {
+    calls.push({ name, args });
+    if (name === 'group_meet_eval_advance') return { advanced: true, done: ['on'], failed: false };
+    return { jobs: [] };
+  }) as Rpc;
+
+  const summary = await runGroupEval(rpc);
+
+  expect(calls.filter((call) => call.name === 'group_meet_eval_advance')).toHaveLength(MEET_ADVANCE_LIMIT);
+  expect(summary.meetTransitions).toBe(MEET_ADVANCE_LIMIT);
 });

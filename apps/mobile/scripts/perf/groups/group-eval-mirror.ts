@@ -27,7 +27,7 @@ export type Rpc = <T>(name: string, args: Record<string, unknown>) => Promise<T>
 type Job = { job_id: number; kind: 'session' | 'target'; member_user_id: string; session_id: string | null; generation: number };
 type MetricJob = { job_id: number; generation: number; claim_id: string };
 type CoWJob = { cow_id: string; generation: number; claim_id: string };
-type MeetAdvance = { on: number; results: number; snapshots: number; deferred: number; failed: number };
+type MeetStep = { advanced?: boolean; done?: string[]; failed?: boolean };
 
 export type DrainSummary = {
   claimed: number;
@@ -166,8 +166,11 @@ export const runGroupEval = async (rpc: Rpc): Promise<DrainSummary> => {
     summary.claimed += jobs.length;
     for (const job of jobs) await processCoWJob(rpc, job, summary);
   }
-  const meets = await rpc<MeetAdvance | undefined>('group_meet_eval_advance', { p_limit: MEET_ADVANCE_LIMIT });
-  summary.meetTransitions = (meets?.on ?? 0) + (meets?.results ?? 0) + (meets?.snapshots ?? 0);
-  summary.meetFailed = meets?.failed ?? 0;
+  for (let call = 0; call < MEET_ADVANCE_LIMIT; call += 1) {
+    const step = await rpc<MeetStep>('group_meet_eval_advance', {});
+    if (!step?.advanced) break;
+    summary.meetTransitions += (step.done ?? []).filter((transition) => transition !== 'deferred').length;
+    summary.meetFailed += step.failed ? 1 : 0;
+  }
   return summary;
 };

@@ -65,6 +65,8 @@ export type ReadPathContext = {
   session: { member: string; sessionId: string };
   /** The group's CoWs and their metrics: the ones the CoW result readers page. */
   cows: { id: string; metrics: string[] }[];
+  /** The planted meet whose results are still live (computed on read). */
+  liveMeet: string;
   /** The workout the viewer finishes and its synced graph, as the app confirms it; set once it is finished. */
   completion: { sessionId: string; entities: unknown } | null;
   /** What the notification parity cases call with; set when parity runs. */
@@ -138,6 +140,12 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     budget: { kind: 'budgeted', pages: 110, scoped: true } },
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
+  // Live results read every counting session's sets and their scores; a
+  // meet's window is at most a week, so the cost does not grow with history.
+  { fn: 'group_meet_results', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_meet_id: c.liveMeet }),
+    budget: { kind: 'budgeted', pages: 4_000, scoped: true } },
+  { fn: 'group_meet_leaderboard', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
+    budget: { kind: 'budgeted', pages: 500, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }), budget: { kind: 'budgeted', pages: 30, scoped: true } },
   { fn: 'group_competition_exercise_list', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
@@ -525,6 +533,36 @@ export const plantStatements = (): string[] => [
 ];
 
 const OWN_COWS = `select id from app_public.group_cows where group_id=(select group_id from perf_fx)`;
+const OWN_MEETS = `select id from app_public.group_meets where group_id=(select group_id from perf_fx)`;
+
+/**
+ * Five week-long meets on Bench press: `Perf meet 0` ends an hour ago (its
+ * results live, computed on read); meets 1-4 are the four weeks before it,
+ * final, each snapshotted as the worker would. Every member joins every
+ * shared session in each window; each meet challenges 1RM, Weight, reps and
+ * Volume.
+ */
+const MEET_PLANT_STATEMENTS = [
+  `insert into app_public.group_meets(id,group_id,title,starts_at,ends_at,venue_name,create_key,created_by)
+     select gen_random_uuid(),f.group_id,'Perf meet '||k,
+       app_public.group_meet_at(f.now_ms-(k+1)::bigint*${WEEK_MS}+3600000),app_public.group_meet_at(f.now_ms-k::bigint*${WEEK_MS}-3600000),
+       'Perf gym','perf-meet-'||k,(select uid from perf_members where idx=1)
+     from perf_fx f, generate_series(0,4) k`,
+  `insert into app_public.group_meet_challenges(id,meet_id,group_exercise_id,metric,create_key,created_by)
+     select gen_random_uuid(),m.id,ge.id,x.metric,'perf-'||x.metric,(select uid from perf_members where idx=1)
+     from app_public.group_meets m, perf_group_exercises ge, unnest(array['e1rm','weight','reps','volume']) x(metric)
+     where m.id in (${OWN_MEETS}) and ge.ex=0`,
+  `insert into app_public.session_meet_links(owner_user_id,id,session_id,meet_id,created_at,updated_at,client_updated_at_ms)
+     select s.owner_user_id,m.id::text||':'||s.id,s.id,m.id::text,s.started_at,s.started_at,s.started_at
+     from app_public.group_meets m join app_public.group_session_shares sh on sh.group_id=m.group_id
+       join app_public.sessions s on s.owner_user_id=sh.member_user_id and s.id=sh.session_id and s.deleted_at is null
+     where m.id in (${OWN_MEETS}) and s.started_at>=app_public.group_meet_ms(m.starts_at)
+       and s.started_at<app_public.group_meet_ms(m.ends_at)`,
+  `select app_public.group_meet_take_snapshot(m,clock_timestamp(),null)
+     from app_public.group_meets m where m.id in (${OWN_MEETS}) and m.title<>'Perf meet 0'`,
+  `update app_public.group_meets set on_at=clock_timestamp(),results_at=clock_timestamp(),finalized_at=clock_timestamp()
+     where id in (${OWN_MEETS}) and title<>'Perf meet 0'`,
+];
 
 /**
  * Planted after the first steady state (a CoW's start context needs the
@@ -566,6 +604,7 @@ export const postSteadyPlantStatements = (): string[] => [
        order by e.seq desc limit 1) r
      where es.owner_user_id=r.member_user_id and es.id=r.set_id`,
   `select set_config('request.jwt.claim.sub','',true), set_config('request.jwt.claims','',true)`,
+  ...MEET_PLANT_STATEMENTS,
 ];
 
 /** The start of the rolling weeks parity compares, in the fixture's ms clock. */
@@ -594,6 +633,10 @@ export const PLANT_CHECKS_SQL = `select
     as finished_cow,
   exists(select 1 from app_public.group_cows c where c.group_id=f.group_id and c.finalized_at is null
     and c.starts_at<=clock_timestamp() and c.published_generation is not null) as live_cow,
+  (select count(distinct m.id)=4 from app_public.group_meets m join app_public.group_meet_standings st on st.meet_id=m.id
+    where m.group_id=f.group_id and m.finalized_at is not null and st.place<=3) as final_meets,
+  exists(select 1 from app_public.group_meets m, app_public.group_meet_rankings(m,clock_timestamp(),false) r
+    where m.group_id=f.group_id and m.title='Perf meet 0' and m.finalized_at is null) as live_meet,
   (select count(*) from app_public.notification_installations i join perf_members m on m.uid=i.user_id)=(select count(*) from perf_members)
     as installations
   from perf_fx f`;
@@ -620,14 +663,15 @@ const CONTEXT_SQL = `select f.group_id, f.now_ms,
   (select uid from perf_members where idx=1) as viewer,
   (select s.id from auth.sessions s join perf_members m on m.uid=s.user_id where m.idx=1) as viewer_session,
   (select coalesce(json_agg(json_build_object('id',c.id,'metrics',c.metrics) order by c.created_at,c.id),'[]')
-     from app_public.group_cows c where c.group_id=f.group_id) as cows
+     from app_public.group_cows c where c.group_id=f.group_id) as cows,
+  (select m.id from app_public.group_meets m where m.group_id=f.group_id and m.title='Perf meet 0') as live_meet
   from perf_fx f`;
 
 const readContext = async (session: Tier1Session): Promise<ReadPathContext> => {
   const [row] = await session.exec<{
     group_id: string; now_ms: string; members: string[]; bench: string; exercises: string[];
     sessions: ReadPathContext['sessions'] | null; session: string; viewer: string; viewer_session: string;
-    cows: { id: string; metrics: string[] }[];
+    cows: { id: string; metrics: string[] }[]; live_meet: string;
   }>(CONTEXT_SQL);
   const [member, sessionId] = row.session.replace(/^\(|\)$/g, '').split(',');
   const now = Number(row.now_ms);
@@ -636,6 +680,7 @@ const readContext = async (session: Tier1Session): Promise<ReadPathContext> => {
     exercises: row.exercises, sessions: row.sessions ?? [],
     session: { member, sessionId },
     cows: row.cows,
+    liveMeet: row.live_meet,
     completion: null,
     notification: null,
     weeks: Array.from({ length: PERIOD_WINDOWS }, (_, index) => {
