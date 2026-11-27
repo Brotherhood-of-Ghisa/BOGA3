@@ -76,3 +76,8 @@ export {
   type Injury,
   type NewInjury,
 } from './injuries';
+export {
+  sessionMeetLinks,
+  type SessionMeetLink,
+  type NewSessionMeetLink,
+} from './session-meet-links';

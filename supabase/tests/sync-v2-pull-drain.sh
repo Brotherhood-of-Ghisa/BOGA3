@@ -133,7 +133,7 @@ RUN_TAG="${SYNC_PULL_DRAIN_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 
 cleanup_rows() {
-  for table in session_exercise_tags exercise_sets session_exercises \
+  for table in session_exercise_tags exercise_sets session_exercises session_meet_links \
                exercise_muscle_mappings exercise_tag_definitions sessions \
                exercise_group_links muscle_groups exercise_definitions gyms; do
     http_request DELETE \
@@ -172,7 +172,8 @@ sync_pull() {
 #          + 2 exercise_group_links = 6 rows
 # Layer 2: no authored blocks or uses in this ordinary-workout seed
 # Layer 3: 2 sessions = 2 rows
-# Layer 4: 2 session_exercises = 2 rows
+# Layer 4: 2 session_exercises + 2 session_meet_links (one a tombstone)
+#          = 4 rows
 # Layer 5: 2 exercise_sets + 2 session_exercise_tags = 4 rows
 # + 1 tombstone row (deleted_at non-null) in gyms.
 # ---------------------------------------------------------------------------
@@ -278,6 +279,16 @@ SEED_PAYLOAD="$(jq -nc \
               source_plan_exercise_id: null, source_plan_use_id: null,
               order_index: 0, name: "SX2", machine_name: "Smith",
               created_at: ($b + 130), updated_at: ($b + 130), deleted_at: null}},
+    # session_meet_links ids are the client-derived `<meet_id>:<session_id>`;
+    # meet_id is plain text (no FK). The second is a tombstone (a Leave).
+    {type: "session_meet_links", id: ("pd-" + $tag + "-meet-1:pd-" + $tag + "-sess-1"),
+     client_updated_at_ms: ($b + 132),
+     fields: {session_id: ("pd-" + $tag + "-sess-1"), meet_id: ("pd-" + $tag + "-meet-1"),
+              created_at: ($b + 132), updated_at: ($b + 132), deleted_at: null}},
+    {type: "session_meet_links", id: ("pd-" + $tag + "-meet-1:pd-" + $tag + "-sess-2"),
+     client_updated_at_ms: ($b + 134),
+     fields: {session_id: ("pd-" + $tag + "-sess-2"), meet_id: ("pd-" + $tag + "-meet-1"),
+              created_at: ($b + 134), updated_at: ($b + 134), deleted_at: ($b + 134)}},
 
     # Layer 5
     {type: "exercise_sets", id: ("pd-" + $tag + "-set-1"), client_updated_at_ms: ($b + 140),
@@ -337,7 +348,7 @@ LAYER0_FILTER='(.type == "gyms" or .type == "exercise_definitions" or .type == "
 LAYER1_FILTER='(.type == "exercise_muscle_mappings" or .type == "exercise_tag_definitions" or .type == "exercise_group_links")'
 LAYER2_FILTER='(.type == "session_plan_exercises" or .type == "session_plan_uses")'
 LAYER3_FILTER='(.type == "sessions")'
-LAYER4_FILTER='(.type == "session_exercises")'
+LAYER4_FILTER='(.type == "session_exercises" or .type == "session_meet_links")'
 LAYER5_FILTER='(.type == "exercise_sets" or .type == "session_exercise_tags")'
 
 drain_layer() {

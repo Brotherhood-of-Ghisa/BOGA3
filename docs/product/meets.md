@@ -2,18 +2,24 @@
 
 ### meets.linking · definition · accepted
 
-A session counts toward a meet only after its member explicitly joins that
-session to the meet (the meet's own Join is separate and only adds the member to
-the roster). It counts while the link is live, the session is shared into the meet's group, and
-it overlaps the meet window: `started_at < ends_at`, and its end (or now, while
-the session is running) `> starts_at`. A session can count toward meets in
-several groups. The roster is the members who joined plus members with a live
-counting link. A session that does not overlap the window cannot be attached.
+A session counts toward a meet only after its member joins that session to the
+meet (the meet's Join only adds them to the roster). It counts while the link
+is live, the session is shared into the meet's group, its member is still in
+the group, the meet is not cancelled, and the session overlaps the window:
+`started_at < ends_at`, and its end (now while running; its start if none was
+recorded) `> starts_at`. A session can count in several groups' meets. The
+roster is the members who joined plus members with a counting link. A session
+that can no longer overlap cannot be attached; a running one that started
+earlier can. Leaving a meet detaches all its sessions. Every join and leave
+closes at the [[meets.results]] cutoff.
 
 Why: results must come from deliberate choices, never from whatever a member
 happened to train that day.
-Code: `apps/mobile/src/groups/api.ts`; `supabase/functions/group-eval/`.
-Pending: meet linking is not built yet.
+Code: `apps/mobile/src/data/session-meet-links.ts`;
+`supabase/migrations/20261127213000_session_meet_links.sql`;
+`supabase/migrations/20261127202908_group_meet_storage.sql` (online Join).
+Pending: the app's meet and session Join/Leave controls (meet Leave must pull,
+then call `leaveMeetSessions`) and meet scoring are not built yet.
 
 ### meets.results · definition · accepted
 

@@ -34,6 +34,7 @@ const SYNCABLE_ENTITY_TABLE_VARIABLES = [
   'sessionExerciseTags',
   'muscleGroups',
   'exerciseGroupLinks',
+  'sessionMeetLinks',
 ] as const;
 
 const SRC_ROOT = path.resolve(__dirname, '..', 'src');

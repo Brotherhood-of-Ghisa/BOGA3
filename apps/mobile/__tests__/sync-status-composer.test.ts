@@ -43,6 +43,7 @@ import {
   muscleGroups,
   sessionExercises,
   sessionExerciseTags,
+  sessionMeetLinks,
   sessionPlanExercises,
   sessionPlanSets,
   sessionPlans,
@@ -153,6 +154,12 @@ describe('dirty-row count across the synced entity tables', () => {
       localDirty: true,
     });
 
+    // One dirty session meet link (Layer 4) beside a clean one.
+    await db.insert(sessionMeetLinks).values([
+      { id: 'meet-1:sess-1', sessionId: 'sess-1', meetId: 'meet-1', localDirty: true },
+      { id: 'meet-2:sess-1', sessionId: 'sess-1', meetId: 'meet-2', localDirty: false },
+    ]);
+
     // One dirty set + one dirty session-exercise-tag (Layer 3).
     await db
       .insert(exerciseSets)
@@ -176,8 +183,8 @@ describe('dirty-row count across the synced entity tables', () => {
 
     const status = await getSyncStatus();
     // 2 gyms + 1 def + 1 muscle group + 1 tag-def + 1 mapping + 1 link
-    // + 1 session + 1 se + 1 set + 1 se-tag + 4 planning = 15
-    expect(status.dirtyCount).toBe(15);
+    // + 1 session + 1 se + 1 meet link + 1 set + 1 se-tag + 4 planning = 16
+    expect(status.dirtyCount).toBe(16);
   });
 
   it('counts a dirty muscle_groups row like every other synced entity', async () => {

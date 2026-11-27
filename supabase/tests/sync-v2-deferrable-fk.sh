@@ -4,7 +4,7 @@
 #
 # Asserts the two halves of the deferrable-FK contract from docs/specs/tech/sync-v2-server-contract.md ("Deferrable foreign keys"):
 #
-#   A. All twenty-four cross-entity FKs are present in information_schema.
+#   A. All twenty-five cross-entity FKs are present in information_schema.
 #      referential_constraints with is_deferrable='YES' and
 #      initially_deferred='YES'.
 #   B. A transaction that inserts a complete FK chain in child-before-parent
@@ -86,7 +86,7 @@ fail() { echo "[sync-v2-deferrable-fk] FAIL: $*" >&2; exit 1; }
 pass() { echo "[sync-v2-deferrable-fk] pass: $*"; }
 
 # -----------------------------------------------------------------------------
-# A. All twenty-four cross-entity FKs deferrable + initially deferred.
+# A. All twenty-five cross-entity FKs deferrable + initially deferred.
 #
 # Map (constraint_name -> child_table), as declared by the sync-v2 migrations.
 # -----------------------------------------------------------------------------
@@ -116,6 +116,7 @@ FK_SPECS=(
   "session_plan_sets|session_plan_sets_session_plan_exercise_fk"
   "training_notes|training_notes_exercise_definition_fk"
   "injuries|injuries_muscle_group_fk"
+  "session_meet_links|session_meet_links_session_fk"
 )
 
 for spec in "${FK_SPECS[@]}"; do
@@ -146,9 +147,9 @@ for spec in "${FK_SPECS[@]}"; do
     fail "${fk_name}: expected initially_deferred=YES, got '${initially_deferred}'"
   fi
 done
-pass "deferrable-fk A — twenty-four expected FKs present with is_deferrable=YES and initially_deferred=YES (information_schema.referential_constraints joined to .table_constraints)"
+pass "deferrable-fk A — twenty-five expected FKs present with is_deferrable=YES and initially_deferred=YES (information_schema.referential_constraints joined to .table_constraints)"
 
-# Also check: exactly 24 cross-entity FKs in app_public schema with both flags
+# Also check: exactly 25 cross-entity FKs in app_public schema with both flags
 # set. (The auth.users CASCADE FKs from each entity's owner_user_id sit in
 # information_schema with unique_constraint_schema='auth', so they don't show
 # up under app_public; the ten here are exactly the cross-entity set.)
@@ -164,10 +165,10 @@ TOTAL_DEFERRED_FKS="$(run_psql "
      and tc.is_deferrable = 'YES'
      and tc.initially_deferred = 'YES';
 ")"
-if [[ "${TOTAL_DEFERRED_FKS}" != "24" ]]; then
-  fail "expected exactly 24 deferrable+initially-deferred app_public→app_public FKs; got ${TOTAL_DEFERRED_FKS}"
+if [[ "${TOTAL_DEFERRED_FKS}" != "25" ]]; then
+  fail "expected exactly 25 deferrable+initially-deferred app_public→app_public FKs; got ${TOTAL_DEFERRED_FKS}"
 fi
-pass "deferrable-fk A — exactly 24 cross-entity deferrable FKs in app_public"
+pass "deferrable-fk A — exactly 25 cross-entity deferrable FKs in app_public"
 
 # -----------------------------------------------------------------------------
 # B. Behavioural: insert children before parents inside one transaction.
@@ -176,6 +177,7 @@ pass "deferrable-fk A — exactly 24 cross-entity deferrable FKs in app_public"
 # transaction that:
 #   1. SET CONSTRAINTS ALL DEFERRED  (matches the push RPC's pattern)
 #   2. INSERT exercise_sets (FK -> session_exercises that does not exist yet)
+#      and session_meet_links (FK -> sessions that does not exist yet)
 #   3. INSERT session_exercises (FK -> sessions that does not exist yet,
 #                                 FK -> exercise_definitions that does not
 #                                 exist yet)
@@ -204,12 +206,14 @@ EDEF_ID="fk-edef-${RUN_TAG}"
 SESSION_ID="fk-session-${RUN_TAG}"
 SX_ID="fk-sx-${RUN_TAG}"
 SET_ID="fk-set-${RUN_TAG}"
+MEET_LINK_ID="fk-meet-${RUN_TAG}:${SESSION_ID}"
 
 NOW_MS="$(($(date +%s) * 1000))"
 
 cleanup_rows() {
   run_psql_sql "
     delete from app_public.exercise_sets        where id = 'fk-set-${RUN_TAG}'    and owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.session_meet_links   where id = 'fk-meet-${RUN_TAG}:fk-session-${RUN_TAG}' and owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_exercises    where id = 'fk-sx-${RUN_TAG}'     and owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.sessions             where id = 'fk-session-${RUN_TAG}' and owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_definitions where id = 'fk-edef-${RUN_TAG}'   and owner_user_id = '${USER_A_UUID}'::uuid;
@@ -246,6 +250,13 @@ run_psql_sql "
       ('${USER_A_UUID}'::uuid, '${SET_ID}', '${SX_ID}', 0,
        '100', '8', ${NOW_MS}, ${NOW_MS},
        ${NOW_MS});
+
+    insert into app_public.session_meet_links
+      (owner_user_id, id, session_id, meet_id, created_at, updated_at,
+       client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid, '${MEET_LINK_ID}', '${SESSION_ID}', 'fk-meet-${RUN_TAG}',
+       ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
     insert into app_public.session_exercises
       (owner_user_id, id, session_id, exercise_definition_id, order_index,
@@ -293,6 +304,16 @@ SX_LANDED="$(run_psql "
 ")"
 if [[ "${SX_LANDED}" != "1" ]]; then
   fail "deferred-FK txn committed but session_exercises row missing (count=${SX_LANDED})"
+fi
+
+MEET_LINK_LANDED="$(run_psql "
+  select count(*)
+    from app_public.session_meet_links
+   where owner_user_id = '${USER_A_UUID}'::uuid
+     and id = '${MEET_LINK_ID}';
+")"
+if [[ "${MEET_LINK_LANDED}" != "1" ]]; then
+  fail "deferred-FK txn committed but session_meet_links row missing (count=${MEET_LINK_LANDED})"
 fi
 
 SESS_LANDED="$(run_psql "

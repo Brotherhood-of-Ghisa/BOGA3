@@ -216,6 +216,7 @@ const SYNC_TABLES_CHILD_FIRST = [
   'session_exercise_tags',
   'exercise_sets',
   'session_exercises',
+  'session_meet_links',
   'sessions',
   'session_plan_uses',
   'session_plan_sets',

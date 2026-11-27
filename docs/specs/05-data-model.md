@@ -47,7 +47,7 @@ round-trip and the drift checker ignores it.
 
 | Table group | Scope | Owning path |
 | --- | --- | --- |
-| The nineteen user-owned entities (`apps/mobile/src/sync/topo-order.ts` names them with their FK layers; training notes: [`tech/training-notes-contract.md`](tech/training-notes-contract.md); injuries: [`tech/injury-contract.md`](tech/injury-contract.md)) | **in** — mirrored 1:1; the user's backup/restore scope | `apps/mobile/src/data/schema/`, `supabase/migrations/` |
+| The twenty user-owned entities (`apps/mobile/src/sync/topo-order.ts` names them with their FK layers; training notes: [`tech/training-notes-contract.md`](tech/training-notes-contract.md); injuries: [`tech/injury-contract.md`](tech/injury-contract.md)) | **in** — mirrored 1:1; the user's backup/restore scope | `apps/mobile/src/data/schema/`, `supabase/migrations/` |
 | Device-local browsing and Progress preferences (key-value, not SQL tables) | out — device choices | `apps/mobile/src/preferences/` |
 | The three `exercise_session_facts*` tables | out — derived, rebuildable local facts | `apps/mobile/src/data/schema/exercise-session-facts.ts` |
 | `group_cache` | out — disposable cache of server group-RPC results, readable only by the signed-in `user_id` | `apps/mobile/src/data/schema/group-cache.ts` |
@@ -68,8 +68,8 @@ and never rewrite source kg or readings. Load
 [`tech/groups-contract.md`](tech/groups-contract.md) for group tables, triggers
 and RPCs, and
 [`tech/group-competition-contract.md`](tech/group-competition-contract.md) for
-competition scoring. `exercise_group_links` is the one exception above (Sync v2
-rule 8). Notification installation/delivery metadata never enters private sync.
+competition scoring. `exercise_group_links` and `session_meet_links` are the
+exceptions above (Sync v2 rule 8). Notification installation/delivery metadata never enters private sync.
 
 ## Device-local preferences
 
@@ -104,7 +104,7 @@ load it when changing those tables, their triggers or a rule that feeds them.
 The local store holds one account's data; `sync_runtime_state.account_user_id`
 records which (null on a fresh or signed-out store). One complete wipe,
 `wipeLocalDatabaseRows` (`apps/mobile/src/data/local-wipe.ts`), empties it in
-one transaction — the nineteen entity tables child before parent, `group_cache`,
+one transaction — the twenty entity tables child before parent, `group_cache`,
 `sync_quarantine`, then the three facts tables last, after the raw deletes have
 fired their triggers — resets `bootstrap_completed_at`, `pull_cursor` and
 `applied_seed_migration_app_version`, sets `account_user_id`, keeps
@@ -136,7 +136,7 @@ every retry). Wipes run under the cycle's lock, never between pages.
 
 ## Local sync bookkeeping (Sync v2)
 
-Per-row sync state is two local-only columns on each of the nineteen user-owned
+Per-row sync state is two local-only columns on each of the twenty user-owned
 entity tables — `local_dirty` (1 iff the row needs pushing) and
 `local_updated_at_ms` (the monotonic client timestamp, sent as
 `client_updated_at_ms`). Neither crosses the wire, and there is no outbox or
@@ -167,7 +167,7 @@ one local orphan cannot wedge the backlog.
    `tech/sync-v2-server-contract.md`, "LWW and undelete", included).
 5. Diagnostic log rows are write-only from authenticated clients, read through
    backend operator tooling.
-6. All nineteen mirror tables use composite primary key `(owner_user_id, id)` —
+6. All twenty mirror tables use composite primary key `(owner_user_id, id)` —
    **owner-first**. The order is load-bearing: the canonical pull query
    (`where owner_user_id = … order by server_received_at`) leads with the PK
    column and the per-layer cursor depends on it. Every user owns their own
@@ -195,8 +195,8 @@ one local orphan cannot wedge the backlog.
    `muscle_groups` — the FK parent of
    `exercise_muscle_mappings.muscle_group_id` — is a synced entity rather than
    a version-bundled taxonomy, and `exercise_group_links` has an FK only to
-   `exercise_definitions` (its group columns reference server-only tables, so
-   they are plain text). Every `out of sync scope` local table above is FK-free
+   `exercise_definitions` and `session_meet_links` only to `sessions` (their
+   group columns reference server-only tables, so they are plain text). Every `out of sync scope` local table above is FK-free
    for the same reason, and inner-joins the live rows instead.
 3. Bootstrap FK pragma/integrity failures are logged through `public.app_logs`
    with sanitized context, then rethrown; a logging failure must not mask the
@@ -252,7 +252,10 @@ the data-model-level invariants.
    tombstones the row and relink undeletes the same id. Its only FK is to
    `exercise_definitions`; `group_id` and `group_exercise_id` are opaque text,
    so a link to a group the member has left, or to a group exercise that no
-   longer exists, is kept and simply inert.
+   longer exists, is kept and simply inert. `session_meet_links` is the same
+   for a session and a group meet, so Join works offline: id
+   `<meet_id>:<session_id>`, its only FK is to `sessions`, `meet_id` is opaque
+   text, and a link that does not count ([[meets.linking]]) is kept and ignored.
 9. **No derived figure is persisted.** Every figure is computed at read time
    from current exercise metadata and the applicable private policy
    (`tech/training-metrics-contract.md` §4), so current metadata reinterprets
@@ -279,7 +282,7 @@ the data-model-level invariants.
 
 ### Entity coverage (Sync v2)
 
-All nineteen entities use typed-envelope LWW upserts. Deletion sets
+All twenty entities use typed-envelope LWW upserts. Deletion sets
 `deleted_at`; undelete clears it on the same row. Reorder, complete and attach
 are ordinary field changes. The envelope and error tokens belong to
 `tech/sync-v2-server-contract.md`.
@@ -297,7 +300,7 @@ tests) or `out of sync scope` (rationale and guardrails).
 
 ## Client schema drift rule (Sync v2)
 
-Modifying any file under `apps/mobile/src/data/schema/` for the nineteen
+Modifying any file under `apps/mobile/src/data/schema/` for the twenty
 user-owned entities to add a domain column requires a paired server migration
 under `supabase/migrations/` that adds the matching `app_public.<entity>`
 column with a compatible Postgres type, **and the server migration must be

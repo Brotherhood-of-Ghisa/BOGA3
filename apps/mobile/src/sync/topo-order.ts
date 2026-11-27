@@ -7,7 +7,7 @@ export const TOPO_LAYERS: readonly (readonly string[])[] = [
   ['session_plans', 'exercise_muscle_mappings', 'exercise_tag_definitions', 'exercise_group_links', 'training_notes', 'injuries'], // Layer 1
   ['session_plan_exercises', 'session_plan_uses'], // Layer 2
   ['sessions', 'session_plan_sets'], // Layer 3
-  ['session_exercises'], // Layer 4
+  ['session_exercises', 'session_meet_links'], // Layer 4
   ['exercise_sets', 'session_exercise_tags', 'body_weight_measurements'], // Layer 5
 ] as const;
 
