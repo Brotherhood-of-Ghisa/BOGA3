@@ -18,8 +18,8 @@ happened to train that day.
 Code: `apps/mobile/src/data/session-meet-links.ts`;
 `supabase/migrations/20261127213000_session_meet_links.sql`;
 `supabase/migrations/20261127202908_group_meet_storage.sql` (online Join).
-Pending: the app's meet and session Join/Leave controls (meet Leave must pull,
-then call `leaveMeetSessions`) and meet scoring are not built yet.
+Pending: the app's session Join/Leave controls (meet Leave must pull, then call
+`leaveMeetSessions`) and meet scoring are not built yet.
 
 ### meets.results · definition · accepted
 

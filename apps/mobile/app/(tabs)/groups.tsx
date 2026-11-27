@@ -1,3 +1,4 @@
+import { GroupMeetsPage } from '@/components/groups/group-meets-page';
 import { groupSessionHref } from '@/src/navigation/routes';
 import { getCompetitionPodiums } from '@/src/groups/api';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
@@ -27,7 +28,7 @@ import {
   type GroupsSection,
 } from '@/components/groups';
 import { GroupCoWsPage } from '@/components/groups/group-cows-page';
-import { Icon, IconButton, ScreenScroll, SwipePages, makeStyles, uiSpace, type SwipePageFrame } from '@/components/ui';
+import { IconButton, ScreenScroll, SwipePages, makeStyles, uiSpace, type SwipePageFrame } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
 import { groupRankSeriesEnd, type GroupHomeMetric } from '@/src/groups/home-periods';
 import { useGroupGlance } from '@/src/groups/use-group-glance';
@@ -48,12 +49,12 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 const toSection = (value: string | null): GroupsSection | null =>
-  value === 'glance' || value === 'stream' || value === 'leaderboards' || value === 'cows' ? value : null;
+  value === 'glance' || value === 'stream' || value === 'leaderboards' || value === 'cows' || value === 'meets' ? value : null;
 
 /**
  * The Groups screen (groups contract): one group at a time, named by the
- * native title and picked from it, in four pages swiped between — Stream,
- * At a glance (where it opens), Leaderboards, CoWs — under tabs naming them.
+ * native title and picked from it, in five pages swiped between — Stream,
+ * At a glance (where it opens), Leaderboards, CoWs, Meets — under tabs naming them.
  * Managing groups (join, create, the group page) lives behind the header's
  * `Manage`. `?groupId=` preselects a group and `?section=` its page.
  */
@@ -177,7 +178,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
       selectedGroupId={selectedGroupId}
     />
   );
-  const notices = segment === 'cows' ? null : (
+  const notices = segment === 'cows' || segment === 'meets' ? null : (
     <>
       {offline ? <GroupOfflineBanner lastUpdatedAtMs={segmentResource.lastUpdatedAtMs ?? mine.lastUpdatedAtMs} /> : null}
       {inlineError && (groups !== null || segmentResource.data !== null) ? (
@@ -210,7 +211,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
   const renderPage: Record<GroupsSection, (frame: SwipePageFrame) => ReactNode> = {
     stream: (frame) => (
       <View style={frameStyle(frame)}>
-        <GroupsStreamPage
+        <GroupsStreamPage groupId={selectedGroupId}
           hiddenEventKinds={hiddenEventKinds}
           inlineError={pickInlineError(mine.error, stream.error)}
           offline={mine.offline || stream.offline}
@@ -243,6 +244,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
         onOpenSession={(member, session) => router.push(groupSessionHref(member, session, selectedGroupId ?? ''))}
         style={frameStyle(frame)}
       />,
+    meets: (frame) => (<View style={frameStyle(frame)}>{segment === 'meets' ? <GroupMeetsPage key={`${userId}:${selectedGroupId}`} userId={userId} groupId={selectedGroupId} embedded /> : null}</View>),
     cows: (frame) => (
       <View style={frameStyle(frame)}>
         {segment === 'cows' ? <GroupCoWsPage key={`${userId}:${selectedGroupId}`} userId={userId} groupId={selectedGroupId} embedded /> : null}
@@ -329,6 +331,7 @@ function StreamEventsButton({ onPress }: { onPress: () => void }) {
 }
 
 type GroupsStreamPageProps = {
+  groupId: string;
   stream: ReturnType<typeof useGroupStream>;
   userId: string;
   hiddenEventKinds: readonly StreamEventKind[];

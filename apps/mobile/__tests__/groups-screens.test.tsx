@@ -439,7 +439,7 @@ describe('Groups tab', () => {
     render(<GroupsTabRoute />);
     await screen.findByTestId('groups-tab-cows');
     expect(within(screen.getByTestId('groups-screen')).getAllByRole('tab').map(tab => tab.props.testID)).toEqual([
-      'groups-tab-stream', 'groups-tab-glance', 'groups-tab-leaderboards', 'groups-tab-cows',
+      'groups-tab-stream', 'groups-tab-glance', 'groups-tab-leaderboards', 'groups-tab-cows', 'groups-tab-meets',
     ]);
     expect(screen.queryByTestId('groups-cows-link')).toBeNull();
     expect(api.listCoWs).not.toHaveBeenCalled();

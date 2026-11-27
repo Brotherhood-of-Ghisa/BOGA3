@@ -119,7 +119,27 @@ Start and end push delivery on the existing notification pipeline, and the per-g
 
 ## Mobile reads and writes
 
-Client RPCs, cache keys, the online-only write rule for meet actions, and the offline link path.
+`api.ts` is the only RPC caller; `meet-wire.ts` decodes closed shapes before
+caching. Meet lists and detail reads use `useGroupResource` with versioned,
+account/group-scoped cache keys; older archive pages remain online-only.
+Group access loss evicts meet entries; a missing meet evicts only its entry.
+The stream opts into v7 with a new cache suffix, discarding older cursors.
+
+Roster rows decode `joined`, nullable `joined_at_ms` and `linked`: the going
+list shows every roster row, joined or link-only.
+
+Meet/challenge/roster writes use `useGroupAction`, refused offline and never
+queued. Editors retain input across refresh and conflict; explicit status
+review rebases the expected version, while uncertain creates retain their UUID.
+Metadata locks at the end; challenge actions remain available. The session
+link path belongs to [[meets.linking]].
+
+Address checks call the existing native geocoder on blur, never requesting
+permission: iOS geocodes directly, Android only with an existing foreground
+grant. Unmatched/offline text saves without coordinates; changing the text
+clears coordinates and ignores older checks. Maps uses coordinates when
+present, otherwise an escaped address search. Group-zone wall times reject
+nonexistent daylight-saving times rather than silently shifting them.
 
 ## Verification ownership
 

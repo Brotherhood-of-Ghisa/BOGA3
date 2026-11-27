@@ -82,6 +82,9 @@ const render = async (initialUrl: string) =>
       '(tabs)/today': () => <Text testID="today-stub">Today</Text>,
       profile: () => <Text testID="profile-stub">Profile</Text>,
       'settings-recovery': () => <Text testID="recovery-stub">Recovery settings</Text>,
+      'group/[groupId]/meets/index': () => <Text testID="meet-list-stub">Meets</Text>,
+      'group/[groupId]/meets/[meetId]': () => <Text testID="meet-detail-stub">Meet</Text>,
+      'group/[groupId]/meets/schedule': () => <Text testID="meet-schedule-stub">Schedule meet</Text>,
       'rm-curve': () => <Text testID="curve-stub">RM curve</Text>,
       'maestro-harness': () => <Text testID="harness-stub">Harness</Text>,
       'ui-gallery': () => <Text testID="gallery-stub">Gallery</Text>,
@@ -307,4 +310,22 @@ describe('completedSessionOptions', () => {
     expect(completedSessionOptions({ route: { params: { sessionId: 's1', presentation: 'summary' } } })).toEqual({});
     expect(completedSessionOptions({ route: {} })).toEqual({});
   });
+});
+
+it.each([
+  ['/group/g1/meets', 'meet-list-stub'],
+  ['/group/g1/meets/m1', 'meet-detail-stub'],
+  ['/group/g1/meets/schedule', 'meet-schedule-stub'],
+])('protects %s until signed in and bootstrapped', async (path, id) => {
+  const router = await render(path);
+  expect(await screen.findByTestId('sign-in-screen')).toBeTruthy();
+  expect(screen.queryByTestId(id)).toBeNull();
+  await signIn(); await setBootstrapped(false);
+  await act(async () => navigate.push(path as never));
+  expect(await screen.findByTestId('sync-setup-stub')).toBeTruthy();
+  expect(screen.queryByTestId(id)).toBeNull();
+  await setBootstrapped(true);
+  await act(async () => navigate.push(path as never));
+  expect(await screen.findByTestId(id)).toBeTruthy();
+  expect(router.getPathname()).toBe(path);
 });
