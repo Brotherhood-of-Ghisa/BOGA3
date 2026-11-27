@@ -746,6 +746,13 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
   ],
+  session_meet_links: [
+    SC('session_id', 'sessionId'),
+    SC('meet_id', 'meetId'),
+    TS('created_at', 'createdAt'),
+    TS('updated_at', 'updatedAt'),
+    TS('deleted_at', 'deletedAt'),
+  ],
   session_exercises: [
     SC('source_plan_use_id', 'sourcePlanUseId'),
     KEEP('merge_revision', 'mergeRevision'),
@@ -822,6 +829,7 @@ const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,
   injuries: schema.injuries,
+  session_meet_links: schema.sessionMeetLinks,
 };
 
 /** Every entity type in fixed topological order (parents before children). */

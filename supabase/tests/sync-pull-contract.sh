@@ -8,8 +8,10 @@
 # Scenarios covered:
 #   1. Snapshot pull (cursor=null)
 #   2. Paginated drain (limit=2 over 5 rows)
-#   3. Layer→type mapping integrity (all six layers, all ten entities;
-#      asserts the topological-layer partition: pairwise disjoint, union = all 10)
+#   3. Layer→type mapping integrity (all six layers, all eleven seeded
+#      entities; asserts the topological-layer partition: pairwise disjoint,
+#      union = all 11), and the cursor type allow-list carries
+#      session_meet_links (a typo'd type is rejected)
 #   4. RLS isolation (user_a vs user_b)
 #   5. Tombstones included (rows with deleted_at != null appear in the pull)
 #   6. Empty page after drain (next_cursor echoes the input cursor)
@@ -223,6 +225,7 @@ cleanup_run_rows() {
     delete from app_public.session_exercise_tags where id like 'pull-${RUN_TAG}-%';
     delete from app_public.exercise_sets where id like 'pull-${RUN_TAG}-%';
     delete from app_public.session_exercises where id like 'pull-${RUN_TAG}-%';
+    delete from app_public.session_meet_links where id like 'pull-${RUN_TAG}-%';
     delete from app_public.exercise_muscle_mappings where id like 'pull-${RUN_TAG}-%';
     delete from app_public.muscle_groups where id like 'pull-${RUN_TAG}-%';
     delete from app_public.sessions where id like 'pull-${RUN_TAG}-%';
@@ -375,7 +378,7 @@ cleanup_run_rows
 # connected FK chain. Drain each FK-bearing layer (0..5) in pages so rows
 # left by other local suites cannot push our fixture beyond the first page.
 # Assert each layer's response `type` set equals exactly the topological-layer mapping;
-# union = all ten; pairwise disjoint.
+# union = all eleven; pairwise disjoint.
 # -----------------------------------------------------------------------------
 
 echo "[sync-pull-contract] scenario 3: layer→type mapping integrity"
@@ -415,6 +418,11 @@ run_psql_sql "
   -- exercise_definitions).
   insert into app_public.session_exercises (owner_user_id, id, session_id, exercise_definition_id, order_index, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l2-sx', 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-ed', 0, 'SX', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  -- session_meet_links shares session_exercises' layer: its only FK parent is
+  -- sessions. The id is the client-derived <meet_id>:<session_id>; meet_id is
+  -- plain text (no FK).
+  insert into app_public.session_meet_links (owner_user_id, id, session_id, meet_id, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-meet:pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-meet', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
   -- Layer 4: exercise_sets, session_exercise_tags.
   insert into app_public.exercise_sets (owner_user_id, id, session_exercise_id, order_index, weight_value, reps_value, created_at, updated_at, client_updated_at_ms)
@@ -483,15 +491,15 @@ L3_TYPES="${LAYER_TYPES}"
 
 collect_fixture_types_for_layer 4
 L4_TYPES="${LAYER_TYPES}"
-[[ "${L4_TYPES}" == '["session_exercises"]' ]] \
-  || fail "scenario 3 layer 4: expected {session_exercises}, got ${L4_TYPES}"
+[[ "${L4_TYPES}" == '["session_exercises","session_meet_links"]' ]] \
+  || fail "scenario 3 layer 4: expected {session_exercises, session_meet_links}, got ${L4_TYPES}"
 
 collect_fixture_types_for_layer 5
 L5_TYPES="${LAYER_TYPES}"
 [[ "${L5_TYPES}" == '["exercise_sets","session_exercise_tags"]' ]] \
   || fail "scenario 3 layer 5: expected {exercise_sets, session_exercise_tags}, got ${L5_TYPES}"
 
-# Union equals all ten; pairwise disjoint (jq computes both at once).
+# Union equals all eleven; pairwise disjoint (jq computes both at once).
 UNION_AND_DISJOINT="$(jq -nc \
   --argjson l0 "${L0_TYPES}" \
   --argjson l1 "${L1_TYPES}" \
@@ -504,18 +512,30 @@ UNION_AND_DISJOINT="$(jq -nc \
       total_count: ($all | length),
       unique_count: ($all | unique | length)
     }')"
-EXPECTED_UNION='["exercise_definitions","exercise_group_links","exercise_muscle_mappings","exercise_sets","exercise_tag_definitions","gyms","muscle_groups","session_exercise_tags","session_exercises","sessions"]'
+EXPECTED_UNION='["exercise_definitions","exercise_group_links","exercise_muscle_mappings","exercise_sets","exercise_tag_definitions","gyms","muscle_groups","session_exercise_tags","session_exercises","session_meet_links","sessions"]'
 ACTUAL_UNION="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -c '.union_sorted')"
 TOTAL_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.total_count')"
 UNIQUE_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.unique_count')"
 [[ "${ACTUAL_UNION}" == "${EXPECTED_UNION}" ]] \
-  || fail "scenario 3 union: expected all ten, got ${ACTUAL_UNION}"
-[[ "${TOTAL_COUNT}" == "10" ]] \
-  || fail "scenario 3 total: expected 10 entity-type slots across layers, got ${TOTAL_COUNT}"
-[[ "${UNIQUE_COUNT}" == "10" ]] \
-  || fail "scenario 3 disjoint: expected 10 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
+  || fail "scenario 3 union: expected all eleven, got ${ACTUAL_UNION}"
+[[ "${TOTAL_COUNT}" == "11" ]] \
+  || fail "scenario 3 total: expected 11 entity-type slots across layers, got ${TOTAL_COUNT}"
+[[ "${UNIQUE_COUNT}" == "11" ]] \
+  || fail "scenario 3 disjoint: expected 11 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
 
 pass "scenario 3: layer→type mapping integrity (topological partition per the server contract)"
+
+# Cursor allow-list: a layer-4 cursor naming session_meet_links resumes (an
+# empty page past every row, no error); a type outside the allow-list is
+# rejected with the INTERNAL envelope.
+SML_CURSOR='{"server_received_at":"2099-12-31T23:59:59.999+00:00","owner_user_id":"00000000-0000-0000-0000-000000000000","type":"session_meet_links","id":"x"}'
+sync_pull '{"layer":4,"cursor":'"${SML_CURSOR}"',"limit":10}'
+assert_status "200" "scenario 3 session_meet_links cursor status"
+assert_jq '.error == null and .entities == [] and .has_more == false' "scenario 3 session_meet_links cursor type accepted"
+BAD_CURSOR='{"server_received_at":"2099-12-31T23:59:59.999+00:00","owner_user_id":"00000000-0000-0000-0000-000000000000","type":"session_meet_link","id":"x"}'
+sync_pull '{"layer":4,"cursor":'"${BAD_CURSOR}"',"limit":10}'
+assert_jq '.error.code == "INTERNAL"' "scenario 3 unknown cursor type rejected"
+pass "scenario 3: cursor type allow-list accepts session_meet_links"
 
 cleanup_run_rows
 

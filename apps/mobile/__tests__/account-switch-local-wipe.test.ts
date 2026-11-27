@@ -81,6 +81,7 @@ import {
   gyms,
   muscleGroups,
   sessionExerciseTags,
+  sessionMeetLinks,
   sessionExercises,
   sessionPlanExercises,
   sessionPlanSets,
@@ -103,7 +104,7 @@ import * as writeNudge from '@/src/sync/write-nudge';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 import { groupCacheKeys, peekGroupCache, readGroupCache } from '@/src/groups/cache';
 
-// The sixteen syncable, per-user entity tables the wipe must clear, paired with
+// The seventeen syncable, per-user entity tables the wipe must clear, paired with
 // a label for readable assertions.
 const ENTITY_TABLES = [
   ['body_weight_measurements', bodyWeightMeasurements],
@@ -120,6 +121,7 @@ const ENTITY_TABLES = [
   ['session_plan_sets', sessionPlanSets],
   ['sessions', sessions],
   ['session_exercises', sessionExercises],
+  ['session_meet_links', sessionMeetLinks],
   ['exercise_sets', exerciseSets],
   ['session_exercise_tags', sessionExerciseTags],
 ] as const;
@@ -130,7 +132,7 @@ const db = (): TestDatabase => fixture.database;
 
 const PRESERVED_LAST_EMITTED_MS = 1_700_000_555_000;
 
-/** Inserts one minimal row into each of the sixteen syncable entity tables. */
+/** Inserts one minimal row into each of the seventeen syncable entity tables. */
 const seedEveryEntityTable = (): void => {
   db().insert(bodyWeightMeasurements).values({ id: 'bw-1', weightKg: 80, measuredAt: new Date(1000) }).run();
   db().insert(userSettings).values({ id: 'settings', bodyweightCalculationsEnabled: true }).run();
@@ -174,6 +176,7 @@ const seedEveryEntityTable = (): void => {
     .insert(sessions)
     .values({ id: 'session-1', status: 'active', startedAt: new Date('2026-05-30T10:00:00.000Z') })
     .run();
+  db().insert(sessionMeetLinks).values({ id: 'meet-1:session-1', sessionId: 'session-1', meetId: 'meet-1' }).run();
   db()
     .insert(sessionExercises)
     .values({ id: 'sx-1', sessionId: 'session-1', orderIndex: 0, name: 'Bench Press' })
@@ -254,7 +257,7 @@ describe('sign-out / account-switch local wipe', () => {
     expect(db().select().from(userSettings).all()).toEqual([]);
   });
 
-  it('clears every one of the sixteen syncable entity tables', async () => {
+  it('clears every one of the seventeen syncable entity tables', async () => {
     for (const [label, table] of ENTITY_TABLES) {
       expect([label, countRows(table)]).toEqual([label, 1]);
     }

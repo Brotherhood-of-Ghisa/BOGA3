@@ -10,7 +10,7 @@ import type { MergeReviewItem } from '@/src/exercise-core/merge-types';
 //   2. The local `sync_runtime_state` row: whether the first-sync bootstrap has
 //      completed.
 //   3. A dirty-row count: how many local edits are still waiting to be pushed,
-//      summed across the eleven user-owned entity tables.
+//      summed across the user-owned entity tables.
 //
 // It is read-only: building the snapshot never triggers a sync, mutates state,
 // or talks to the server.
@@ -24,7 +24,7 @@ import { getAuthRequiredSignal } from '@/src/sync/auth-required-signal';
 import { getSchedulerStatus } from '@/src/sync/scheduler';
 
 /**
- * The eleven user-owned entity tables that carry a `local_dirty` flag. The dirty
+ * The user-owned entity tables that carry a `local_dirty` flag. The dirty
  * count sums pending (unpushed) rows across all of them. Kept as an explicit
  * list so the count is obviously total over every syncable entity. Listed in
  * the same dependency order the sync engine drains, Layer 0 parents first.
@@ -46,6 +46,7 @@ const DIRTY_COUNTED_TABLES = [
   schema.sessionPlanExercises,
   schema.sessionPlanSets,
   schema.trainingNotes,
+  schema.sessionMeetLinks,
 ] as const;
 
 /**
@@ -85,7 +86,7 @@ export interface SyncStatusSnapshot {
 }
 
 /**
- * Sums `count(*) WHERE local_dirty = 1` across the eleven entity tables. Each
+ * Sums `count(*) WHERE local_dirty = 1` across those entity tables. Each
  * table is a small aggregate query; the total is the number of local edits the
  * next push will flush.
  */

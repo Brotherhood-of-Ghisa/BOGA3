@@ -48,6 +48,7 @@ const TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   sessions: schema.sessions,
   exercise_muscle_mappings: schema.exerciseMuscleMappings,
   exercise_group_links: schema.exerciseGroupLinks,
+  session_meet_links: schema.sessionMeetLinks,
   session_exercises: schema.sessionExercises,
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,
@@ -207,6 +208,14 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
     deletedAt: new Date('2026-05-29T10:00:00.000Z'),
   },
+  session_meet_links: {
+    id: '0f8b2c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e:sess-1',
+    sessionId: 'sess-1',
+    meetId: '0f8b2c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e',
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: null,
+  },
   session_exercises: {
     id: 'sx-wire',
     sessionId: 'sess-1',
@@ -348,6 +357,16 @@ describe('entityToWire / wireToEntity round-trip', () => {
       exercise_definition_id: 'def-1',
       group_id: 'grp-wire',
       group_exercise_id: 'gx-wire',
+    });
+  });
+
+  it('emits the two session_meet_links columns and never a meet FK beyond them', () => {
+    const wire = entityToWire(SAMPLE_ROWS.session_meet_links, 'session_meet_links');
+    expect(Object.keys(wire.fields).sort()).toEqual(['created_at', 'deleted_at', 'meet_id', 'session_id', 'updated_at']);
+    expect(wire.fields).toMatchObject({
+      session_id: 'sess-1',
+      meet_id: '0f8b2c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e',
+      deleted_at: null,
     });
   });
 

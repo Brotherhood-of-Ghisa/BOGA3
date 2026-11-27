@@ -44,7 +44,7 @@ import { join } from 'path';
 const MOBILE_ROOT = join(__dirname, '..', '..');
 
 describe('schema drift checker', () => {
-  it('exits 0 against the as-built client schemas under --strict and covers all nineteen entities', () => {
+  it('exits 0 against the as-built client schemas under --strict and covers all twenty entities', () => {
     const result = spawnSync(
       'npm',
       ['run', 'check:sync-drift', '--', '--strict', '--skip-reset'],
@@ -70,7 +70,7 @@ describe('schema drift checker', () => {
     const combined = `${stdout}\n${stderr}`;
     const introspectMatch = combined.match(/introspecting (\d+) entity table\(s\): (.+)/);
     expect(introspectMatch).not.toBeNull();
-    expect(Number(introspectMatch?.[1])).toBe(19);
+    expect(Number(introspectMatch?.[1])).toBe(20);
     expect(introspectMatch?.[2]).toContain('muscle_groups');
     expect(introspectMatch?.[2]).toContain('exercise_group_links');
     expect(introspectMatch?.[2]).toContain('body_weight_measurements');
@@ -82,5 +82,6 @@ describe('schema drift checker', () => {
     expect(introspectMatch?.[2]).toContain('session_plan_uses');
     expect(introspectMatch?.[2]).toContain('training_notes');
     expect(introspectMatch?.[2]).toContain('injuries');
+    expect(introspectMatch?.[2]).toContain('session_meet_links');
   }, 130_000);
 });

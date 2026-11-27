@@ -23,6 +23,7 @@ import { CURRENT_APP_VERSION } from '@/src/data/exercise-catalog-seeds';
 import {
   exerciseDefinitions,
   exerciseGroupLinks,
+  sessionMeetLinks,
   exerciseSets,
   exerciseTagDefinitions,
   gyms,
@@ -207,6 +208,13 @@ const insertGroupLink = (exerciseDefinitionId: string, groupId: string, ms: numb
     .run();
 };
 
+const insertMeetLink = (sessionId: string, meetId: string, ms: number, dirty = true): void => {
+  database
+    .insert(sessionMeetLinks)
+    .values({ id: `${meetId}:${sessionId}`, sessionId, meetId, localDirty: dirty, localUpdatedAtMs: ms })
+    .run();
+};
+
 const preflight = () =>
   database.transaction((tx) => {
     const batch = selectPushBatch(tx as Transaction, BATCH_CAP);
@@ -291,6 +299,27 @@ describe('findPushBatchFkViolations', () => {
   it('never treats a link group_id / group_exercise_id as an FK (no group row exists locally)', () => {
     insertExerciseDefinition('def-1', 10);
     insertGroupLink('def-1', 'grp-without-any-local-row', 20);
+
+    expect(preflight()).toEqual([]);
+  });
+
+  it('flags a dirty session_meet_link whose sessions parent is missing', () => {
+    plantOrphan(() => insertMeetLink('sess-missing', 'meet-1', 100));
+
+    expect(preflight()).toEqual([
+      {
+        childType: 'session_meet_links',
+        childId: 'meet-1:sess-missing',
+        parentType: 'sessions',
+        parentIdField: 'session_id',
+        parentId: 'sess-missing',
+      },
+    ]);
+  });
+
+  it('never treats a session meet link meet_id as an FK (no meet row exists locally)', () => {
+    insertSession('sess-1', 10);
+    insertMeetLink('sess-1', 'meet-without-any-local-row', 20);
 
     expect(preflight()).toEqual([]);
   });
