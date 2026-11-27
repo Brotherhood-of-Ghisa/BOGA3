@@ -223,9 +223,23 @@ MEET_RPCS="'group_meet_create','group_meet_update','group_meet_cancel','group_me
     and 'search_path=app_public, pg_temp' = any(p.proconfig)
     and has_function_privilege('anon', p.oid, 'EXECUTE') and has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == 11 ]] ||
   fail "every meet RPC must be SECURITY DEFINER, search_path-pinned and executable by anon+authenticated"
+# Results, Refresh and the leaderboard are client RPCs too; the worker's
+# transition entry point is the service role's alone.
+MEET_RESULT_RPCS="'group_meet_results','group_meet_refresh_results','group_meet_leaderboard'"
+[[ "$(sql_value "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'app_public' and p.proname in (${MEET_RESULT_RPCS}) and p.prosecdef
+    and 'search_path=app_public, pg_temp' = any(p.proconfig)
+    and has_function_privilege('anon', p.oid, 'EXECUTE') and has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == 3 ]] ||
+  fail "every meet results RPC must be SECURITY DEFINER, search_path-pinned and executable by anon+authenticated"
+[[ "$(sql_value "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'app_public' and p.proname = 'group_meet_eval_advance' and p.prosecdef
+    and 'search_path=app_public, pg_temp' = any(p.proconfig) and has_function_privilege('service_role', p.oid, 'EXECUTE')
+    and not has_function_privilege('anon', p.oid, 'EXECUTE') and not has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == 1 ]] ||
+  fail "the meet transition entry point must be the service role's alone"
 [[ "$(sql_value "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   cross join unnest(array['anon','authenticated','service_role']) r(role)
-  where n.nspname = 'app_public' and p.proname like 'group\_meet\_%' and p.proname not in (${MEET_RPCS})
+  where n.nspname = 'app_public' and p.proname like 'group\_meet\_%'
+    and p.proname not in (${MEET_RPCS}, ${MEET_RESULT_RPCS}, 'group_meet_eval_advance')
     and (has_function_privilege(r.role, p.oid, 'EXECUTE') or not 'search_path=app_public, pg_temp' = any(p.proconfig));")" == 0 ]] ||
   fail "a meet helper is client-executable or has no pinned search_path"
 for name in group_meets group_meet_challenges group_meet_roster; do
