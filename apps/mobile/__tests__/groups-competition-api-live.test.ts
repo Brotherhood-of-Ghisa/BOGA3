@@ -14,7 +14,7 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
   if (!mockActiveClient) throw new Error('No live client');
   return mockActiveClient;
 } }));
-import { archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
+import { createMeet, updateMeet, cancelMeet, getMeet, listMeets, saveMeetChallenge, removeMeetChallenge, setMeetJoined, archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
   getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,getCompetitionRecordsHistory,
   getCompetitionPeriodTotals,getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
   joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup,createCoW,getCoWCalendar,getCoWResults,getCoWSummary,getPreviousCoWSummary } from '@/src/groups/api';
@@ -297,3 +297,29 @@ it('ranks and certifies Holds by seconds, ignores weight for ties, and retains d
   expect(JSON.parse(context)).toMatchObject({ available: false, normalized: false, bodyweight_calculations_enabled: false });
   expect(weighted.setId).not.toBe(unweighted.setId);
 }, 840000);
+
+it('decodes real meet scheduling, roster, challenges and v7 stream through the typed client', async () => {
+  const { group_id: groupId } = await as(owner, () => createGroup({ name: 'Meet wire', description: null, timeZone: 'Europe/London' }));
+  const { code } = await as(owner, () => getGroupInviteCode(groupId)); await as(member, () => joinGroup(code));
+  const { exercise } = await as(owner, () => createCompetitionExercise({ groupId, name: 'Meet squat', mode: 'total_load' }));
+  const meetId = randomUUID(); const starts = Date.now() + 86400_000;
+  const fields = { title: 'Lifting day', starts_at_ms: starts, ends_at_ms: starts + 10800_000, venue_name: 'Town gym', address: 'High Street', latitude: 51, longitude: -1, entry_note: 'Side entrance' };
+  const created = await as(owner, () => createMeet(groupId, meetId, fields));
+  expect(created.meet).toMatchObject({ meet_id: meetId, time_zone: 'Europe/London', version: 1 });
+  const changed = await as(owner, () => updateMeet(groupId, meetId, 1, { ...fields, title: 'Updated lifts' }));
+  await expect(as(owner, () => updateMeet(groupId, meetId, 1, fields))).rejects.toMatchObject({ code: 'CONFLICT' });
+  await as(member, () => setMeetJoined(groupId, meetId, true));
+  expect((await as(member, () => getMeet(groupId, meetId))).viewer).toEqual({ role: 'member', joined: true });
+  const challengeId = randomUUID(); const input = { groupId, meetId, challengeId, exerciseId: exercise.group_exercise_id, metric: 'weight' as const, version: null };
+  const challenge = await as(member, () => saveMeetChallenge(input));
+  expect(challenge.challenge.author?.user_id).toBe(member.userId);
+  await expect(as(owner, () => saveMeetChallenge({ ...input, challengeId: randomUUID() }))).rejects.toMatchObject({ code: 'DUPLICATE' });
+  const edited = await as(member, () => saveMeetChallenge({ ...input, metric: 'reps', version: challenge.challenge.version }));
+  await as(owner, () => removeMeetChallenge(groupId, meetId, challengeId, edited.challenge.version));
+  await as(member, () => setMeetJoined(groupId, meetId, false));
+  expect((await as(member, () => listMeets(groupId))).upcoming.map(m => m.meet_id)).toContain(meetId);
+  await as(owner, () => cancelMeet(groupId, meetId, changed.meet.version));
+  const stream = await as(member, () => getCompetitionStream(groupId));
+  expect(stream.items.filter(item => item.kind === 'meet').map(item => item.event)).toEqual(['cancelled', 'scheduled']);
+  expect((await as(member, () => getMeet(groupId, meetId))).meet.state).toBe('cancelled');
+}, 60000);

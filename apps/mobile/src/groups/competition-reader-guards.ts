@@ -1,3 +1,4 @@
+import { isMeetStreamItemWire } from './meet-wire.ts';
 import { isCoWStreamItemWire } from './cow-stream-wire.ts';
 import { isAddedOneRepMaxDisplay, isNormalizedSetMetrics } from './competition-set-display.ts';
 
@@ -228,6 +229,7 @@ export function isGroupSharedExerciseDeleteWire(v: unknown): v is GroupSharedExe
     v.contract_version === 4 && id(v.group_id) && id(v.shared_exercise_id) && typeof v.deleted === 'boolean';
 }
 function streamItem(v: unknown): boolean {
+  if (v && typeof v === 'object' && 'kind' in v && v.kind === 'meet') return isMeetStreamItemWire(v);
   if (v && typeof v === 'object' && 'kind' in v && v.kind === 'cow') return isCoWStreamItemWire(v);
   // A withdrawal always carries its record (v5): a page without it fails rather than hiding the card.
   if (exact(v,['kind','key','sort_at_ms','event']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&

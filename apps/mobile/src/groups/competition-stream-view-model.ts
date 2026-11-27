@@ -1,3 +1,4 @@
+import type { MeetStreamItemWire } from './meet-wire';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatBoardDate } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
@@ -28,7 +29,7 @@ export type CompetitionSessionCard = {
 export type CompetitionStreamModel = CompetitionSessionCard | StreamMembershipViewModel |
   { kind: 'competition'; key: string; event: CompetitionEventWire; record?: CompetitionStreamRecordWire;
     withdrawn?: CompetitionStreamWithdrawnWire | null } |
-  CompetitionStreamSharedExerciseWire | CoWStreamItemWire;
+  CompetitionStreamSharedExerciseWire | CoWStreamItemWire | MeetStreamItemWire;
 
 /** Every competition event kind the stream can carry, each able to be hidden. */
 export const STREAM_EVENT_KINDS = ['record','record_voided','lead_change','link','unlink','rules_change'] as const;
@@ -42,7 +43,7 @@ export const DEFAULT_HIDDEN_STREAM_EVENT_KINDS: readonly StreamEventKind[] = ['l
 
 /** Counts come only from permitted set context; absolute totals are never reconstructed. */
 export function buildCompetitionStreamItem(item: CompetitionStreamItemWire, dateFormat: ExerciseDateFormat): CompetitionStreamModel {
-  if (item.kind === 'shared_exercise' || item.kind === 'cow') return item;
+  if (item.kind === 'shared_exercise' || item.kind === 'cow' || item.kind === 'meet') return item;
   if (item.kind === 'competition') return { kind: item.kind,key: item.key,event: item.event,record: item.record,withdrawn: item.withdrawn };
   if (item.kind === 'membership') return { kind: item.kind,key: item.key,groupId: item.group.group_id,
     groupName: item.group.name,sentence: formatMembershipSentence(item.event,item.member.username) };

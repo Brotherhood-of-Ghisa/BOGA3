@@ -113,6 +113,9 @@ export function RootStack() {
         <Stack.Screen name="group/[groupId]/index" options={{ title: 'Group' }} />
         <Stack.Screen name="group/[groupId]/edit" options={{ title: 'Edit group' }} />
         <Stack.Screen name="group/[groupId]/invite" options={{ title: 'Invite' }} />
+        <Stack.Screen name="group/[groupId]/meets/index" options={{ title: 'Meets' }} />
+        <Stack.Screen name="group/[groupId]/meets/[meetId]" options={{ title: 'Meet' }} />
+        <Stack.Screen name="group/[groupId]/meets/schedule" options={{ title: 'Schedule meet' }} />
         <Stack.Screen name="group/[groupId]/cows/index" options={{ title: 'CoWs' }} />
         <Stack.Screen name="group/[groupId]/cows/[cowId]" options={{ title: 'CoW standings' }} />
         <Stack.Screen name="group/[groupId]/cows/schedule" options={{ title: 'Schedule CoW' }} />

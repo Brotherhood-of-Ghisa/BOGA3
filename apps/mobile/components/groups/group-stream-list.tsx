@@ -1,3 +1,4 @@
+import { MeetStreamCard } from './meet-stream-card';
 import { useDateFormat } from '@/src/preferences/hooks';
 import { useMemo, useState, type ReactElement } from 'react';
 import { FlatList, type StyleProp, type ViewStyle } from 'react-native';
@@ -15,7 +16,7 @@ import { StreamSharedExerciseCard } from './stream-shared-exercise-card';
 import { CoWStreamCard } from './cow-stream-card';
 
 type Props = {
-  stream: GroupStreamState; userId: string; roleForGroup: (groupId: string) => GroupRole | null;
+  groupId?: string; stream: GroupStreamState; userId: string; roleForGroup: (groupId: string) => GroupRole | null;
   onCertificationChanged: () => void; showGroupNames: boolean;
   onPressSession: (card: CompetitionSessionCard) => void;
   onPressMembership?: (item: StreamMembershipViewModel) => void;
@@ -25,7 +26,7 @@ type Props = {
   hiddenEventKinds?: readonly StreamEventKind[];
 };
 
-export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChanged,showGroupNames,
+export function GroupStreamList({ groupId,stream,userId,roleForGroup,onCertificationChanged,showGroupNames,
   onPressSession,onPressMembership,pulling,onRefresh,header,emptyState,contentContainerStyle,testID,
   hiddenEventKinds = DEFAULT_HIDDEN_STREAM_EVENT_KINDS }: Props) {
   const groupScreenStyles = useGroupScreenStyles();
@@ -36,6 +37,7 @@ export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChan
   const models = useMemo(() => buildCompetitionStreamModels(stream.items,hiddenEventKinds,dateFormat),[stream.items,hiddenEventKinds,dateFormat]);
   const refresh = async () => { await stream.refresh(); onCertificationChanged(); };
   const renderItem = ({ item }: { item: CompetitionStreamModel }) => {
+    if (item.kind === 'meet') return groupId ? <MeetStreamCard item={item} groupId={groupId} /> : null;
     if (item.kind === 'cow') return <CoWStreamCard item={item} userId={userId} />;
     if (item.kind === 'session') return <GroupStreamSessionCard card={item} onPress={onPressSession}
       onPressRecord={setSelectedKey} showGroupNames={showGroupNames} />;
