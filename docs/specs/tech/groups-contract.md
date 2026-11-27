@@ -12,6 +12,7 @@
 | Wire shapes | `apps/mobile/src/groups/types.ts`, `competition-wire.ts` |
 | Protocol-4 metrics, units, disclosure, history (changing competition scoring or readers) | [group-competition-contract.md](group-competition-contract.md) |
 | CoW intake, publication and readers (changing CoW) | [group-cow-contract.md](group-cow-contract.md) |
+| Meet storage, linking, scoring and readers (changing meets) | [group-meet-contract.md](group-meet-contract.md) |
 | Bodyweight policy and privacy (changing group bodyweight scoring) | [bodyweight-load-contract.md](bodyweight-load-contract.md) |
 | Authorization baseline | `docs/specs/10-api-authn-authz-guidelines.md` rules 15–19 |
 | Routes, screens, wording (changing group UI) | `docs/specs/ui/group-screens.md`, `docs/product/copy.md`, the group components (`apps/mobile/components/groups/`) |
