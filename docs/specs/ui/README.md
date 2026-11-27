@@ -29,6 +29,9 @@ drifted from the code. Git history has them.)
 - `screen-map.md`
   - the route inventory (route, purpose, owning file) and the screen rules a
     route file will not state
+- `group-screens.md`
+  - the group route inventory and the screen rules for group routes; load it
+    when adding, removing or repurposing a group screen
 - `navigation-contract.md`
   - route access and guards, params with a non-trivial rule, and the allowed
     transitions for current mobile flows

@@ -263,6 +263,17 @@ them); Certified lists Certified lead changes that have a leader. Both
 include rules changes. The cursor binds group, exercise, metric and scope;
 disclosure is the stream's own helpers.
 
+Record stream (`group_competition_stream_v2`) gives each record its `record`: its
+set, and per board the previous #1 (holder and set, or own prior value). `_v4`
+adds the boards taken #1 (`GR`) and the rest PRs (client rules in
+`apps/mobile/src/groups/record-boards.ts`); `_v5` gives each withdrawal its
+voided record (`withdrawn`, or null). Session records
+(`group_competition_session_records`, beside the session detail; exact readers
+reject new keys) return one shared session's non-voided records as stream
+events, each with the All board's current leader (`leads` while its own set
+holds #1; none for an earlier revision). The app shows them once the session
+completes; there is no Volume board.
+
 Kernel upgrades rescore live comparisons silently, preserving immutable record
 and certification audits and advancing private record baselines. Personal facts,
 evaluator rules and coaching revisions must advance; device cache generation 7

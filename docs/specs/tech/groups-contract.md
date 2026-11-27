@@ -14,7 +14,7 @@
 | CoW intake, publication and readers (changing CoW) | [group-cow-contract.md](group-cow-contract.md) |
 | Bodyweight policy and privacy (changing group bodyweight scoring) | [bodyweight-load-contract.md](bodyweight-load-contract.md) |
 | Authorization baseline | `docs/specs/10-api-authn-authz-guidelines.md` rules 15–19 |
-| Routes, screens, wording (changing group UI) | `docs/specs/ui/screen-map.md`, `docs/product/copy.md`, the group components (`apps/mobile/components/groups/`) |
+| Routes, screens, wording (changing group UI) | `docs/specs/ui/group-screens.md`, `docs/product/copy.md`, the group components (`apps/mobile/components/groups/`) |
 | Performed / working / parsing rules | [training-metrics-contract.md](training-metrics-contract.md) |
 | Diagnostics triage and repair | `RUNBOOK.md` |
 | Lanes and what they prove | spec `06`; the `supabase/tests/groups-*.sh` and flow headers |
@@ -31,7 +31,7 @@ personal sync never changes (no second push path; triggers failure-isolated).
 
 The stream is one persistent table, `group_events`. All access goes through
 `SECURITY DEFINER` RPCs. Devices pull into a disposable cache; there is no
-Realtime. The `group-eval` Edge Function normalizes shared sets with the app's
+Realtime. `group-eval` normalizes shared sets with the app's
 TS and materializes the boards.
 
 Rejected: per-group session copies or client-pushed projections (duplicated
@@ -52,9 +52,8 @@ Membership is **periods**: at most one active per person and one active owner;
 a rejoin inserts a new `member` period; ended periods never reopen. An invite
 is one multi-use, non-expiring code per group; regenerating replaces it.
 
-**Failure isolation.** Every trigger on a Sync v2 table (share, stream item,
-evaluator enqueue) and every certification enqueue runs in its own `begin …
-exception` block. A failure writes one sanitized `public.app_logs` row (ids
+**Failure isolation.** Every Sync v2 trigger and certification enqueue runs in its own `begin … exception`
+block. A failure writes one sanitized `public.app_logs` row (ids
 and `sqlstate`, never `SQLERRM`, which echoes row values) and returns
 normally: `sync_push` always commits.
 
@@ -99,8 +98,7 @@ the function raises `AUTH_REQUIRED` instead of PostgREST's 42501; every
 mutating RPC locks the `groups` row `FOR UPDATE` before role checks,
 serializing role changes, transfers, removals and leaves; publishers take `FOR
 NO KEY UPDATE` and reads `KEY SHARE`: reads wait for mutating RPCs, not publishers,
-and see a mid-read publication in later statements only; usernames come from
-`user_profiles`, and create and join need one. The owner cannot leave (`OWNER_MUST_TRANSFER`)
+and see a mid-read publication in later statements only; the owner cannot leave (`OWNER_MUST_TRANSFER`)
 and becomes admin on transfer. Admins invite, edit, manage group exercises,
 remove members and cancel certifications.
 
@@ -144,17 +142,9 @@ training now is an active session written within 2 h (latest
 `server_received_at` of any row); latest completed is any time. Period
 totals (At a glance): 1–12 windows of ≤ 32 days, in order, unranked.
 
-**Record stream** (`group_competition_stream_v2`) adds each record's
-`record`: its set, and per board the previous #1 (holder and set, or own
-prior value); `_v4` adds `group_record_metrics`: boards
-taken #1 (`GR`), the rest PRs (`apps/mobile/src/groups/record-boards.ts`);
-`_v5` gives each withdrawal its voided record (`withdrawn`, or null).
-
-**Session records** (`group_competition_session_records`, beside the session
-detail; exact readers reject new keys): one shared session's non-voided group records, as stream events whose
-`record` values are those boards, each with the All board's current leader
-(`leads` while its own set holds #1; none for an earlier revision). The app
-shows them once the session completes; no Volume board (being dropped).
+**Competitive readers** (stream, records, history) are owned
+by [group-competition-contract.md](group-competition-contract.md) §4; load it
+when changing them.
 
 ## Device-computed card metrics
 
@@ -195,9 +185,8 @@ enqueue nothing. The evaluator never writes links: a bad server-written link
 stalls the member's pull.
 
 **Invocation.** A `pg_net` kick (one per transaction, after commit) starts work
-in seconds. An hourly `pg_cron` sweep is the backstop, slow because each run
-forces a hosted WAL archive; its runs log work done (`app_logs`). URL and
-secret live in Vault; without a URL the queue waits. Postgres calls it (shared
+in seconds. An hourly `pg_cron` sweep is the backstop (slow: each run forces a
+hosted WAL archive). URL and secret live in Vault; without a URL the queue waits. Postgres calls it (shared
 secret, no JWT), never a client.
 
 **Facts.** `group_set_facts` has one row per set of every shared session,
@@ -209,13 +198,9 @@ the fixed group rule of [[set.eligibility]] (`isWorkingSetType` with no
 policy); readers read it as `working is not false`. A set-rule or kernel change bumps
 `GROUP_EVAL_RULES_VERSION`, and drains re-queue older facts as a silent
 `rules` recompute, a bounded batch per run. Each run records its version
-(`group_eval_rules_state`); the sweep kicks while older facts lack a queued
-job, so once the new function has run, bumps finish without member activity.
-Comparisons are not stamped: the same change ships a migration, applied once
-the new worker is live, queuing `rules` evaluations of live comparisons. Kernel
-rescores advance only private record baselines; historical values and
-revisions stay immutable.
-
+(`group_eval_rules_state`); the sweep finishes bumps without member activity.
+Comparisons are not stamped: a migration, applied once the new worker is live,
+queues `rules` evaluations of live comparisons. 
 **Live target:** the member is active in a non-deleted group that owns the
 unarchived group exercise. Any other board is frozen.
 
@@ -273,7 +258,7 @@ Implements [[groups.certification]]: attests the raw synced values of a
 record set (a current All entry or a non-voided record) on an unarchived
 exercise, stored as a row per current score under one public id. Certify takes
 any score's token and checks every score's live fingerprint (`CONFLICT`); a
-repeat returns it (`created: false`). Ending any row ends them all. Only the
+repeat returns it. Ending any row ends them all. Only the
 certifier withdraws; owners and admins cancel; both are idempotent. Ended rows
 never reopen, and undelete revives nothing. RPCs and apply write certificates;
 the failure-isolated source-mode trigger implements [[groups.certification]].

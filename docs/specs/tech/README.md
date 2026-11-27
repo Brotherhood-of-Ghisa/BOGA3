@@ -4,6 +4,10 @@ This folder holds subsystem-level implementation references that sit below the t
 
 Current docs:
 
+- `exercise-session-facts-contract.md`: load for the local derived session-facts tables: grain, staleness triggers and the rules version.
+
+- `sync-client-cycle.md`: load for the mobile sync cycle, dirty bits and the monotonic clock guard.
+
 - `exercise-merge-contract.md`: load for merge transactions, protocol-5 history revisions, staged apply and private recovery.
 
 - `strength-regimes-contract.md`: experimental RM fitting, session sampling,
