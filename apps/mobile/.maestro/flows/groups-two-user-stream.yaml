@@ -29,13 +29,14 @@ appId: com.dinoderek.mobile
 #   7. CoW browser/form entry, native exercise-sheet search/selection, a real
 #      next-week publish and native Back preserve the originating group;
 #   8. scheduling a meet through the native keyboard, Join, Back to the
-#      group preview, and the fifth Meets tab open the same meet;
+#      challenge Modal, group preview, and fifth Meets tab open the same meet;
 #   9. removing the counterparty through the native confirmation alert shows
 #      `was removed` and one member.
 # Why device: two real users and real round trips through the app; 1 the cold
 #   boot, real sign-in and keyboard; 3 the focus refresh; 4 the keyboard;
 #   7 the searchable native Modal/keyboard, stack Back and server refresh;
-#   8 the new form keyboard, replacement route/native Back and fifth-tab fit;
+#   8 the new form keyboard, scrolling native challenge Modal, replacement
+#     route/native Back and fifth-tab fit;
 #   5 react-native-screens' native back (it went dead from the second visit on
 #   iOS 26); 6 the sheet and its backdrop; 7 the native alert.
 # Jest counterpart: __tests__/groups-api-live.test.ts (lane groups-api-live:
@@ -540,6 +541,32 @@ appId: com.dinoderek.mobile
     visible: { id: "meet-join-leave", text: "Leave meet" }
     timeout: 15000
 - takeScreenshot: "meet-detail-joined"
+# Add challenge ends the page: no centre request beyond its scroll boundary.
+- scrollUntilVisible:
+    element: { id: "meet-add-challenge" }
+    direction: DOWN
+    timeout: 15000
+- tapOn: { id: "meet-add-challenge" }
+- extendedWaitUntil:
+    visible: { id: "meet-challenge-editor" }
+    timeout: 15000
+- scrollUntilVisible:
+    element: { id: "meet-challenge-exercise-${output.groupsBoardExerciseId}" }
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: { id: "meet-challenge-exercise-${output.groupsBoardExerciseId}" }
+# Save ends the sheet body and is clear of the bottom safe area.
+- scrollUntilVisible:
+    element: { id: "meet-challenge-save" }
+    direction: DOWN
+    timeout: 15000
+- tapOn: { id: "meet-challenge-save" }
+- extendedWaitUntil:
+    notVisible: { id: "meet-challenge-editor" }
+    timeout: 15000
+- assertVisible: "Added by ${MAESTRO_GROUPS_DEVICE_USERNAME}"
+- takeScreenshot: "meet-challenge-added"
 - tapOn: { id: "BackButton" }
 - extendedWaitUntil:
     visible: { id: "group-meets-preview" }

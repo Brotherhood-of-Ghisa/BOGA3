@@ -1,7 +1,7 @@
 import type { StagedMeetChallenge } from '@/src/groups/meet-draft';
 import { useCallback, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
-import { ActionButton, ChoiceRow, FormSection, ScreenScroll, Sheet, uiSpace, useUiText } from '@/components/ui';
+import { Alert, ScrollView, Text, View } from 'react-native';
+import { ActionButton, ChoiceRow, FormSection, Sheet, uiSpace, useUiText } from '@/components/ui';
 import { listCompetitionExercises, removeMeetChallenge, saveMeetChallenge } from '@/src/groups/api';
 import { groupCacheKeys } from '@/src/groups/cache';
 import { createCoWId } from '@/src/groups/cow-draft';
@@ -82,18 +82,18 @@ export function MeetChallengeEditor({ groupId, meetId, userId, challenge, onDism
       await onChanged();
     } catch { setMessage("Couldn't check status. Try again when connected."); }
   };
-  return <Sheet visible onDismiss={() => { if (!action.pending) onDismiss(); }} dismissLabel="Dismiss challenge" title={challenge ? 'Edit challenge' : 'Add challenge'}>
-    <ScreenScroll keyboardShouldPersistTaps="handled">
+  return <Sheet visible onDismiss={() => { if (!action.pending) onDismiss(); }} dismissLabel="Dismiss challenge" testID="meet-challenge-editor" title={challenge ? 'Edit challenge' : 'Add challenge'}>
+    <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ padding: uiSpace.md, gap: uiSpace.md }}>
       {!exercises.data ? <GroupMissingDataState error={pickInlineError(exercises.error)} offline={exercises.offline} onRetry={() => void exercises.refresh()} testIDPrefix="meet-challenge-exercises" /> : <>
         <FormSection title="Exercise">{exercises.data.exercises.filter(e => e.archived_at_ms === null).map(e =>
-          <ChoiceRow key={e.group_exercise_id} label={`${e.name}${e.group_exercise_id === exerciseId ? ' · Selected' : ''}`} disabled={action.pending || blocked}
+          <ChoiceRow key={e.group_exercise_id} testID={`meet-challenge-exercise-${e.group_exercise_id}`} label={`${e.name}${e.group_exercise_id === exerciseId ? ' · Selected' : ''}`} disabled={action.pending || blocked}
             onPress={() => { setExerciseId(e.group_exercise_id); setMetric(e.rules.default_metric === 'seconds' ? 'seconds' : 'e1rm'); }} />)}</FormSection>
         <FormSection title="Metric">{meetMetrics(chosen?.rules.default_metric === 'seconds').map(m =>
           <ChoiceRow key={m} label={`${MEET_METRICS[m]}${metric === m ? ' · Selected' : ''}`} disabled={action.pending || blocked} onPress={() => setMetric(m)} />)}</FormSection>
       </>}
       {message ? <GroupWriteNotice testID="meet-write-notice" tone="error" message={message} /> : null}
       {blocked ? <ActionButton label="Check status" variant="outline" disabled={action.offline} onPress={() => void check()} /> : null}
-      <ActionButton variant="primary" label="Save challenge" disabled={action.pending || blocked || !chosen || chosen.archived_at_ms !== null} onPress={() => void submit()} />
-    </ScreenScroll>
+      <ActionButton variant="primary" testID="meet-challenge-save" label="Save challenge" disabled={action.pending || blocked || !chosen || chosen.archived_at_ms !== null} onPress={() => void submit()} />
+    </ScrollView>
   </Sheet>;
 }
