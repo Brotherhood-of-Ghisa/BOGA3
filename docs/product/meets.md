@@ -16,8 +16,8 @@ Why: results must come from deliberate choices, never from whatever a member
 happened to train that day.
 Code: `apps/mobile/src/data/session-meet-links.ts`;
 `supabase/migrations/20261127213000_session_meet_links.sql`.
-Pending: the app's meet Leave (which detaches the sessions), session Join
-controls and meet scoring are not built yet.
+Pending: the app's meet and session Join/Leave controls (meet Leave must also
+call `leaveMeetSessions`) and meet scoring are not built yet.
 
 ### meets.results · definition · accepted
 
