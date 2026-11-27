@@ -120,7 +120,8 @@ and only the owner's app session writes them, through a `SECURITY DEFINER` RPC
 that rejects OAuth `client_id`s. When changing either path, load
 [`tech/health-activities-contract.md`](tech/health-activities-contract.md).
 
-Group prediction writes are the exception to the per-agent permission row below.
+Group prediction writes are the exception to the per-agent permission row below
+([[agents.group-predictions]]).
 An agent's offers, withdrawals and CoW scheduling are gated by the group's
 Predictions setting and by membership, not by `public.agent_plan_permissions`.
 Load [`tech/group-predictions-contract.md`](tech/group-predictions-contract.md).
