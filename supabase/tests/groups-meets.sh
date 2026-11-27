@@ -508,6 +508,15 @@ expect_ok "a second member joins"
 rpc "${AUTHOR_TOKEN}" group_meet_get "$(b_ref "${GROUP}" "${ROSTER}")"
 expect_json "roster lists both, viewer joined" --arg a "${MEMBER_UID}" --arg b "${AUTHOR_UID}" \
   '[.roster[].member.user_id] == [$a, $b] and .viewer.joined == true and .viewer.role == "member" and all(.roster[]; .current_member)'
+rpc "${FORMER_TOKEN}" group_join "$(jq -nc --arg c "${CODE}" '{p_code:$c}')"
+expect_ok "the former member rejoins the group"
+rpc "${FORMER_TOKEN}" group_meet_join "$(b_ref "${GROUP}" "${ROSTER}")"
+expect_ok "and joins the meet"
+rpc "${FORMER_TOKEN}" group_leave "$(jq -nc --arg g "${GROUP}" '{p_group_id:$g}')"
+expect_ok "then leaves the group again"
+rpc "${OWNER_TOKEN}" group_meet_get "$(b_ref "${GROUP}" "${ROSTER}")"
+expect_json "a member who left the group stays on the roster, marked" --arg f "${FORMER_UID}" \
+  '[.roster[] | select(.member.user_id == $f) | .current_member] == [false] and (.roster | length) == 3'
 rpc "${AUTHOR_TOKEN}" group_meet_leave "$(b_ref "${GROUP}" "${ROSTER}")"
 expect_ok "a member leaves"
 expect_json "left" '.joined == false'
@@ -521,7 +530,7 @@ rpc "${OWNER_TOKEN}" group_meet_join "$(b_ref "${GROUP}" "${ROSTER}")"
 expect_error CONFLICT "joining after the cutoff"
 rpc "${MEMBER_TOKEN}" group_meet_leave "$(b_ref "${GROUP}" "${ROSTER}")"
 expect_error CONFLICT "leaving after the cutoff"
-[[ "$(sql_value "select string_agg(user_id::text, ',' order by joined_at) from app_public.group_meet_roster where meet_id = '${ROSTER}';")" == "${MEMBER_UID},${AUTHOR_UID}" ]] ||
+[[ "$(sql_value "select string_agg(user_id::text, ',' order by joined_at) from app_public.group_meet_roster where meet_id = '${ROSTER}';")" == "${MEMBER_UID},${FORMER_UID},${AUTHOR_UID}" ]] ||
   fail "the roster must hold exactly the joined members"
 pass "roster: members join and leave idempotently until the cutoff, refused after it"
 
@@ -546,7 +555,7 @@ CURSOR="$(jq -r '.next_cursor' <<<"${BODY}")"
 rpc "${MEMBER_TOKEN}" group_meet_list "$(jq -nc --arg g "${GROUP}" --arg c "${CURSOR}" '{p_group_id:$g, p_before:$c, p_limit:2}')"
 expect_json "second page: no upcoming, the remaining past meet" --argjson p "${PAGE1}" \
   '.upcoming == [] and (.past | length) == 1 and (.past[0].meet_id as $id | $p | index($id) | not) and .next_cursor == null'
-for bad in '"bad"' '"{}"' "$(jq -c --arg c "$(jq -c --arg g "${MISSING_GROUP}" '.group_id = $g' <<<"${CURSOR}")" -n '$c')"; do
+for bad in '"bad"' '"{}"' "$(jq -c --arg c "$(jq -c '{group_id, meet_id, other: 1}' <<<"${CURSOR}")" -n '$c')" "$(jq -c --arg c "$(jq -c --arg g "${MISSING_GROUP}" '.group_id = $g' <<<"${CURSOR}")" -n '$c')"; do
   rpc "${MEMBER_TOKEN}" group_meet_list "$(jq -nc --arg g "${GROUP}" --argjson c "${bad}" '{p_group_id:$g, p_before:$c}')"
   expect_error VALIDATION "a malformed or foreign cursor ${bad}"
 done

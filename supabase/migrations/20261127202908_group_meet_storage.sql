@@ -214,13 +214,15 @@ language sql stable set search_path = app_public, pg_temp as $$
     'metric', p_challenge.metric);
 $$;
 
+-- Helpers run as the definer RPC (or stream page) that calls them; none is
+-- SECURITY DEFINER or client-executable.
 -- One stream item, in the writer's transaction. `scheduled`, `cancelled`,
 -- `on` and `results` are written once per meet (a unique index);
 -- `results_refreshed` and `challenge_changed` once per write. Payloads hold
 -- definition snapshots only, never scores or private context.
 create function app_public.group_meet_stream_write(p_meet app_public.group_meets, p_event text,
   p_occurred_at timestamptz, p_actor uuid, p_detail jsonb default null) returns void
-language plpgsql security definer set search_path = app_public, pg_temp as $$
+language plpgsql set search_path = app_public, pg_temp as $$
 begin
   insert into app_public.group_events(group_id, kind, member_user_id, actor_user_id, sort_at_ms, payload)
   values (p_meet.group_id, 'meet', null, p_actor, app_public.group_meet_ms(p_occurred_at),
@@ -231,7 +233,7 @@ end $$;
 
 create function app_public.group_meet_challenge_changed(p_meet app_public.group_meets, p_change text,
   p_challenge jsonb, p_previous jsonb, p_actor uuid, p_now timestamptz) returns void
-language plpgsql security definer set search_path = app_public, pg_temp as $$
+language plpgsql set search_path = app_public, pg_temp as $$
 begin
   if p_now >= app_public.group_meet_cutoff(p_meet) then
     perform app_public.group_meet_stream_write(p_meet, 'challenge_changed', p_now, p_actor,
@@ -620,7 +622,7 @@ begin
       _cursor := p_before::jsonb;
       if jsonb_typeof(_cursor) <> 'object' or (select count(*) from jsonb_object_keys(_cursor)) <> 3
          or _cursor->>'group_id' is distinct from p_group_id::text
-         or jsonb_typeof(_cursor->'starts_at_ms') <> 'number' then
+         or jsonb_typeof(_cursor->'starts_at_ms') is distinct from 'number' then
         raise exception 'bad cursor';
       end if;
       _edge := app_public.group_meet_at((_cursor->>'starts_at_ms')::bigint);
@@ -653,7 +655,7 @@ end $$;
 -- ---------------------------------------------------------------------------
 
 create function app_public.group_meet_stream_item(p_event_id uuid, p_sort bigint) returns jsonb
-language sql stable security definer set search_path = app_public, pg_temp as $$
+language sql stable set search_path = app_public, pg_temp as $$
   select jsonb_build_object('kind', 'meet', 'key', lpad(e.seq::text, 20, '0'), 'sort_at_ms', p_sort,
     'event', e.payload->'event', 'meet', e.payload->'meet', 'change', e.payload->'change',
     'challenge', e.payload->'challenge', 'previous', e.payload->'previous',

@@ -58,7 +58,9 @@ without one) and the server never applies.
   else is `FORBIDDEN`. A meet holds at most 20.
 - **Metrics** follow the exercise's comparison ([[groups.hold-ranking]]):
   `seconds` for a Hold, else `e1rm`, `weight`, `reps` or `volume`. The
-  exercise must be a live (unarchived) exercise of the group.
+  exercise must be a live (unarchived) exercise of the group. The group
+  boards rank only `e1rm`, `volume` and `seconds`; meet scoring defines
+  `weight` and `reps`.
 - **Uniqueness.** One live challenge per exercise + metric on a meet; a second
   add or an edit onto that pair is `DUPLICATE`. Adds are keyed by a client ID
   (an identical retry returns it, even once the exercise is archived), so concurrent adds of different challenges
