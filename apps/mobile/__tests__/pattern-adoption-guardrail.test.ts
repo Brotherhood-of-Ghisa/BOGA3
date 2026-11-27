@@ -125,3 +125,7 @@ it('follows wildcard barrels of imported style modules and permits safe column s
   write('components/groups/row-values.ts', 'export const rowStyles = {width: 76, textAlign: "right"};');
   expect(findListPatternViolations({ rootDir })).toEqual([]);
 });
+
+it('keeps meet summary and lifecycle cards under the compact family guard', () => {
+  expect(COMPACT_PATTERN_FILES).toEqual(expect.arrayContaining(['components/groups/meet-summary-card.tsx', 'components/groups/meet-stream-card.tsx']));
+});

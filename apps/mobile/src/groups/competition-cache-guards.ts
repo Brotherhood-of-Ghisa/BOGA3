@@ -1,3 +1,4 @@
+import { isMeetDetailWire, isMeetListWire } from './meet-wire';
 import { isObservedCompetitionPolicy } from './competition-cache-policy';
 import { coWSummaryCacheKey, isCoWSummaryWire } from './cow-wire';
 import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionSessionDetailWire,
@@ -29,6 +30,7 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
       (value.selection === 'none' || (previous ? value.selection === 'previous' : value.selection !== 'previous')) &&
       key === coWSummaryCacheKey(value, previous);
   }
+  if (['meets', 'meet'].includes(kind)) return meetCachePayload(kind, scope, value);
   if (kind === 'group-policy') return isObservedCompetitionPolicy(value);
   if (kind === 'group') return exact(value,['group','members']) && summary(value.group) && record(value.group) &&
     value.group.group_id === groupId && Array.isArray(value.members) && value.members.every(member);
@@ -41,10 +43,20 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
     scope.length === 3 && isCompetitionPeriodTotalsWire(value) && value.group_id === groupId;
   if (kind === 'session') return isCompetitionSessionDetailWire(value) && value.group_id === groupId &&
     value.session.member.user_id === scope[1] && value.session.session_id === scope.slice(2).join(':');
-  if (kind === 'stream') return scope.length === 2 && scope[1] === 'withdrawn-records-v1' && isCompetitionStreamWire(value) && value.items.every(item => item.kind === 'session'
+  if (kind === 'stream') return streamCachePayload(scope, value, groupId);
+  return false;
+}
+
+function meetCachePayload(kind: string, scope: string[], value: unknown): boolean {
+  if (kind === 'meets') return scope.length === 2 && scope[1] === 'v1' && isMeetListWire(value) && [...value.upcoming, ...value.past].every(m => m.group_id === scope[0]);
+  return scope.length === 3 && scope[2] === 'v1' && isMeetDetailWire(value) && value.meet.group_id === scope[0] && value.meet.meet_id === scope[1];
+}
+
+function streamCachePayload(scope: string[], value: unknown, groupId: string): boolean {
+  return scope.length === 2 && scope[1] === 'meets-v1' && isCompetitionStreamWire(value) && value.items.every(item => item.kind === 'session'
     ? item.groups.every(group => group.group_id === groupId)
     : item.kind === 'cow' ? item.definition.group_id === groupId
+    : item.kind === 'meet' ? true
     : item.kind === 'shared_exercise' ? item.group_id === groupId
     : (item.kind === 'competition' ? item.event.group.group_id : item.group.group_id) === groupId);
-  return false;
 }

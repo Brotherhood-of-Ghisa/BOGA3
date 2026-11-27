@@ -28,11 +28,15 @@ appId: com.dinoderek.mobile
 #      sheet closes on its backdrop;
 #   7. CoW browser/form entry, native exercise-sheet search/selection, a real
 #      next-week publish and native Back preserve the originating group;
-#   8. removing the counterparty through the native confirmation alert shows
+#   8. scheduling a meet through the native keyboard, Join, Back to the
+#      challenge Modal, group preview, and fifth Meets tab open the same meet;
+#   9. removing the counterparty through the native confirmation alert shows
 #      `was removed` and one member.
 # Why device: two real users and real round trips through the app; 1 the cold
 #   boot, real sign-in and keyboard; 3 the focus refresh; 4 the keyboard;
 #   7 the searchable native Modal/keyboard, stack Back and server refresh;
+#   8 the new form keyboard, scrolling native challenge Modal, replacement
+#     route/native Back and fifth-tab fit;
 #   5 react-native-screens' native back (it went dead from the second visit on
 #   iOS 26); 6 the sheet and its backdrop; 7 the native alert.
 # Jest counterpart: __tests__/groups-api-live.test.ts (lane groups-api-live:
@@ -42,7 +46,7 @@ appId: com.dinoderek.mobile
 #   exercise-picker.test.tsx (linked group rows), groups-screens.test.tsx
 #   (cards, friend view), groups-leaderboards-screens.test.tsx,
 #   groups-metric-screens.test.tsx, groups-record-set-sheet.test.tsx,
-#   groups-comparison-form.test.tsx, groups-cow-screens.test.tsx. Server rules: supabase/tests/groups-*.sh
+#   groups-comparison-form.test.tsx, groups-cow-screens.test.tsx, groups-meet-screens.test.tsx. Server rules: supabase/tests/groups-*.sh
 #   (lanes groups-contract, groups-leaderboards).
 #
 # ISOLATION: user_c and user_d are dedicated to this flow (docs/specs/11,
@@ -492,6 +496,92 @@ appId: com.dinoderek.mobile
 # from the modal accessibility tree, so tap the exposed region directly.
 - tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
+
+# --- Meet: native keyboard, replacement/Back, and the fifth pager tab ----------
+- openLink: "boga3://group/${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible: { id: "group-meets-preview" }
+    timeout: 15000
+- scrollUntilVisible:
+    element: { id: "group-meets-schedule" }
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: { id: "group-meets-schedule" }
+- extendedWaitUntil:
+    visible: { id: "meet-form-title" }
+    timeout: 15000
+- tapOn: { id: "meet-form-title" }
+- inputText: "Saturday lifting at the riverside gym"
+- scrollUntilVisible:
+    element: { id: "meet-form-venue" }
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: { id: "meet-form-venue" }
+- inputText: "Riverside strength and conditioning room"
+# The form dismisses its keyboard on this real content drag.
+- swipe:
+    start: "50%,40%"
+    end: "50%,20%"
+    duration: 500
+- scrollUntilVisible:
+    element: { id: "meet-form-submit" }
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: "meet-schedule-filled"
+- tapOn: { id: "meet-form-submit" }
+- extendedWaitUntil:
+    visible: { id: "meet-screen" }
+    timeout: 15000
+- assertVisible: "Riverside strength and conditioning room"
+- tapOn: { id: "meet-join-leave" }
+- extendedWaitUntil:
+    visible: { id: "meet-join-leave", text: "Leave meet" }
+    timeout: 15000
+- takeScreenshot: "meet-detail-joined"
+# Add challenge ends the page: no centre request beyond its scroll boundary.
+- scrollUntilVisible:
+    element: { id: "meet-add-challenge" }
+    direction: DOWN
+    timeout: 15000
+- tapOn: { id: "meet-add-challenge" }
+- extendedWaitUntil:
+    visible: { id: "meet-challenge-editor" }
+    timeout: 15000
+- scrollUntilVisible:
+    element: { id: "meet-challenge-exercise-${output.groupsBoardExerciseId}" }
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: { id: "meet-challenge-exercise-${output.groupsBoardExerciseId}" }
+# Save ends the sheet body and is clear of the bottom safe area.
+- scrollUntilVisible:
+    element: { id: "meet-challenge-save" }
+    direction: DOWN
+    timeout: 15000
+- tapOn: { id: "meet-challenge-save" }
+- extendedWaitUntil:
+    notVisible: { id: "meet-challenge-editor" }
+    timeout: 15000
+- assertVisible: "Added by ${MAESTRO_GROUPS_DEVICE_USERNAME}"
+- takeScreenshot: "meet-challenge-added"
+- tapOn: { id: "BackButton" }
+- extendedWaitUntil:
+    visible: { id: "group-meets-preview" }
+    timeout: 15000
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}&section=meets"
+- extendedWaitUntil:
+    visible: { id: "meet-summary-.*" }
+    timeout: 15000
+- assertVisible: { id: "groups-tab-meets", selected: true }
+- takeScreenshot: "groups-meets-tab"
+- tapOn: { id: "meet-summary-.*" }
+- extendedWaitUntil:
+    visible: { id: "meet-screen" }
+    timeout: 15000
+- assertVisible: { id: "meet-join-leave", text: "Leave meet" }
 
 # --- 7. The device removes the counterparty -> "was removed" -------------------
 - openLink: "boga3://group/${output.groupsGroupId}"

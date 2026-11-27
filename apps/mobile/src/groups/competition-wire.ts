@@ -1,3 +1,4 @@
+import type { MeetStreamItemWire } from './meet-wire.ts';
 import type { CoWMetric } from './cow-scoring.ts';
 import type { LoadInputMode } from '../exercise-core/index.ts';
 import type { CompetitionMetric, CompetitionValue } from './competition-contract.ts';
@@ -209,7 +210,8 @@ export type CompetitionStreamItemWire =
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';
       group: { group_id: string; name: string }; member: GroupMemberRef }
   | CompetitionStreamSharedExerciseWire
-  | CoWStreamItemWire;
+  | CoWStreamItemWire
+  | MeetStreamItemWire;
 export type CompetitionStreamWire = { contract_version: 4; items: CompetitionStreamItemWire[]; next_cursor: string | null; has_more: boolean };
 /** At a glance: every current member's working sets and group records per requested window, in request order. */
 export type CompetitionPeriodTotalsWire = {

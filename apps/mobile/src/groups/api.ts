@@ -1,3 +1,4 @@
+import { isMeetWriteWire, isMeetDetailWire, isMeetListWire, isMeetChallengeWriteWire, isMeetChallengeRemoveWire, isMeetJoinWire, type MeetWire, type MeetMetric } from './meet-wire';
 import { isCompetitionCachePayload } from './competition-cache-guards';
 import { isCompetitionBoardWire } from './competition-wire-guards';
 import { isCompetitionCertificationResultWire, isCompetitionCertifyResultWire, isCompetitionExerciseListWire,
@@ -140,7 +141,9 @@ export type GroupRpcName =
   | 'group_cow_list'
   | 'group_cow_results'
   | 'group_cow_summary'
-  | 'group_cow_previous_summary';
+  | 'group_cow_previous_summary'
+  | 'group_competition_stream_v7' | 'group_meet_get' | 'group_meet_list' | 'group_meet_create' | 'group_meet_update'
+  | 'group_meet_cancel' | 'group_meet_join' | 'group_meet_leave' | 'group_meet_challenge_add' | 'group_meet_challenge_update' | 'group_meet_challenge_remove';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -333,10 +336,11 @@ export const getCompetitionRecordsHistory = ({ groupId, exerciseId, metric, cert
     p_certified: certified, p_before: before, p_limit: limit },isCompetitionRecordsHistoryWire,
     p => p.exercise.group_exercise_id === exerciseId && p.metric === metric && p.certified === certified);
 export const getCompetitionStream = (groupId: string | null = null, before: string | null = null, limit = 20): Promise<CompetitionStreamWire> =>
-  competitionRpc('group_competition_stream_v6',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
+  competitionRpc('group_competition_stream_v7',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
     p => groupId === null || p.items.every(item => item.kind === 'session' ? item.groups.every(g => g.group_id === groupId) :
       item.kind === 'competition' ? item.event.group.group_id === groupId :
       item.kind === 'cow' ? item.definition.group_id === groupId :
+      item.kind === 'meet' ? true :
       item.kind === 'shared_exercise' ? item.group_id === groupId : item.group.group_id === groupId));
 export const getCompetitionSession = (groupId: string, memberId: string, sessionId: string): Promise<CompetitionSessionDetailWire> =>
   competitionRpc('group_competition_session_detail_v2',{ p_group_id: groupId, p_member_user_id: memberId, p_session_id: sessionId },isCompetitionSessionDetailWire,p => p.group_id === groupId && p.session.member.user_id === memberId && p.session.session_id === sessionId);
@@ -471,3 +475,31 @@ export const getCoWSummary = (groupId: string): Promise<CoWSummaryWire> =>
 export const getPreviousCoWSummary = (groupId: string): Promise<CoWSummaryWire> =>
   competitionRpc('group_cow_previous_summary', { p_group_id: groupId }, isCoWSummaryWire,
     p => p.group_id === groupId && (p.selection === 'previous' || p.selection === 'none'));
+
+// Meet writes retain their caller-held identity/version across uncertain delivery.
+export type MeetFields = Pick<MeetWire, 'title' | 'starts_at_ms' | 'ends_at_ms' | 'venue_name' | 'address' | 'latitude' | 'longitude' | 'entry_note'>;
+const meetFieldsArgs = (fields: MeetFields) => Object.fromEntries(Object.entries(fields).map(([key, value]) => [`p_${key}`, value]));
+export const getMeet = (groupId: string, meetId: string) => competitionRpc('group_meet_get',
+  { p_group_id: groupId, p_meet_id: meetId }, isMeetDetailWire, p => p.meet.group_id === groupId && p.meet.meet_id === meetId);
+export const listMeets = (groupId: string, before: string | null = null) => competitionRpc('group_meet_list',
+  { p_group_id: groupId, p_before: before, p_limit: 20 }, isMeetListWire,
+  p => [...p.upcoming, ...p.past].every(m => m.group_id === groupId));
+export const createMeet = (groupId: string, meetId: string, fields: MeetFields) => competitionRpc('group_meet_create',
+  { p_group_id: groupId, p_meet_id: meetId, ...meetFieldsArgs(fields) }, isMeetWriteWire,
+  p => p.meet.group_id === groupId && p.meet.meet_id === meetId);
+export const updateMeet = (groupId: string, meetId: string, version: number, fields: MeetFields) => competitionRpc('group_meet_update',
+  { p_group_id: groupId, p_meet_id: meetId, p_expected_version: version, ...meetFieldsArgs(fields) }, isMeetWriteWire,
+  p => p.meet.group_id === groupId && p.meet.meet_id === meetId);
+export const cancelMeet = (groupId: string, meetId: string, version: number) => competitionRpc('group_meet_cancel',
+  { p_group_id: groupId, p_meet_id: meetId, p_expected_version: version }, isMeetWriteWire,
+  p => p.meet.group_id === groupId && p.meet.meet_id === meetId);
+export const setMeetJoined = (groupId: string, meetId: string, joined: boolean) => competitionRpc(joined ? 'group_meet_join' : 'group_meet_leave',
+  { p_group_id: groupId, p_meet_id: meetId }, isMeetJoinWire, p => p.meet_id === meetId && p.joined === joined);
+export const saveMeetChallenge = (input: { groupId: string; meetId: string; challengeId: string; exerciseId: string; metric: MeetMetric; version: number | null }) =>
+  competitionRpc(input.version === null ? 'group_meet_challenge_add' : 'group_meet_challenge_update',
+    { p_group_id: input.groupId, p_meet_id: input.meetId, p_challenge_id: input.challengeId,
+      p_group_exercise_id: input.exerciseId, p_metric: input.metric, ...(input.version === null ? {} : { p_expected_version: input.version }) },
+    isMeetChallengeWriteWire, p => p.challenge.meet_id === input.meetId && p.challenge.challenge_id === input.challengeId);
+export const removeMeetChallenge = (groupId: string, meetId: string, challengeId: string, version: number) => competitionRpc('group_meet_challenge_remove',
+  { p_group_id: groupId, p_meet_id: meetId, p_challenge_id: challengeId, p_expected_version: version }, isMeetChallengeRemoveWire, p => p.challenge_id === challengeId);
+export const isMeetNotFound = (error: unknown) => isNotFoundMessage(error, 'meet not found');
