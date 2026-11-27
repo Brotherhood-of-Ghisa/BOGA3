@@ -125,6 +125,9 @@ account/group-scoped cache keys; older archive pages remain online-only.
 Group access loss evicts meet entries; a missing meet evicts only its entry.
 The stream opts into v7 with a new cache suffix, discarding older cursors.
 
+Roster rows decode `joined`, nullable `joined_at_ms` and `linked`: the going
+list shows every roster row, joined or link-only.
+
 Meet/challenge/roster writes use `useGroupAction`, refused offline and never
 queued. Editors retain input across refresh and conflict; explicit status
 review rebases the expected version, while uncertain creates retain their UUID.

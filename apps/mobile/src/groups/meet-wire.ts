@@ -14,7 +14,7 @@ export type MeetChallengeWire = { challenge_id: string; meet_id: string; group_e
   author: GroupMemberRef | null; created_at_ms: number };
 export type MeetWriteWire = { meet: MeetWire };
 export type MeetDetailWire = MeetWriteWire & { challenges: MeetChallengeWire[];
-  roster: { member: GroupMemberRef; joined_at_ms: number; current_member: boolean }[];
+  roster: { member: GroupMemberRef; joined: boolean; joined_at_ms: number | null; linked: boolean; current_member: boolean }[];
   viewer: { role: GroupRole; joined: boolean } };
 export type MeetListWire = { upcoming: MeetWire[]; past: MeetWire[]; next_cursor: string | null };
 export type MeetChallengeSnapshot = Pick<MeetChallengeWire, 'challenge_id' | 'group_exercise_id' | 'exercise_name' | 'metric'>;
@@ -66,7 +66,7 @@ export function isMeetDetailWire(v: unknown): v is MeetDetailWire {
   const meetId = v.meet.meet_id;
   return Array.isArray(v.challenges) && v.challenges.every(c => isMeetChallengeWire(c) && c.meet_id === meetId) &&
     new Set(v.challenges.map(c => c.challenge_id)).size === v.challenges.length &&
-    Array.isArray(v.roster) && v.roster.every(r => exact(r, ['member', 'joined_at_ms', 'current_member']) && member(r.member) && integer(r.joined_at_ms) && typeof r.current_member === 'boolean') &&
+    Array.isArray(v.roster) && v.roster.every(r => exact(r, ['member', 'joined', 'joined_at_ms', 'linked', 'current_member']) && member(r.member) && typeof r.joined === 'boolean' && typeof r.linked === 'boolean' && (r.joined ? integer(r.joined_at_ms) : r.joined_at_ms === null) && typeof r.current_member === 'boolean') &&
     exact(v.viewer, ['role', 'joined']) && ['owner', 'admin', 'member'].includes(String(v.viewer.role)) && typeof v.viewer.joined === 'boolean';
 }
 export const isMeetListWire = (v: unknown): v is MeetListWire => exact(v, ['upcoming', 'past', 'next_cursor']) &&

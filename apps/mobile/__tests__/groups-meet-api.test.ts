@@ -33,6 +33,12 @@ it('guards nested scope and private fields before a read can enter cache', async
   const detail = meetDetailFixture(); expect(isMeetDetailWire(detail)).toBe(true);
   expect(isMeetDetailWire({ ...detail, challenges: [{ ...detail.challenges[0], meet_id: 'other' }] })).toBe(false);
   expect(isMeetChallengeWire({ ...detail.challenges[0], metric: 'improvement' })).toBe(false);
+  const row = detail.roster[0];
+  const rosterOf = (r: object) => ({ ...detail, roster: [{ ...row, ...r }] });
+  expect(isMeetDetailWire(rosterOf({ joined: false, joined_at_ms: null, linked: true }))).toBe(true);
+  expect(isMeetDetailWire(rosterOf({ joined: false, joined_at_ms: 5 }))).toBe(false);
+  expect(isMeetDetailWire(rosterOf({ joined: true, joined_at_ms: null }))).toBe(false);
+  expect(isMeetDetailWire(rosterOf({ linked: 'yes' }))).toBe(false);
   expect(isMeetListWire({ upcoming: [detail.meet], past: [], next_cursor: null })).toBe(true);
   respond({ ...detail, meet: { ...detail.meet, group_id: 'other' } }); await expect(api.getMeet('g1', 'm1')).rejects.toMatchObject({ code: 'INTERNAL', invalidPayload: true });
   respond({ meet: { ...detail.meet, meet_id: 'other' } }); await expect(api.updateMeet('g1', 'm1', 1, fields)).rejects.toMatchObject({ code: 'INTERNAL' });
