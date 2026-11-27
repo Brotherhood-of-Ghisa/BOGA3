@@ -39,7 +39,7 @@ sequence discovery and atomic merge/recovery RPCs, load
   - Domain columns are nullable wherever the client may write NULL; only the
     PK, `owner_user_id` and `client_updated_at_ms` are NOT NULL.
   - Provenance guards and merge revision fences add to structural triggers; group triggers: "Out of scope".
-  - No uniqueness beyond the PK, except the planning provenance guards (see
+  - No uniqueness beyond the PK, except planning provenance and Routine slot guards (see
     "Per-entity rules"). Slot and pair uniqueness is otherwise client-enforced
     (see "Client-enforced constraints") with non-unique btree indexes for speed only.
 - **Typed columns only.** No `extras jsonb` blob anywhere: schema, wire or

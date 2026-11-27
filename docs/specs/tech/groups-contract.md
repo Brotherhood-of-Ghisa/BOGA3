@@ -52,8 +52,8 @@ Membership is **periods**: at most one active per person and one active owner;
 a rejoin inserts a new `member` period; ended periods never reopen. An invite
 is one multi-use, non-expiring code per group; regenerating replaces it.
 
-**Failure isolation.** Every Sync v2 trigger and certification enqueue runs in its own `begin … exception`
-block. A failure writes one sanitized `public.app_logs` row (ids
+**Failure isolation.** Every group trigger on Sync v2 tables and each certification
+enqueue runs in its own `begin … exception` block. A failure writes one sanitized `public.app_logs` row (ids
 and `sqlstate`, never `SQLERRM`, which echoes row values) and returns
 normally: `sync_push` always commits.
 
@@ -64,11 +64,11 @@ before joining is never shared; one started as a member but synced after
 leaving is.
 
 - Shares are additive: leaving, a `started_at` edit or a tombstone never
-  deletes one; reads filter tombstones.
+  deletes one; reads skip tombstones.
 - The trigger fires on every accepted write (not an LWW no-op), so a missed
   share appears on the next one; a failure on a session's last write never
   self-heals.
-- `started_at` is client-authored: a member can only steer their own sessions
+- `started_at` is client-authored: a member steers only their own sessions
   into groups they belong or belonged to. Accepted.
 
 **Stream.** One `group_events` row per item, written once and never deleted
@@ -98,8 +98,8 @@ the function raises `AUTH_REQUIRED` instead of PostgREST's 42501; every
 mutating RPC locks the `groups` row `FOR UPDATE` before role checks,
 serializing role changes, transfers, removals and leaves; publishers take `FOR
 NO KEY UPDATE` and reads `KEY SHARE`: reads wait for mutating RPCs, not publishers,
-and see a mid-read publication in later statements only; the owner cannot leave (`OWNER_MUST_TRANSFER`)
-and becomes admin on transfer. Admins invite, edit, manage group exercises,
+and see a mid-read publication in later statements only. Create and join need a username (`USERNAME_REQUIRED`); the owner cannot
+leave (`OWNER_MUST_TRANSFER`) and becomes admin on transfer. Admins invite, edit, manage group exercises,
 remove members and cancel certifications.
 
 ## RPC conventions
@@ -187,7 +187,7 @@ stalls the member's pull.
 **Invocation.** A `pg_net` kick (one per transaction, after commit) starts work
 in seconds. An hourly `pg_cron` sweep is the backstop (slow: each run forces a
 hosted WAL archive). URL and secret live in Vault; without a URL the queue waits. Postgres calls it (shared
-secret, no JWT), never a client.
+secret, no JWT), never clients.
 
 **Facts.** `group_set_facts` has one row per set of every shared session,
 linked or not, so a new link is a re-apply. `apps/mobile/src/groups/set-facts.ts`
@@ -196,13 +196,13 @@ the same kernel.
 `fingerprint` hashes raw synced values and interprets nothing. `working` is
 the fixed group rule of [[set.eligibility]] (`isWorkingSetType` with no
 policy); readers read it as `working is not false`. A set-rule or kernel change bumps
-`GROUP_EVAL_RULES_VERSION`, and drains re-queue older facts as a silent
-`rules` recompute, a bounded batch per run. Each run records its version
+`GROUP_EVAL_RULES_VERSION`, and drains re-queue older facts silently as
+`rules` recomputes, a bounded batch per run. Runs record their version
 (`group_eval_rules_state`); the sweep finishes bumps without member activity.
-Comparisons are not stamped: a migration, applied once the new worker is live,
-queues `rules` evaluations of live comparisons. 
-**Live target:** the member is active in a non-deleted group that owns the
-unarchived group exercise. Any other board is frozen.
+Comparisons are not stamped; a migration queues `rules` evaluations once the new worker is live.
+
+**Live target:** the member is active in a non-deleted group owning the unarchived
+exercise; any other board is frozen.
 
 ## Boards
 
