@@ -4,7 +4,7 @@
 #
 # Sets up rows for two fixture users (A and B), then with user A's JWT
 # exercises SELECT / INSERT / UPDATE / DELETE against user B's rows on every
-# one of the eighteen v2 entity tables. All four operations must either:
+# one of the twenty v2 entity tables. All four operations must either:
 #
 #   - return zero rows (SELECT, UPDATE, DELETE under PostgREST + RLS),
 #   - or fail with an RLS-deny status / response shape (INSERT with a
@@ -88,9 +88,9 @@ ENTITIES=(
   session_plan_exercises
   session_plan_sets
   session_plan_uses
-  session_plan_uses
   training_notes
   injuries
+  session_meet_links
 )
 
 # -----------------------------------------------------------------------------
@@ -168,6 +168,8 @@ NOW_MS="$(($(date +%s) * 1000))"
 # The v2 plan chain adds a training_programme, a session_plan referencing the
 # programme + gym, a session_plan_exercise referencing the plan +
 # exercise_definition, and a session_plan_set referencing the plan exercise.
+# A session_meet_link references the session (its meet_id is plain text, no
+# FK; the id is the client's deterministic `<meet_id>:<session_id>`).
 GYM_ID="rls-${RUN_TAG}-bgym"
 EDEF_ID="rls-${RUN_TAG}-bedef"
 MG_ID="rls-${RUN_TAG}-bmg"
@@ -188,11 +190,14 @@ SPS_ID="rls-${RUN_TAG}-bsps"
 SPU_ID="rls-${RUN_TAG}-bspu"
 NOTE_ID="rls-${RUN_TAG}-bnote"
 INJURY_ID="rls-${RUN_TAG}-binjury"
+MEET_ID="rls-${RUN_TAG}-bmeet"
+SML_ID="${MEET_ID}:${SESS_ID}"
 
 cleanup_rows() {
   run_psql_sql "
     delete from app_public.training_notes           where id = '${NOTE_ID}';
     delete from app_public.injuries                 where id = '${INJURY_ID}';
+    delete from app_public.session_meet_links       where id = '${SML_ID}';
     delete from app_public.session_plan_uses        where id = '${SPU_ID}';
     delete from app_public.session_plan_sets        where id = '${SPS_ID}';
     delete from app_public.session_plan_exercises   where id = '${SPE_ID}';
@@ -344,6 +349,12 @@ run_psql_sql "
        started_at, created_at, updated_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${INJURY_ID}', '${MG_ID}', 'left', 'acute',
             7, 'B Injury', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.session_meet_links
+      (owner_user_id, id, session_id, meet_id,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${SML_ID}', '${SESS_ID}', '${MEET_ID}',
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   commit;
 " >/dev/null
 
@@ -511,6 +522,12 @@ insert_payload_for() {
           pain_score: 5, label: "Injected", started_at: $ts,
           client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
       ;;
+    session_meet_links)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --arg sess "${SESS_ID}" --arg meet "${MEET_ID}" --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, session_id: $sess, meet_id: $meet,
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
   esac
 }
 
@@ -535,6 +552,7 @@ target_row_id_for() {
     session_plan_uses)        echo "${SPU_ID}" ;;
     training_notes)           echo "${NOTE_ID}" ;;
     injuries)                 echo "${INJURY_ID}" ;;
+    session_meet_links)       echo "${SML_ID}" ;;
   esac
 }
 

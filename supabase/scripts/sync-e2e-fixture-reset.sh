@@ -99,7 +99,7 @@ docker exec "${DB_CONTAINER}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q
 sync_rows=0
 # The performed rows that carry a source-plan link (exercise_sets,
 # session_exercises, sessions) precede the plan rows they reference.
-for table in session_exercise_tags exercise_sets session_exercises sessions \
+for table in session_exercise_tags exercise_sets session_exercises session_meet_links sessions \
   session_plan_uses session_plan_sets session_plan_exercises session_plans training_programmes \
   exercise_muscle_mappings exercise_tag_definitions exercise_group_links exercise_definitions \
   training_notes injuries muscle_groups gyms body_weight_measurements user_settings; do

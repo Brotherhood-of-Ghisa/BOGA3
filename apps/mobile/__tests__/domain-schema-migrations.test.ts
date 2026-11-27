@@ -145,9 +145,8 @@ describe('domain schema and runtime migrations', () => {
     // m0026 adds synced muscle targets; m0027 separates the Volume choice; m0028 adds reusable plan uses;
     // m0029 extends the revision fence to the session lifecycle; m0030 mirrors server-owned logging control;
     // m0031 adds combined muscles and the single target map, and re-pulls every row once;
-    // m0031 adds combined muscles and the single target map, and re-pulls every row once;
-    // m0032 adds training notes; m0033 adds injuries schema.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(38);
+    // m0032 adds training notes; m0033 adds injuries schema; m0038 adds session meet links.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(39);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -215,6 +214,7 @@ describe('domain schema and runtime migrations', () => {
       'm0035',
       'm0036',
       'm0037',
+      'm0038',
     ]);
   });
 
@@ -390,6 +390,21 @@ describe('domain schema and runtime migrations', () => {
     expect(linksMigration).toContain('`local_dirty` integer DEFAULT false NOT NULL');
     expect(linksMigration).toContain('`local_updated_at_ms` integer DEFAULT 0 NOT NULL');
     expect(linksMigration).toContain('exercise_group_links_id_deterministic');
+  });
+
+  it('creates the session_meet_links synced entity in m0038 without a cursor reset', () => {
+    const linksMigration = localRuntimeMigrations.migrations.m0038;
+    expect(linksMigration).toContain('CREATE TABLE `session_meet_links`');
+    // The only FK is the synced sessions parent; meet_id carries no FK.
+    expect(linksMigration).toContain(
+      'FOREIGN KEY (`session_id`) REFERENCES `sessions`(`id`) ON UPDATE no action ON DELETE cascade'
+    );
+    expect(linksMigration.match(/FOREIGN KEY/g)).toHaveLength(1);
+    expect(linksMigration).toContain('`local_dirty` integer DEFAULT false NOT NULL');
+    expect(linksMigration).toContain('session_meet_links_id_deterministic');
+    // The new layer-4 type re-pulls only its layer, through the stored layer
+    // types (pull-layer-types.ts), never a migration-wide cursor reset.
+    expect(linksMigration).not.toContain('pull_cursor');
   });
 
   it('empties the group cache once in m0005 (groups contract §6.2 shape change)', () => {

@@ -12,8 +12,9 @@ counting link. A session that does not overlap the window cannot be attached.
 
 Why: results must come from deliberate choices, never from whatever a member
 happened to train that day.
-Code: `apps/mobile/src/groups/api.ts`; `supabase/functions/group-eval/`.
-Pending: meet linking is not built yet.
+Code: `apps/mobile/src/data/session-meet-links.ts`;
+`supabase/migrations/20261127213000_session_meet_links.sql`.
+Pending: the app's session Join controls and meet scoring are not built yet.
 
 ### meets.results · definition · accepted
 

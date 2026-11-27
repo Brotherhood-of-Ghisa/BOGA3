@@ -112,6 +112,12 @@ Drizzle and migrations own columns; drift checks enforce parity. Additional rule
   only reads it. Its id must stay `<group_id>:<exercise_definition_id>`: a local
   CHECK enforces that form, so a pulled row that breaks it fails the layer-1
   page apply with `INTERNAL` and pull cannot advance past it.
+- **`session_meet_links`** (layer 4) is likewise the member's own data: its id
+  stays `<meet_id>:<session_id>` (local CHECK), its only FK is to `sessions`
+  (`on delete cascade`), and `meet_id` is plain text. Whether a link counts is
+  read by the meet's SQL helpers, never stored, so a link that does not count
+  never fails `sync_push`; load [`group-meet-contract.md`](group-meet-contract.md)
+  when changing that rule.
 - **Session planning** adds `training_programmes`, `session_plans`,
   `session_plan_exercises`, `session_plan_sets`, `session_plan_uses`, and performed-domain
   provenance columns (`sessions.source_plan_id`,
@@ -128,7 +134,7 @@ Drizzle and migrations own columns; drift checks enforce parity. Additional rule
 
 ## Deferrable foreign keys
 
-All twenty-four cross-entity FKs
+All twenty-five cross-entity FKs
 are `DEFERRABLE INITIALLY DEFERRED`, so checks run at COMMIT. A push may
 write a child before its parent in one transaction, and any unsatisfied FK at
 COMMIT rolls back the whole batch. The `supabase/tests/sync-v2-*` scripts check names, targets and delete actions.
@@ -335,8 +341,8 @@ duplicate reaching the server is a client bug it does not reject.
    `(session_exercise_id, exercise_tag_definition_id)`.
 6. No orphan-child push (the topological batch builder).
 7. `exercise_group_links` has at most one row per
-   `(group_id, exercise_definition_id)`, through its deterministic id; relink
-   reuses that id.
+   `(group_id, exercise_definition_id)`, and `session_meet_links` per
+   `(meet_id, session_id)`, through their deterministic ids; relink reuses it.
 
 ## Out of scope
 

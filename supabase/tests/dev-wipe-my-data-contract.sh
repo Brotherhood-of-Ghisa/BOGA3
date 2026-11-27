@@ -106,15 +106,23 @@ A_SP="dw-${RUN_TAG}-asp"
 A_SPE="dw-${RUN_TAG}-aspe"
 A_SPS="dw-${RUN_TAG}-asps"
 A_INJ="dw-${RUN_TAG}-ainj"
+# session_meet_links id is the client-derived <meet_id>:<session_id>; meet_id
+# is plain text (no FK, no meet row needed). User B's link (on B's own
+# session) must survive A's wipe.
+A_MEET="dw-${RUN_TAG}-ameet"
+A_SML="${A_MEET}:${A_SESS}"
 B_GYM="dw-${RUN_TAG}-bgym"
+B_SESS="dw-${RUN_TAG}-bsess"
+B_SML="${A_MEET}:${B_SESS}"
 
 cleanup_rows() {
   run_psql_sql "
     delete from app_public.injuries                 where id in ('${A_INJ}');
+    delete from app_public.session_meet_links       where id in ('${A_SML}', '${B_SML}');
     delete from app_public.session_exercise_tags    where id in ('${A_SXTAG}');
     delete from app_public.exercise_sets            where id in ('${A_SET}');
     delete from app_public.session_exercises        where id in ('${A_SX}');
-    delete from app_public.sessions                 where id in ('${A_SESS}');
+    delete from app_public.sessions                 where id in ('${A_SESS}', '${B_SESS}');
     delete from app_public.session_plan_sets        where id in ('${A_SPS}');
     delete from app_public.session_plan_exercises   where id in ('${A_SPE}');
     delete from app_public.session_plans            where id in ('${A_SP}');
@@ -187,7 +195,7 @@ pass "scenario 2: unset app.env raises FORBIDDEN_ENV"
 #
 # Seed user A's FK chain and a general training note plus one user B gym, then call the
 # helper as user A with app.env='local'. Assert: the return count equals A's
-# sixteen rows, all of A's rows are gone, and B's gym survives.
+# twenty rows, all of A's rows are gone, and B's gym survives.
 # ---------------------------------------------------------------------------
 echo "[dev-wipe] scenario 3: owner-scoped wipe deletes only the caller's rows"
 
@@ -195,7 +203,7 @@ echo "[dev-wipe] scenario 3: owner-scoped wipe deletes only the caller's rows"
 # earlier suites in the same gate run may have left rows owned by this fixture
 # user, and the helper (correctly) deletes ALL of the caller's rows. Removing
 # A's existing rows up front means the helper's count reflects exactly the
-# sixteen rows seeded below.
+# twenty rows seeded below.
 run_psql_sql "
   begin;
     set constraints all deferred;
@@ -205,6 +213,7 @@ run_psql_sql "
     delete from app_public.session_exercise_tags    where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_sets            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_exercises        where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.session_meet_links       where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.sessions                 where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_plan_sets        where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_plan_exercises   where owner_user_id = '${USER_A_UUID}'::uuid;
@@ -322,9 +331,21 @@ run_psql_sql "
       (owner_user_id, id, muscle_group_id, side, status, pain_score, label, started_at, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, '${A_INJ}', '${A_MG}', 'left', 'acute', 5, 'A Injury', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
+    insert into app_public.session_meet_links
+      (owner_user_id, id, session_id, meet_id, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_SML}', '${A_SESS}', '${A_MEET}', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
     insert into app_public.gyms
       (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${B_GYM}', 'B Gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+    insert into app_public.sessions
+      (owner_user_id, id, gym_id, status, started_at,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${B_SESS}', '${B_GYM}', 'active', ${NOW_MS},
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+    insert into app_public.session_meet_links
+      (owner_user_id, id, session_id, meet_id, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${B_SML}', '${B_SESS}', '${A_MEET}', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
     insert into public.agent_workout_permissions(owner_user_id,client_id,workout_logging_enabled,granted_at)
     values('${USER_A_UUID}','wipe-workout',true,now());
   commit;
@@ -342,10 +363,10 @@ deleted="$(run_psql_sql "
   commit;
 " | grep -E '^[0-9]+$' | head -n1)"
 
-if [[ "${deleted}" != "19" ]]; then
-  fail "scenario 3 expected 19 rows deleted (including workout permission), got '${deleted}'"
+if [[ "${deleted}" != "20" ]]; then
+  fail "scenario 3 expected 20 rows deleted (including workout permission), got '${deleted}'"
 fi
-pass "scenario 3: helper returned rows_deleted = 19"
+pass "scenario 3: helper returned rows_deleted = 20"
 [[ "$(run_psql "select count(*) from public.agent_workout_permissions where owner_user_id='${USER_A_UUID}';")" == 0 ]] ||
   fail 'developer wipe retained workout authority'
 
@@ -368,7 +389,8 @@ remaining_a="$(run_psql "
   + (select count(*) from app_public.training_notes           where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_NOTE}')
   + (select count(*) from app_public.user_settings           where owner_user_id = '${USER_A_UUID}'::uuid)
   + (select count(*) from app_public.injuries                where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_INJ}')
-  + (select count(*) from app_public.exercise_group_links     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_EGL}');
+  + (select count(*) from app_public.exercise_group_links     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_EGL}')
+  + (select count(*) from app_public.session_meet_links       where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SML}');
 ")"
 if [[ "${remaining_a}" != "0" ]]; then
   fail "scenario 3 expected all of user A's rows gone, ${remaining_a} remain"
@@ -381,9 +403,14 @@ if [[ "${bindings_a}" != "0" ]]; then
 fi
 pass "scenario 3: the caller's bound group reading contexts were deleted"
 
-remaining_b="$(run_psql "select count(*) from app_public.gyms where owner_user_id = '${USER_B_UUID}'::uuid and id = '${B_GYM}';")"
-if [[ "${remaining_b}" != "1" ]]; then
-  fail "scenario 3 expected user B's gym to survive, count=${remaining_b}"
+remaining_b="$(run_psql "
+  select
+    (select count(*) from app_public.gyms               where owner_user_id = '${USER_B_UUID}'::uuid and id = '${B_GYM}')
+  + (select count(*) from app_public.sessions           where owner_user_id = '${USER_B_UUID}'::uuid and id = '${B_SESS}')
+  + (select count(*) from app_public.session_meet_links where owner_user_id = '${USER_B_UUID}'::uuid and id = '${B_SML}');
+")"
+if [[ "${remaining_b}" != "3" ]]; then
+  fail "scenario 3 expected user B's gym, session and meet link to survive, count=${remaining_b} of 3"
 fi
 pass "scenario 3: a second user's rows were left untouched"
 

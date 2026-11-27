@@ -21,6 +21,11 @@
 #     link whose group_id / group_exercise_id reference no group row is
 #     accepted (no FK on the group columns); an FK-orphan link (unknown
 #     exercise_definition_id) is rejected with FK_VIOLATION and does not land.
+#   - session_meet_links lifecycle: a tombstone (a Leave) at a newer cuam
+#     lands; a stale undelete at an older cuam loses (row stays tombstoned);
+#     an undelete of the SAME `<meet_id>:<session_id>` id at a still-newer
+#     cuam restores it; a link whose session parent is missing fails the
+#     whole batch at COMMIT (deferred FK) and nothing from that batch lands.
 #
 # This is integration-level on top of the per-feature push contract suite
 # (sync-push-contract.sh) — it exercises the multi-layer ordering + LWW +
@@ -190,7 +195,7 @@ BASE_MS="$(($(date +%s) * 1000))"
 # Per-layer ID set. Non-topological ARRAY ORDER for the multi-layer batch:
 # we list layer-3 first, layer-2, layer-1, layer-0 last so the deferrable-FK
 # path is exercised inside one transaction (mirroring the push contract
-# suite's deferrable-FK scenarios, but with all ten FK-bearing entity types in
+# suite's deferrable-FK scenarios, but with all eleven FK-bearing entity types in
 # one call rather than just the four-row chain). The two independent roots are
 # covered by sync-bodyweight-contract.sh.
 GYM_ID="rt-${RUN_TAG}-gym"
@@ -207,6 +212,10 @@ SXTAG_ID="rt-${RUN_TAG}-sxtag"
 # still starts with the rt-${RUN_TAG}- prefix the cleanup `like` matches.
 GRP_ID="rt-${RUN_TAG}-grp"
 EGL_ID="${GRP_ID}:${EDEF_ID}"
+# session_meet_links id is the client-derived `<meet_id>:<session_id>`; meet_id
+# is plain text (no FK) and keeps the rt-${RUN_TAG}- prefix for cleanup.
+MEET_ID="rt-${RUN_TAG}-meet"
+SML_ID="${MEET_ID}:${SESS_ID}"
 ORPHAN_SX_ID="rt-${RUN_TAG}-orphan-sx"
 MISSING_PARENT_SESS_ID="rt-${RUN_TAG}-doesnotexist-sess"
 
@@ -214,6 +223,7 @@ cleanup_rows() {
   service_delete "session_exercise_tags"    "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "exercise_sets"            "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "session_exercises"        "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
+  service_delete "session_meet_links"       "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "exercise_muscle_mappings" "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "muscle_groups"            "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "exercise_tag_definitions" "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
@@ -240,7 +250,7 @@ trap cleanup_on_exit EXIT
 
 # ---------------------------------------------------------------------------
 # Step 1 — multi-layer multi-row batch in NON-topological order. All four
-# FK-bearing layers, all ten FK-bearing entity types in a single push.
+# FK-bearing layers, all eleven FK-bearing entity types in a single push.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-push-roundtrip] step 1 — multi-layer batch in non-topological order"
 
@@ -250,6 +260,7 @@ BATCH_PAYLOAD="$(jq -nc \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
   --arg egl "${EGL_ID}" --arg grp "${GRP_ID}" \
+  --arg sml "${SML_ID}" --arg meet "${MEET_ID}" \
   --argjson ts "${T1}" \
   '{entities: [
     # Layer 1 exercise_group_links leads the array: it precedes its Layer-0
@@ -257,6 +268,10 @@ BATCH_PAYLOAD="$(jq -nc \
     {type: "exercise_group_links", id: $egl, client_updated_at_ms: $ts,
      fields: {exercise_definition_id: $edef, group_id: $grp,
               group_exercise_id: "rt-gex-1",
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
+    # Pull-layer 4 session_meet_links precedes its sessions parent.
+    {type: "session_meet_links", id: $sml, client_updated_at_ms: $ts,
+     fields: {session_id: $sess, meet_id: $meet,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     # Layer 3.
     {type: "exercise_sets", id: $set, client_updated_at_ms: $ts,
@@ -308,7 +323,8 @@ for spec in "gyms|${GYM_ID}" "exercise_definitions|${EDEF_ID}" \
             "exercise_tag_definitions|${ETD_ID}" "sessions|${SESS_ID}" \
             "exercise_muscle_mappings|${EMM_ID}" "session_exercises|${SX_ID}" \
             "exercise_sets|${SET_ID}" "session_exercise_tags|${SXTAG_ID}" \
-            "exercise_group_links|${EGL_ID}"; do
+            "exercise_group_links|${EGL_ID}" \
+            "session_meet_links|${SML_ID}"; do
   IFS='|' read -r table row_id <<<"${spec}"
   service_select "${table}" "owner_user_id=eq.${USER_A_UUID}&id=eq.${row_id}&select=id"
   assert_jq 'length == 1' "step 1 service-role read ${table}.${row_id}"
@@ -328,6 +344,7 @@ NEWER_PAYLOAD="$(jq -nc \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
   --arg egl "${EGL_ID}" --arg grp "${GRP_ID}" \
+  --arg sml "${SML_ID}" --arg meet "${MEET_ID}" --argjson created "${T1}" \
   --argjson ts "${T2}" \
   '{entities: [
     {type: "gyms", id: $gym, client_updated_at_ms: $ts,
@@ -363,7 +380,10 @@ NEWER_PAYLOAD="$(jq -nc \
     {type: "exercise_group_links", id: $egl, client_updated_at_ms: $ts,
      fields: {exercise_definition_id: $edef, group_id: $grp,
               group_exercise_id: "rt-gex-2",
-              created_at: $ts, updated_at: $ts, deleted_at: null}}
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
+    {type: "session_meet_links", id: $sml, client_updated_at_ms: $ts,
+     fields: {session_id: $sess, meet_id: $meet,
+              created_at: $created, updated_at: $ts, deleted_at: null}}
   ]}')"
 
 sync_push "${USER_A_TOKEN}" "${NEWER_PAYLOAD}"
@@ -380,6 +400,10 @@ service_select "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SET_ID}&
 assert_jq --argjson ts "${T2}" '.[0].weight_value == "120" and .[0].reps_value == "5" and .[0].set_type == "rir_0" and .[0].client_updated_at_ms == $ts' "step 2 exercise_sets LWW overwrote"
 service_select "exercise_group_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EGL_ID}&select=group_exercise_id,client_updated_at_ms"
 assert_jq --argjson ts "${T2}" '.[0].group_exercise_id == "rt-gex-2" and .[0].client_updated_at_ms == $ts' "step 2 exercise_group_links LWW overwrote"
+service_select "session_meet_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SML_ID}&select=session_id,meet_id,updated_at,client_updated_at_ms"
+assert_jq --argjson ts "${T2}" --arg sess "${SESS_ID}" --arg meet "${MEET_ID}" \
+  '.[0].session_id == $sess and .[0].meet_id == $meet and .[0].updated_at == $ts and .[0].client_updated_at_ms == $ts' \
+  "step 2 session_meet_links LWW overwrote"
 
 # ---------------------------------------------------------------------------
 # Step 3 — LWW older loses. Push the original T1 payload again. ack ok:true,
@@ -392,6 +416,8 @@ assert_jq '.ok == true' "step 3 older-loses ack"
 
 service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_ID}&select=name,client_updated_at_ms"
 assert_jq --argjson ts "${T2}" '.[0].name == "Renamed Gym" and .[0].client_updated_at_ms == $ts' "step 3 LWW older: stored row unchanged"
+service_select "session_meet_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SML_ID}&select=updated_at,client_updated_at_ms"
+assert_jq --argjson ts "${T2}" '.[0].updated_at == $ts and .[0].client_updated_at_ms == $ts' "step 3 LWW older: session_meet_links unchanged"
 
 # ---------------------------------------------------------------------------
 # Step 4 — Future-clock clamp. Push a gyms row with client_updated_at_ms ~1 day
@@ -530,6 +556,79 @@ assert_non_2xx "step 6d FK-orphan link rejected"
 assert_body_contains "FK_VIOLATION" "step 6d FK_VIOLATION token in body"
 service_select "exercise_group_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${ORPHAN_EGL_ID}&select=id"
 assert_jq 'length == 0' "step 6d FK-orphan link absent from server"
+
+# ---------------------------------------------------------------------------
+# Step 7 — session_meet_links lifecycle. Leave is a tombstone and re-join
+# undeletes the SAME deterministic `<meet_id>:<session_id>` id (server
+# contract, "LWW and undelete"); meet_id carries no FK; the session FK is
+# deferred and enforced at COMMIT.
+# ---------------------------------------------------------------------------
+echo "[sync-v2-push-roundtrip] step 7 — session_meet_links tombstone, stale undelete, undelete, deferred FK"
+
+sml_payload() {
+  # $1 id, $2 session_id, $3 cuam, $4 deleted_at (json: null or a number)
+  jq -nc --arg sml "$1" --arg sess "$2" --arg meet "${MEET_ID}" \
+    --argjson created "${T1}" --argjson ts "$3" --argjson deleted "$4" \
+    '{entities: [
+      {type: "session_meet_links", id: $sml, client_updated_at_ms: $ts,
+       fields: {session_id: $sess, meet_id: $meet,
+                created_at: $created, updated_at: $ts, deleted_at: $deleted}}
+    ]}'
+}
+
+# 7a. Tombstone (Leave) at a newer cuam lands.
+T7_TOMB=$((BASE_MS + 8000))
+sync_push "${USER_A_TOKEN}" "$(sml_payload "${SML_ID}" "${SESS_ID}" "${T7_TOMB}" "${T7_TOMB}")"
+assert_status "200" "step 7a meet link tombstone push"
+assert_jq '.ok == true' "step 7a meet link tombstone ack"
+service_select "session_meet_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SML_ID}&select=deleted_at,client_updated_at_ms"
+assert_jq --argjson ts "${T7_TOMB}" 'length == 1 and .[0].deleted_at == $ts and .[0].client_updated_at_ms == $ts' \
+  "step 7a meet link tombstone landed (deleted_at set at the newer cuam)"
+
+# 7b. A stale undelete (cuam older than the tombstone) is acked but loses:
+# the row stays tombstoned at the tombstone's cuam.
+T7_STALE=$((BASE_MS + 7500))
+sync_push "${USER_A_TOKEN}" "$(sml_payload "${SML_ID}" "${SESS_ID}" "${T7_STALE}" null)"
+assert_status "200" "step 7b stale meet link undelete push"
+assert_jq '.ok == true' "step 7b stale meet link undelete ack"
+service_select "session_meet_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SML_ID}&select=deleted_at,client_updated_at_ms"
+assert_jq --argjson ts "${T7_TOMB}" 'length == 1 and .[0].deleted_at == $ts and .[0].client_updated_at_ms == $ts' \
+  "step 7b stale meet link undelete lost (row still tombstoned)"
+
+# 7c. Undelete (re-join) of the SAME id at a still-newer cuam restores it.
+T7_UNDELETE=$((BASE_MS + 9000))
+sync_push "${USER_A_TOKEN}" "$(sml_payload "${SML_ID}" "${SESS_ID}" "${T7_UNDELETE}" null)"
+assert_status "200" "step 7c meet link undelete push"
+assert_jq '.ok == true' "step 7c meet link undelete ack"
+service_select "session_meet_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SML_ID}&select=deleted_at,session_id,meet_id,client_updated_at_ms"
+assert_jq --argjson ts "${T7_UNDELETE}" --arg sess "${SESS_ID}" --arg meet "${MEET_ID}" \
+  'length == 1 and .[0].deleted_at == null and .[0].session_id == $sess and .[0].meet_id == $meet and .[0].client_updated_at_ms == $ts' \
+  "step 7c meet link undelete restored the same id (deleted_at null)"
+
+# 7d. A link whose session is neither in the batch nor on the server fails
+# the whole batch at COMMIT (the FK is deferred): FK_VIOLATION, and neither
+# the orphan link nor a valid sibling row in the same batch lands.
+ORPHAN_SML_ID="${MEET_ID}:${MISSING_PARENT_SESS_ID}"
+SIBLING_GYM_ID="rt-${RUN_TAG}-sml-sibling-gym"
+T7_ORPHAN=$((BASE_MS + 9100))
+ORPHAN_SML_PAYLOAD="$(jq -nc --arg sml "${ORPHAN_SML_ID}" --arg sess "${MISSING_PARENT_SESS_ID}" \
+  --arg meet "${MEET_ID}" --arg gym "${SIBLING_GYM_ID}" --argjson ts "${T7_ORPHAN}" \
+  '{entities: [
+    {type: "session_meet_links", id: $sml, client_updated_at_ms: $ts,
+     fields: {session_id: $sess, meet_id: $meet,
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
+    {type: "gyms", id: $gym, client_updated_at_ms: $ts,
+     fields: {name: "Sibling", latitude: null, longitude: null,
+              coordinate_accuracy_m: null, coordinates_updated_at: null,
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${ORPHAN_SML_PAYLOAD}"
+assert_non_2xx "step 7d meet link with missing session rejected"
+assert_body_contains "FK_VIOLATION" "step 7d FK_VIOLATION token in body"
+service_select "session_meet_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${ORPHAN_SML_ID}&select=id"
+assert_jq 'length == 0' "step 7d orphan meet link absent from server"
+service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SIBLING_GYM_ID}&select=id"
+assert_jq 'length == 0' "step 7d sibling row of the rejected batch absent (batch rolled back)"
 
 COMPLETED=1
 echo "[sync-v2-push-roundtrip] all assertions passed"
