@@ -276,5 +276,14 @@ link "${MEMBER_TOKEN}" "${FUTURE_MEET}" "${p}-running"
 expect_counting "${FUTURE_MEET}" "" "a running session does not count before the meet starts"
 pass "counting: future meet"
 
+# The server never writes a member's Sync v2 rows: only sync_push (the member's
+# own push) and dev_wipe_my_data touch session_meet_links.
+[[ "$(run_psql "select string_agg(distinct p.proname, ',' order by p.proname) from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname in ('app_public', 'public')
+    and p.prosrc ~* '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+(app_public\\.)?session_meet_links';")" \
+  == "dev_wipe_my_data,sync_push" ]] || fail "only sync_push and dev_wipe_my_data may write session_meet_links"
+pass "no server function writes session_meet_links beyond sync_push and dev_wipe_my_data"
+
 COMPLETED=1
 echo "[${LANE_LABEL}] PASS"
