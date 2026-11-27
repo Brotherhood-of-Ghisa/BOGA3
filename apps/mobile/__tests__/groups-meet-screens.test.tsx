@@ -135,7 +135,7 @@ describe('Leave also detaches this member\'s sessions', () => {
   it('tombstones the links this device holds for that meet after the online leave, and no other meet\'s', async () => {
     seedLinks(); await leave();
     await waitFor(() => expect(liveIds()).toEqual(['other:s1']));
-    expect(api.setMeetJoined).toHaveBeenCalledWith('g1', 'm1', false); expect(mockRunSyncCycle).toHaveBeenCalledTimes(1);
+    expect(api.setMeetJoined).toHaveBeenCalledWith('g1', 'm1', false); expect(mockRunSyncCycle).toHaveBeenCalledTimes(2);
     expect(screen.queryByTestId('meet-leave-note')).toBeNull();
   });
   it('still detaches what is here when the pull fails, and says other devices\' sessions may still count', async () => {

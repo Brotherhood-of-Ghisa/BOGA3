@@ -21,6 +21,7 @@ import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
 import { makeStyles } from '@/components/ui/theme-context';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { exerciseIdsOfDefinitions } from '@/src/groups/session-meets';
 import { useSessionChallengeExercises } from '@/src/groups/use-session-meets';
 import { sessionAddExerciseHref, sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { GYMS_ROUTE } from '@/src/navigation/routes';
@@ -291,9 +292,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
   );
   const challengedDefinitions = useSessionChallengeExercises(userId, sessionId, challengeDefinitionIds);
   const challengeExerciseIds = useMemo(
-    () => new Set((sessionExercises ?? [])
-      .filter((exercise) => challengedDefinitions.has(exercise.exerciseDefinitionId))
-      .map((exercise) => exercise.id)),
+    () => exerciseIdsOfDefinitions(sessionExercises ?? [], challengedDefinitions),
     [sessionExercises, challengedDefinitions]
   );
 

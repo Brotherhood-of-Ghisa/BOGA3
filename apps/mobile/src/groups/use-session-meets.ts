@@ -67,9 +67,14 @@ export function useSessionMeets({
       return EMPTY;
     }
   }, [userId, sessionId]);
-  const reload = useCallback(() => read().then((next) => {
-    if (next && alive.current) setSnapshot(next);
-  }), [read]);
+  // Reads can finish out of order; only the newest applies.
+  const latestRead = useRef(0);
+  const reload = useCallback(() => {
+    const request = ++latestRead.current;
+    return read().then((next) => {
+      if (next && alive.current && request === latestRead.current) setSnapshot(next);
+    });
+  }, [read]);
 
   // Re-read on mount, when a link changes, and on the clock tick, so a meet list
   // cached while this screen stayed mounted (the Train tab) shows up.
@@ -99,18 +104,22 @@ export function useSessionMeets({
       .map((candidate) => ({ ...candidate, joined: snapshot.joined.has(candidate.meet.meet_id) }));
   }, [snapshot, userId, sessionId, startedAtMs, completedAtMs, status, placement, now]);
 
+  // One write at a time; a ref, so two taps before a re-render cannot both start.
+  const writing = useRef(false);
   const change = useCallback(async (row: SessionMeetRow, write: typeof joinMeetFromSession): Promise<SessionMeetResult | null> => {
-    if (!sessionId || busyMeetId) return null;
+    if (!sessionId || writing.current) return null;
+    writing.current = true;
     setBusyMeetId(row.meet.meet_id);
     setMessage(null);
     const result = await write(sessionId, row.meet);
+    writing.current = false;
     if (alive.current) {
       setBusyMeetId(null);
       setMessage(result.ok ? null : sessionMeetFailureMessage(result.failure));
     }
     await reload();
     return result;
-  }, [sessionId, busyMeetId, reload]);
+  }, [sessionId, reload]);
 
   return {
     rows,
@@ -139,13 +148,15 @@ export function useSessionChallengeExercises(
     };
   }, []);
   const key = definitionIds.join('\u0000');
+  const latestRead = useRef(0);
   const reload = useCallback(() => {
     if (!userId || !sessionId) return Promise.resolve();
     const owner = `${userId}|${sessionId}|${key}`;
+    const request = ++latestRead.current;
     return loadChallengeExerciseIds(userId, sessionId, key ? key.split('\u0000') : [])
       .catch(() => new Set<string>())
       .then((ids) => {
-        if (alive.current) setRead({ owner, ids });
+        if (alive.current && request === latestRead.current) setRead({ owner, ids });
       });
   }, [userId, sessionId, key]);
   useEffect(() => {

@@ -38,6 +38,7 @@ import {
   joinMeetFromSession,
   leaveMeetFromSession,
   leaveMeetLinks,
+  exerciseIdsOfDefinitions,
   loadChallengeExerciseIds,
   offeredMeets,
   readCachedMeetCandidates,
@@ -183,15 +184,18 @@ describe('leaveMeetLinks (the meet page\'s Leave)', () => {
 
   it('pulls first, then tombstones every local link for that meet and no other', async () => {
     const order: string[] = [];
-    mockRunSyncCycle.mockImplementation(async () => {
+    mockRunSyncCycle.mockImplementationOnce(async () => {
       order.push('pull');
       // A link made on another device arrives with the pull.
       insertSession('s3', STARTS + HOUR, STARTS + 2 * HOUR);
       db().insert(sessionMeetLinks).values({ id: 'm1:s3', sessionId: 's3', meetId: 'm1', createdAt: new Date(), updatedAt: new Date() }).run();
       return 'converged';
+    }).mockImplementationOnce(async () => {
+      order.push('push');
+      return 'converged';
     });
     expect(await leaveMeetLinks(meet(), at)).toEqual({ left: 3, pulled: true });
-    expect(order).toEqual(['pull']);
+    expect(order).toEqual(['pull', 'push']); // the pull first, then the push of the tombstones
     expect(links().filter((l) => l.deletedAt === null).map((l) => l.id)).toEqual(['other:s1']);
   });
 
@@ -251,5 +255,13 @@ describe('loadChallengeExerciseIds', () => {
     db().delete(exerciseGroupLinks).where(eq(exerciseGroupLinks.id, 'g1:squat')).run();
     expect([...(await loadChallengeExerciseIds('u1', 's1', ['squat']))]).toEqual([]);
     expect([...(await loadChallengeExerciseIds('u1', 's1', []))]).toEqual([]);
+  });
+});
+
+describe('exerciseIdsOfDefinitions', () => {
+  it('maps challenge exercise definitions to the session exercises (cards) that use them', () => {
+    const exercises = [{ id: 'a', exerciseDefinitionId: 'squat' }, { id: 'b', exerciseDefinitionId: 'curl' }, { id: 'c', exerciseDefinitionId: 'squat' }];
+    expect([...exerciseIdsOfDefinitions(exercises, new Set(['squat']))]).toEqual(['a', 'c']);
+    expect(exerciseIdsOfDefinitions(exercises, new Set()).size).toBe(0);
   });
 });

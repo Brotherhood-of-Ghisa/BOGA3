@@ -184,7 +184,7 @@ export type MeetLeaveLinksResult = {
 /**
  * The local half of the meet page's Leave, run after the online leave RPC: pull
  * once so links made on another device reach this one, then tombstone every
- * live link this device holds for the meet. The server never writes a member's
+ * live link this device holds for the meet, then push them. The server never writes a member's
  * Sync v2 rows, so this is the only way the leave reaches them. A pull that
  * fails (offline, a busy cycle) does not stop the local tombstones: links that
  * exist only on another device stay until that device syncs, and are removed
@@ -194,6 +194,16 @@ export type MeetLeaveLinksResult = {
 export const leaveMeetLinks = async (meet: MeetWire, now: Date = currentTime()): Promise<MeetLeaveLinksResult> => {
   const pulled = await runSyncCycle().then((outcome) => outcome === 'converged', () => false);
   const left = await leaveMeetSessions(toMeetWindow(meet), now);
-  if (left > 0) notifySessionMeetLinksChanged();
+  if (left > 0) {
+    notifySessionMeetLinksChanged();
+    // Push the tombstones now, so the roster read that follows no longer counts them.
+    await runSyncCycle().catch(() => undefined);
+  }
   return { left, pulled };
 };
+
+/** The session-exercise ids whose exercise definition is in `definitions` (challenge exercises, mapped to their cards). */
+export const exerciseIdsOfDefinitions = (
+  exercises: readonly { id: string; exerciseDefinitionId: string }[],
+  definitions: ReadonlySet<string>,
+): Set<string> => new Set(exercises.filter((exercise) => definitions.has(exercise.exerciseDefinitionId)).map((exercise) => exercise.id));
