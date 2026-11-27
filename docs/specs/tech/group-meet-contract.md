@@ -23,7 +23,7 @@ The synced session↔meet link entity, Join and Leave, roster derivation and the
 
 ## Scoring, snapshot and refresh
 
-Live scoring, the cutoff snapshot, rescoring on challenge change, Refresh results, and the accepted exception to [groups-contract.md](groups-contract.md)'s "Nothing is copied": the cutoff snapshot copies set values into group storage, and account deletion removes them.
+Live scoring, rescoring on challenge change and Refresh results, under [[meets.results]]. The [[meets.results]] cutoff snapshot is the accepted exception to [groups-contract.md](groups-contract.md)'s "Nothing is copied".
 
 ## Meets leaderboard
 

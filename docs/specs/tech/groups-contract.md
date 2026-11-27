@@ -24,8 +24,9 @@
 
 The group record is a server-side **share ledger**, `group_session_shares`,
 written by a trigger on `app_public.sessions` when a member's session arrives
-through `sync_push`. Nothing is copied: group reads read through to the
-member's own live Sync v2 rows. So the group owns a permanent record that
+through `sync_push`. Nothing is copied (the one accepted exception, meet
+snapshots, is in [group-meet-contract.md](group-meet-contract.md)): group reads
+read through to the member's own live Sync v2 rows. So the group owns a permanent record that
 nothing recomputes from membership; sessions update until complete; edits,
 deletes and undeletes flow through; membership at logging time decides; and
 personal sync never changes (no second push path; triggers failure-isolated).
