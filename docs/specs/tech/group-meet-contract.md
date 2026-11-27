@@ -5,9 +5,9 @@
 > leaderboard, notification delivery and client reads.
 > **Not here:** product rules (they live in [[meets.linking]], [[meets.results]]
 > and [[notifications.meets]]), and what the code states (columns, SQL, wire
-> shapes, messages, tests). **Status:** storage, challenges, the online roster
-> and the stream kind are built; the other sections are filled by the cards
-> that build them. **Load when:** changing meets, meet challenges, the
+> shapes, messages, tests). **Status:** storage, challenges, the roster, the
+> session link and the stream kind are built; the other sections are filled by
+> the cards that build them. **Load when:** changing meets, meet challenges, the
 > meet session link, or `supabase/functions/group-eval/` meet scoring.
 
 ## Storage and lifecycle
@@ -76,9 +76,34 @@ without one) and the server never applies.
 
 **Online Join and Leave.** Any current member joins or leaves a meet with an
 online RPC until its cutoff; a cancelled meet refuses joins. Both are
-idempotent. The roster read lists joined members, marking those who have
-since left the group. The synced session↔meet link, the roster union with
-counting links ([[meets.linking]]) and the overlap check are not built yet.
+idempotent.
+
+**Session links.** A member joins one of their sessions to a meet with the
+Sync v2 entity `session_meet_links` (load
+[sync-v2-server-contract.md](sync-v2-server-contract.md) when changing it), so
+it works offline. Only the member's client writes it: the server never writes
+a member's Sync v2 rows, so detaching all of a member's sessions from a meet is
+the client tombstoning the links it holds (`leaveMeetSessions`; pull first to
+reach links made on another device). The client refuses joins and leaves past
+the cutoff ([[meets.linking]]) and a session that can
+no longer overlap the window (it started at or after `ends_at`, or ended at or
+before `starts_at`); the server accepts every link and decides at read time.
+
+**Counting.** `group_meet_counting_links` applies [[meets.linking]]: the link
+and its session are live, the session is in the share ledger for the meet's
+group, its owner is a current member, the meet is not cancelled, and the
+session overlaps the window. A session's end is `completed_at`; while it runs,
+now; a completed session without one ends where it started. No trigger reacts
+to a link, so a link that does not count never fails `sync_push`; it is kept
+and ignored. Scoring reuses the same helper.
+
+**Roster.** The meet read lists joined members ∪ members with a counting link
+(`group_meet_roster_members`): `joined` and `joined_at_ms` are the explicit
+join (null for a member there by a link only), `linked` marks a counting link,
+and `current_member` is false for joined members who have since left the
+group (a member there only by a link drops off when they leave, as their links
+stop counting). Joined members
+come first, in join order.
 
 ## Scoring, snapshot and refresh
 
@@ -102,3 +127,7 @@ Client RPCs, cache keys, the online-only write rule for meet actions, and the of
 lifecycle", "Challenges" and online Join and Leave against the local stack:
 posture, the role and denial matrix, versions and retries, state refusals,
 `DUPLICATE`, concurrent adds, the cutoff, list paging and the stream items.
+`supabase/tests/groups-meet-links.sh` (same lane) proves the counting cases and
+the roster union; the `sync-v2-*` lanes prove the link's sync behaviour, and
+`apps/mobile/__tests__/session-meet-links-repository.test.ts` the client join,
+leave and overlap check.

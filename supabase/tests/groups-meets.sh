@@ -201,7 +201,7 @@ SQUAT="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
 # --- posture -----------------------------------------------------------------------
 
 MEET_TABLES="'group_meets','group_meet_challenges','group_meet_roster'"
-SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definitions','sessions','exercise_muscle_mappings','session_exercises','exercise_sets','session_exercise_tags','exercise_group_links'"
+SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definitions','sessions','exercise_muscle_mappings','session_exercises','exercise_sets','session_exercise_tags','exercise_group_links','session_meet_links'"
 [[ "$(sql_value "select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'app_public' and c.relname in (${MEET_TABLES}) and c.relkind = 'r' and c.relrowsecurity;")" == 3 ]] ||
   fail "RLS must be on for every meet table"

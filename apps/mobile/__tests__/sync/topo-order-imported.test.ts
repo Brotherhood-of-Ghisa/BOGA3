@@ -62,10 +62,10 @@ describe('the cycle and scheduler import the layer partition, never redefine it'
 });
 
 describe('the single source of truth has the expected shape', () => {
-  it('declares six layers spanning nineteen entity types', () => {
+  it('declares six layers spanning twenty entity types', () => {
     expect(TOPO_LAYERS).toHaveLength(6);
     const flat = TOPO_LAYERS.flat();
-    expect(new Set(flat).size).toBe(19);
+    expect(new Set(flat).size).toBe(20);
     // Layer 0 anchors the FK graph (no outbound entity FKs);  adds the
     // programme container.
     expect([...TOPO_LAYERS[0]].sort()).toEqual([
@@ -88,8 +88,9 @@ describe('the single source of truth has the expected shape', () => {
     // Sessions follow use identities; authored targets follow blocks.
     expect(TOPO_LAYERS[3]).toEqual(['sessions', 'session_plan_sets']);
     // Performed cards follow sessions, and sets follow cards, alongside the
-    // tags join and the independently cursorable bodyweight root.
-    expect(TOPO_LAYERS[4]).toEqual(['session_exercises']);
+    // tags join and the independently cursorable bodyweight root. Session meet
+    // links FK only sessions (Layer 3).
+    expect(TOPO_LAYERS[4]).toEqual(['session_exercises', 'session_meet_links']);
     expect(TOPO_LAYERS[5]).toEqual([
       'exercise_sets',
       'session_exercise_tags',

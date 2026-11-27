@@ -267,6 +267,13 @@
       "when": 1795369371332,
       "tag": "0037_health_weight_repull",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1795813409414,
+      "tag": "0038_black_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

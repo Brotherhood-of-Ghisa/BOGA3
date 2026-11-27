@@ -208,6 +208,16 @@ describe('layer type lists (pure)', () => {
     expect(state).toEqual({ '0': cursor(0, 'a'), '5': cursor(5, 'a') });
   });
 
+  it('a layer-4 cursor drained before session meet links re-pulls layer 4 only', () => {
+    const state: Record<string, unknown> = {
+      '3': cursor(3, 'a'),
+      '4': cursor(4, 'a'),
+      [LAYER_TYPES_KEY]: { '3': ['session_plan_sets', 'sessions'], '4': ['session_exercises'] },
+    };
+    expect(resetLayersMissingTypes(state)).toEqual([4]);
+    expect(state).toEqual({ '3': cursor(3, 'a'), [LAYER_TYPES_KEY]: { '3': ['session_plan_sets', 'sessions'] } });
+  });
+
   it('a new type in an existing layer resets only that layer, keeping other cursors and pending moves', () => {
     const upgraded = withType(1, 'future_widgets');
     const state: Record<string, unknown> = { '0': cursor(0, 'a'), '1': cursor(1, 'a'), '3': cursor(3, 'a'), provisional_moves: [{ id: 'm' }] };

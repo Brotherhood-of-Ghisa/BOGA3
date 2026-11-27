@@ -61,6 +61,7 @@ import {
 } from '@/src/data/exercise-catalog-seeds';
 import { linkExercise, unlinkExercise } from '@/src/data/exercise-group-links';
 import { upsertLocalGym } from '@/src/data/local-gyms';
+import { joinSessionToMeet, leaveSessionMeet } from '@/src/data/session-meet-links';
 import {
   exerciseDefinitions,
   exerciseGroupLinks,
@@ -71,6 +72,7 @@ import {
   muscleGroups,
   sessionExercises,
   sessionExerciseTags,
+  sessionMeetLinks,
   sessions,
 } from '@/src/data/schema';
 import { createDrizzleSessionDraftStore } from '@/src/data/session-drafts';
@@ -224,6 +226,25 @@ describe('every entity write path flips the dirty bit in the write transaction',
     expect(afterUnlink?.localDirty).toBe(true);
     expect(afterUnlink?.deletedAt).not.toBeNull();
     expect(afterUnlink?.localUpdatedAtMs ?? 0).toBeGreaterThan(afterLink?.localUpdatedAtMs ?? 0);
+  });
+
+  it('session_meet_links — join and leave each flip local_dirty and stamp a newer timestamp', async () => {
+    seedSession();
+    const meet = { meetId: 'meet-1', startsAtMs: Date.parse('2026-05-30T09:00:00.000Z'), endsAtMs: Date.parse('2026-05-30T12:00:00.000Z'), cutoffAtMs: Date.parse('2026-05-31T12:00:00.000Z') };
+
+    const joined = await joinSessionToMeet(SESSION_ID, meet, new Date('2026-05-30T10:00:00.000Z'));
+    const readLink = () => db().select().from(sessionMeetLinks).where(eq(sessionMeetLinks.id, joined.id)).get();
+    const afterJoin = readLink();
+    expect(afterJoin?.localDirty).toBe(true);
+    expect(afterJoin?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+
+    db().update(sessionMeetLinks).set({ localDirty: false }).run();
+    await leaveSessionMeet(SESSION_ID, meet, new Date('2026-05-30T11:00:00.000Z'));
+
+    const afterLeave = readLink();
+    expect(afterLeave?.localDirty).toBe(true);
+    expect(afterLeave?.deletedAt).not.toBeNull();
+    expect(afterLeave?.localUpdatedAtMs ?? 0).toBeGreaterThan(afterJoin?.localUpdatedAtMs ?? 0);
   });
 
   it('sessions — soft delete flips local_dirty and sets deleted_at', async () => {

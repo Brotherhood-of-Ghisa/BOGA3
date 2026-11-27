@@ -25,9 +25,10 @@
 #   Layer 0: gyms, exercise_definitions, muscle_groups
 #   Layer 1: exercise_muscle_mappings, exercise_tag_definitions,
 #            exercise_group_links
-#   Layer 2: sessions
-#   Layer 3: session_exercises
-#   Layer 4: exercise_sets, session_exercise_tags
+#   Layer 2: (no type in this seed)
+#   Layer 3: sessions
+#   Layer 4: session_exercises, session_meet_links
+#   Layer 5: exercise_sets, session_exercise_tags
 
 set -euo pipefail
 
@@ -111,7 +112,7 @@ RUN_TAG="${SYNC_FK_CLOSURE_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 
 cleanup_rows() {
-  for table in session_exercise_tags exercise_sets session_exercises \
+  for table in session_exercise_tags exercise_sets session_exercises session_meet_links \
                exercise_muscle_mappings exercise_tag_definitions sessions \
                exercise_group_links muscle_groups exercise_definitions gyms; do
     http_request DELETE \
@@ -173,6 +174,7 @@ FK_EDGES=(
   "session_exercises|source_plan_exercise_id|session_plan_exercises"
   "exercise_sets|source_plan_set_id|session_plan_sets"
   "training_notes|exercise_definition_id|exercise_definitions"
+  "session_meet_links|session_id|sessions"
 )
 
 # Per-layer expected type set per the server contract's topological layers.
@@ -181,7 +183,7 @@ LAYER_TYPES_0='["exercise_definitions","gyms","muscle_groups"]'
 LAYER_TYPES_1='["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions"]'
 LAYER_TYPES_2='[]'
 LAYER_TYPES_3='["sessions"]'
-LAYER_TYPES_4='["session_exercises"]'
+LAYER_TYPES_4='["session_exercises","session_meet_links"]'
 LAYER_TYPES_5='["exercise_sets","session_exercise_tags"]'
 
 # ---------------------------------------------------------------------------
@@ -201,12 +203,16 @@ SXTAG_ID="fkc-${RUN_TAG}-sxtag"
 # Client-derived `<group_id>:<exercise_definition_id>`; group_id is plain text.
 GRP_ID="fkc-${RUN_TAG}-grp"
 EGL_ID="${GRP_ID}:${ED_ID}"
+# Client-derived `<meet_id>:<session_id>`; meet_id is plain text.
+MEET_ID="fkc-${RUN_TAG}-meet"
+SML_ID="${MEET_ID}:${SESS_ID}"
 
 PAYLOAD="$(jq -nc \
   --arg gym "${GYM_ID}" --arg ed "${ED_ID}" --arg mg "${MG_ID}" --arg etd "${ETD_ID}" \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
   --arg egl "${EGL_ID}" --arg grp "${GRP_ID}" \
+  --arg sml "${SML_ID}" --arg meet "${MEET_ID}" \
   --argjson ts "${BASE_MS}" \
   '{entities: [
     {type: "gyms", id: $gym, client_updated_at_ms: ($ts + 1),
@@ -245,6 +251,9 @@ PAYLOAD="$(jq -nc \
     {type: "exercise_group_links", id: $egl, client_updated_at_ms: ($ts + 9),
      fields: {exercise_definition_id: $ed, group_id: $grp,
               group_exercise_id: "gex",
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
+    {type: "session_meet_links", id: $sml, client_updated_at_ms: ($ts + 10),
+     fields: {session_id: $sess, meet_id: $meet,
               created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
 
@@ -262,7 +271,7 @@ SEEN_IDS='[]'  # JSON array of {type, id} pairs.
 
 drain_layer_and_check() {
   local layer="$1" expected_types_sorted="$2"
-  # Pull all rows for this layer (limit 200 covers everything in our 10-row seed).
+  # Pull all rows for this layer (limit 200 covers everything in our 11-row seed).
   local body
   body="$(jq -nc --argjson layer "${layer}" '{layer: $layer, cursor: null, limit: 200}')"
   http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "${USER_A_TOKEN}" "${body}"
@@ -348,14 +357,14 @@ drain_layer_and_check 3 "${LAYER_TYPES_3}"
 drain_layer_and_check 4 "${LAYER_TYPES_4}"
 drain_layer_and_check 5 "${LAYER_TYPES_5}"
 
-# Final sanity: SEEN_IDS holds all ten FK-bearing seed rows.
+# Final sanity: SEEN_IDS holds all eleven FK-bearing seed rows.
 TOTAL_SEEN="$(printf '%s' "${SEEN_IDS}" | jq 'length')"
-if [[ "${TOTAL_SEEN}" != "10" ]]; then
-  fail "after draining all six layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 10"
+if [[ "${TOTAL_SEEN}" != "11" ]]; then
+  fail "after draining all six layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 11"
 fi
 
 pass "FK closure — fully-connected dataset drained layer-by-layer with zero forward FK references"
-pass "FK closure — ten FK-bearing entity types partition exactly across layers 0–5"
+pass "FK closure — eleven FK-bearing entity types partition exactly across layers 0–5"
 
 # ---------------------------------------------------------------------------
 # Step 3 — pull every layer one more time as a sanity check that the
@@ -371,7 +380,7 @@ ALL_LAYER_TYPES=(
   '["session_plans","exercise_muscle_mappings","exercise_tag_definitions","exercise_group_links","training_notes","injuries"]'
   '["session_plan_exercises","session_plan_uses"]'
   '["sessions","session_plan_sets"]'
-  '["session_exercises"]'
+  '["session_exercises","session_meet_links"]'
   '["exercise_sets","session_exercise_tags","body_weight_measurements"]'
 )
 for layer in 0 1 2 3 4 5; do

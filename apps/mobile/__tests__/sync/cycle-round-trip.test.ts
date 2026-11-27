@@ -93,10 +93,12 @@ jest.mock('@/src/auth/supabase', () =>
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import { linkExercise, listLinks, unlinkExercise } from '@/src/data/exercise-group-links';
+import { joinSessionToMeet, leaveSessionMeet, listSessionLinksForMeet } from '@/src/data/session-meet-links';
 import {
   bodyWeightMeasurements,
   exerciseDefinitions,
   exerciseGroupLinks,
+  sessionMeetLinks,
   exerciseSets,
   gyms,
   muscleGroups,
@@ -569,6 +571,43 @@ describe('sync cycle round-trip against a live endpoint', () => {
     expect(
       database.select().from(exerciseGroupLinks).all().filter((row) => row.groupId === ids.group),
     ).toHaveLength(1);
+  }, 90_000);
+
+  it('round-trips a session_meet_links row: join, leave tombstone, re-join undeletes the same id', async () => {
+    // The link's only FK parent is the member's own session (Layer 3); meet_id
+    // is plain text with no server meet row.
+    const ms = Date.now();
+    database
+      .insert(sessions)
+      .values({ id: ids.session, status: 'active', startedAt: new Date(ms), localDirty: true, localUpdatedAtMs: ms })
+      .run();
+    const meet = { meetId: `${ids.group}-meet`, startsAtMs: ms - 3_600_000, endsAtMs: ms + 3_600_000, cutoffAtMs: ms + 90_000_000 };
+    const linkId = `${meet.meetId}:${ids.session}`;
+    const readLink = () => database.select().from(sessionMeetLinks).where(eq(sessionMeetLinks.id, linkId)).get();
+
+    // 1. Join → push → a wiped client re-pulls the link (Layer 4) after its session.
+    await joinSessionToMeet(ids.session, meet);
+    await runSyncCycle();
+    expect(readLink()?.localDirty).toBe(false);
+    wipeLocalStore();
+    await runSyncCycle();
+    expect(readLink()).toMatchObject({ sessionId: ids.session, meetId: meet.meetId, deletedAt: null, localDirty: false });
+
+    // 2. Leave → the tombstone syncs and survives a wiped re-pull.
+    await leaveSessionMeet(ids.session, meet);
+    await runSyncCycle();
+    wipeLocalStore();
+    await runSyncCycle();
+    expect(readLink()?.deletedAt).not.toBeNull();
+    expect(await listSessionLinksForMeet(meet.meetId)).toEqual([]);
+
+    // 3. Re-join → the same id is undeleted server-side.
+    await joinSessionToMeet(ids.session, meet);
+    await runSyncCycle();
+    wipeLocalStore();
+    await runSyncCycle();
+    expect(readLink()).toMatchObject({ deletedAt: null, localDirty: false });
+    expect(database.select().from(sessionMeetLinks).all()).toHaveLength(1);
   }, 90_000);
 
   it('re-pushes a row edited in every in-flight window, then converges losing nothing (push-in-flight race)', async () => {
