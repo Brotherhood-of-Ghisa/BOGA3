@@ -84,8 +84,8 @@ Sync v2 entity `session_meet_links` (load
 it works offline. Only the member's client writes it: the server never writes
 a member's Sync v2 rows, so detaching all of a member's sessions from a meet is
 the client tombstoning the links it holds (`leaveMeetSessions`; pull first to
-reach links made on another device). Like the online Join and Leave, the
-client joins and leaves only until the cutoff, and refuses a session that can
+reach links made on another device). The client refuses joins and leaves past
+the cutoff ([[meets.linking]]) and a session that can
 no longer overlap the window (it started at or after `ends_at`, or ended at or
 before `starts_at`); the server accepts every link and decides at read time.
 
