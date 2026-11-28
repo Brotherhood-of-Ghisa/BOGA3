@@ -79,4 +79,38 @@ for heading in ["Started a workout at ", "Finished a workout at " + String(repea
   located["heading"] = heading
   verify(decrypt(try encrypt(located)) == nil, "Malformed location heading")
 }
+// A meet push: free-text heading, the standings as detail (end only), no counts, the meet id as the route's session.
+let meetId = "88888888-8888-4888-8888-888888888888"
+var meetStart = clear
+meetStart["kind"] = "meet_start"
+meetStart["heading"] = "Bench day is on at Iron Temple"
+meetStart["detail"] = ""
+meetStart["bestCount"] = 0
+meetStart["rankCount"] = 0
+meetStart["route"] = ["groupId": "66666666-6666-4666-8666-666666666666", "memberId": user, "sessionId": meetId]
+verify(decrypt(try encrypt(meetStart))?.heading == "Bench day is on at Iron Temple", "Meet start")
+var meetEnd = meetStart
+meetEnd["kind"] = "meet_end"
+meetEnd["heading"] = "Bench day: results so far"
+meetEnd["detail"] = "Bench · Max reps: Ana, Bo\nSquat · Best 1RM: Cy"
+verify(decrypt(try encrypt(meetEnd))?.summary == "Bench · Max reps: Ana, Bo\nSquat · Best 1RM: Cy", "Meet end standings")
+for (name, value) in [("detail", "x" as Any), ("heading", "" as Any), ("bestCount", 1 as Any), ("url", "https://example.invalid" as Any)] {
+  var changed = meetStart
+  changed[name] = value
+  verify(decrypt(try encrypt(changed)) == nil, "Invalid meet start field \(name)")
+}
+for (name, value) in [("heading", "Bench\nday" as Any), ("detail", String(repeating: "a", count: 401) as Any), ("detail", "Bad\u{7}" as Any)] {
+  var changed = meetEnd
+  changed[name] = value
+  verify(decrypt(try encrypt(changed)) == nil, "Invalid meet end field \(name)")
+}
+var missingDetail = meetEnd
+missingDetail.removeValue(forKey: "detail")
+verify(decrypt(try encrypt(missingDetail)) == nil, "A meet push carries detail")
+var meetRoute = meetEnd
+meetRoute["route"] = ["groupId": "66666666-6666-4666-8666-666666666666", "memberId": user, "sessionId": "not-a-meet"]
+verify(decrypt(try encrypt(meetRoute)) == nil, "A meet route names a meet")
+var workoutDetail = clear
+workoutDetail["detail"] = "Ana"
+verify(decrypt(try encrypt(workoutDetail)) == nil, "A workout push carries no detail")
 print("Native authenticated notification checks passed: \(checked)")

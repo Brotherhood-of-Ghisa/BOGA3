@@ -14,8 +14,11 @@ import {
   setAppliedNotificationTheme,
   startNotificationLifecycle,
   subscribePendingNotificationTap,
+  type NotificationMeetTarget,
   type NotificationTarget,
+  type NotificationUnavailableSubject,
 } from '@/src/notifications';
+import { meetHref } from '@/src/groups/meet-presentation';
 
 // Native listeners live across protected-route changes; a tap waits for both
 // the mounted navigator and the existing account/first-sync gates.
@@ -30,9 +33,11 @@ export function NotificationTapBridge() {
   const revision = useSyncExternalStore(subscribePendingNotificationTap, getPendingNotificationTapRevision,
     getPendingNotificationTapRevision);
   const userId = user?.id ?? null;
-  const [failure, setFailure] = useState<{ userId: string | null; reason: 'offline' | 'unavailable' | null }>({ userId, reason: null });
+  const [failure, setFailure] = useState<{ userId: string | null; reason: 'offline' | 'unavailable' | null; subject: NotificationUnavailableSubject }>({
+    userId, reason: null, subject: 'session',
+  });
   const [retry, setRetry] = useState(0);
-  if (failure.userId !== userId) setFailure({ userId, reason: null });
+  if (failure.userId !== userId) setFailure({ userId, reason: null, subject: 'session' });
   const unavailable = failure.userId === userId ? failure.reason : null;
   const ready = status === 'ready' && Boolean(userId && navigator?.key) && access === 'app';
 
@@ -51,8 +56,8 @@ export function NotificationTapBridge() {
 
   useEffect(() => startNotificationLifecycle(), []);
 
-  const showUnavailable = useCallback((reason: 'offline' | 'unavailable' | null) => {
-    setFailure(previous => previous.userId === userId ? { userId, reason } : previous);
+  const showUnavailable = useCallback((reason: 'offline' | 'unavailable' | null, subject: NotificationUnavailableSubject = 'session') => {
+    setFailure(previous => previous.userId === userId ? { userId, reason, subject } : previous);
   }, [userId]);
 
   const onOpen = useCallback((target: NotificationTarget) => {
@@ -63,8 +68,15 @@ export function NotificationTapBridge() {
     router.push({ pathname: '/group-session/[memberId]/[sessionId]', params: target });
   }, [groupId, pathname, router, showUnavailable]);
 
+  const onOpenMeet = useCallback((target: NotificationMeetTarget) => {
+    showUnavailable(null);
+    const href = meetHref(target.groupId, target.meetId);
+    if (pathname === href) return;
+    router.push(href);
+  }, [pathname, router, showUnavailable]);
+
   useEffect(() => {
-    void processPendingNotificationTap({ userId, ready, onOpen, onUnavailable: showUnavailable })
+    void processPendingNotificationTap({ userId, ready, onOpen, onOpenMeet, onUnavailable: showUnavailable })
       .catch((error) => {
         void logEvent({
           level: 'error',
@@ -73,7 +85,7 @@ export function NotificationTapBridge() {
         });
         showUnavailable('unavailable');
       });
-  }, [onOpen, ready, retry, revision, showUnavailable, userId]);
+  }, [onOpen, onOpenMeet, ready, retry, revision, showUnavailable, userId]);
 
   const dismiss = () => {
     discardPendingNotificationTap();
@@ -85,8 +97,12 @@ export function NotificationTapBridge() {
       title="Notification" visible={ready && unavailable !== null}>
       <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>
         {unavailable === 'offline' ? (
-          <GroupStateView actionLabel="Retry" actionTestID="notification-retry" body="Connect to open this workout."
+          <GroupStateView actionLabel="Retry" actionTestID="notification-retry"
+            body={failure.subject === 'meet' ? 'Connect to open this meet.' : 'Connect to open this workout.'}
             onAction={() => setRetry(value => value + 1)} testID="notification-offline" title="You're offline" />
+        ) : failure.subject === 'meet' ? (
+          <GroupStateView body="You're no longer in its group, or it was removed."
+            testID="notification-unavailable" title="This meet is no longer available" />
         ) : (
           <GroupStateView body="It was deleted, or you're no longer in a group it was shared with."
             testID="notification-unavailable" title="This session is no longer available" />
