@@ -307,6 +307,17 @@ Comparison jobs (`kind = 'exercise'`, `app_public.group_metric_eval_queue`) carr
 check `select app_public.group_eval_config('group_eval_url');` and the
 `group-eval` function logs.
 
+**Group predictions** (`docs/specs/tech/group-predictions-contract.md`).
+After a live test, reset one group's game from the SQL Editor:
+`select app_public.group_predictions_reset('<group-id>');`. It deletes that
+group's boards, markets, offers, matches and weekly results, and keeps the
+Predictions setting and the AIs. `group.prediction_sweep_failed` (`context` =
+`{group_id, week_start, sqlstate}`, or only `sqlstate` when the whole hour's
+prediction work rolled back) means a board failed to close or settle;
+the hourly sweep retries it, so a recurring sqlstate needs a fix, not a rerun.
+A board also waits while the group's evaluation is pending; a parked job
+(`group.eval_parked`) holds it until it is retried.
+
 **Sync-health triage.** `source = 'sync'`, `event = 'sync.cycle_result'` gives
 each cycle's classified outcome (`converged` / `auth_required` /
 `retryable_error` / `structural_error`) with an error code and sanitized message
