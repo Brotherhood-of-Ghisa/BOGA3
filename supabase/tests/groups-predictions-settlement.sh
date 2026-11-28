@@ -376,6 +376,8 @@ pair "${NOW}" "${W}" cow_top "{\"member_user_id\":\"${ALEX_UID}\",\"metric\":\"v
 M_COW_UNRANKED="${MARKET}"
 pair "${NOW}" "${W}" cow_top "{\"member_user_id\":\"${CASEY_UID}\",\"metric\":\"e1rm\"}" A2 B1 50 1 1
 M_COW_MEMBER_UNAVAILABLE="${MARKET}"
+pair "${NOW}" "${W}" cow_top "{\"member_user_id\":\"${OWNER_UID}\",\"metric\":\"e1rm\"}" A2 B1 50 1 1
+M_COW_NOT_ROSTERED="${MARKET}"
 # A partly matched offer (10 yes, 5 matched) and offers that never match.
 post_at "${NOW}" A2 "${W}" sets_line "{\"member_user_id\":\"${CASEY_UID}\",\"line\":5}" yes 50 10
 PARTIAL="${OFFER}"
@@ -398,11 +400,17 @@ seed_cow() { # seed_cow <id> <week> <metrics> <extra columns> <extra values>
     commit;" >/dev/null
 }
 seed_cow "${COW_W}" "${W}" "array['e1rm','volume']" "" ""
+# Its roster: Alex, Blair and Casey (the owner is not in it).
+run_psql "begin; set local session_replication_role = replica;
+  insert into app_public.group_cow_participants(cow_id, member_user_id, membership_id)
+  select '${COW_W}', gm.user_id, gm.id from app_public.group_memberships gm
+   where gm.group_id = '${GROUP}' and gm.ended_at is null and gm.user_id in ('${ALEX_UID}', '${BLAIR_UID}', '${CASEY_UID}');
+  commit;" >/dev/null
 
 # Nothing closes or settles before its time.
 expect_sql "no close before the start" "select app_public.group_prediction_close_at($(week_clock "${W}" '-1 second'), '${GROUP}', '${W}');" f
 expect_sql "no settlement before the end" "select app_public.group_prediction_settle_at($(week_clock "${W}" '7 days -1 second'), '${GROUP}', '${W}');" f
-pass "board: 16 fully matched markets (every template, yes/no/void cases), a partial fill, unmatched offers, a non-final CoW"
+pass "board: 17 fully matched markets (every template, yes/no/void cases), a partial fill, unmatched offers, a non-final CoW"
 
 # --- close -------------------------------------------------------------------------
 
@@ -506,6 +514,7 @@ expect_outcome "CoW no (Alex #2)" "${M_COW_NO}" "no:2:place"
 expect_outcome "CoW void: metric not selected" "${M_COW_UNSELECTED}" "void:-:-"
 expect_outcome "CoW void: nobody ranked" "${M_COW_UNRANKED}" "void:-:-"
 expect_outcome "CoW void: the member's figure unavailable" "${M_COW_MEMBER_UNAVAILABLE}" "void:-:-"
+expect_outcome "CoW void: the member is not in the CoW's roster" "${M_COW_NOT_ROSTERED}" "void:-:-"
 expect_outcome "the partial fill's market (Casey: no sessions)" "${M_PARTIAL}" "no:0:sets"
 expect_sql "unmatched markets get no outcome" "select count(*) from app_public.group_prediction_markets m where m.group_id = '${GROUP}'
   and m.outcome is not null and not exists (select 1 from app_public.group_prediction_matches x where x.market_id = m.id);" 0
@@ -514,8 +523,8 @@ pass "settlement: yes and no per template; e1RM and cow_top void cases; cow_top 
 # Hand-counted (stakes in points): A1 +4 -3 +4 -5 -4 -2 +1 +1; A2 +5 +3 +4 +1 -5;
 # B1 -4 -5 -4 +5 -1 +2 -1 -1 +5; C1 never matched (voids add no points).
 [[ "$(result_line "${W}" A1)" == "-400/11/4/4/3" ]] || fail "A1's week: $(result_line "${W}" A1)"
-[[ "$(result_line "${W}" A2)" == "800/9/4/1/4" ]] || fail "A2's week: $(result_line "${W}" A2)"
-[[ "$(result_line "${W}" B1)" == "-400/14/3/6/5" ]] || fail "B1's week: $(result_line "${W}" B1)"
+[[ "$(result_line "${W}" A2)" == "800/10/4/1/5" ]] || fail "A2's week: $(result_line "${W}" A2)"
+[[ "$(result_line "${W}" B1)" == "-400/15/3/6/6" ]] || fail "B1's week: $(result_line "${W}" B1)"
 [[ "$(result_line "${W}" C1)" == "0/0/0/0/0" ]] || fail "C1's week: $(result_line "${W}" C1)"
 expect_sql "a board's profits sum to zero" "select sum(profit_cents) from app_public.group_prediction_results
   where group_id = '${GROUP}' and week_start = '${W}';" 0
@@ -557,9 +566,14 @@ M_COW_UNAVAILABLE="${MARKET}"
 seed_cow "$(new_uuid)" "${W14}" "array['e1rm']" ", cancelled_at" ", clock_timestamp()"
 seed_cow "$(new_uuid)" "${W21}" "array['e1rm']" ", finalized_at, final_outcome, final_rankings" \
   ", clock_timestamp(), 'unavailable', '[]'::jsonb"
+# A pending comparison of an exercise no matched W7 market reads (Squat)
+# does not hold W7.
+run_psql "insert into app_public.group_metric_eval_queue(group_id, group_exercise_id, causes)
+  values ('${GROUP}', '${SQUAT}', '{set}');" >/dev/null
 for week in "${W7}" "${W14}" "${W21}"; do
   [[ "$(settle_at "$(week_clock "${week}" '7 days 1 hour')" "${week}")" == t ]] || fail "settle ${week} (closes first)"
 done
+run_psql "delete from app_public.group_metric_eval_queue where group_id = '${GROUP}' and group_exercise_id = '${SQUAT}';" >/dev/null
 expect_outcome "CoW void: no CoW that week" "${M_COW_NONE}" "void:-:-"
 expect_outcome "sets no (Alex has no sessions that week)" "${M_W7_SETS}" "no:0:sets"
 expect_outcome "lead change no: the first #1 on an empty board" "${M_LEAD_FIRST}" "no:0:lead_changes"
@@ -624,7 +638,7 @@ expect_sql_error "A settled prediction is final" "a results row refuses an updat
 pass "finality: re-running close/settle/sweep or editing settled sessions changes nothing; settled rows refuse updates"
 
 # The other readiness arms: a target job and a rules drain hold the group.
-PENDING="select app_public.group_prediction_eval_pending('${GROUP}', ${WS_MS} + 60 * 86400000::bigint);"
+PENDING="select app_public.group_prediction_eval_pending('${GROUP}', ${WS_MS} + 60 * 86400000::bigint, null);"
 expect_sql "nothing pending after the drains" "${PENDING}" f
 run_psql "insert into app_public.group_eval_queue(kind, member_user_id, group_id, group_exercise_id, causes)
   values ('target', '${ALEX_UID}', '${GROUP}', '${BENCH}', '{link}');" >/dev/null
@@ -638,6 +652,12 @@ run_psql "begin; set local session_replication_role = replica;
   update app_public.group_set_facts set rules_version = rules_version + 1 where member_user_id = '${ALEX_UID}' and set_id = '${T}-a0';
   commit;" >/dev/null
 expect_sql "and clear once drained" "${PENDING}" f
+run_psql "insert into app_public.group_metric_eval_queue(group_id, group_exercise_id, causes)
+  values ('${GROUP}', '${SQUAT}', '{set}');" >/dev/null
+expect_sql "a Squat comparison job holds a board reading every exercise" "${PENDING}" t
+expect_sql "but not one reading only Bench" \
+  "select app_public.group_prediction_eval_pending('${GROUP}', ${WS_MS}, array['${BENCH}'::uuid]);" f
+run_psql "delete from app_public.group_metric_eval_queue where group_id = '${GROUP}' and group_exercise_id = '${SQUAT}';" >/dev/null
 pass "readiness: target jobs and rules drains hold the group's boards too"
 
 # --- the hourly sweep ---------------------------------------------------------------
@@ -663,6 +683,8 @@ PAST_OFFER="$(seed_past_board "${GROUP}" A1)"
 seed_past_board "${HGROUP}" H1 >/dev/null
 run_psql "alter table app_public.group_prediction_boards add constraint ${FAULT_CONSTRAINT}
   check (group_id <> '${HGROUP}' or closed_at is null) not valid;" >/dev/null
+expect_sql "group_eval_sweep() runs the prediction sweep" "select position('group_prediction_sweep()' in
+  pg_get_functiondef('app_public.group_eval_sweep()'::regprocedure)) > 0;" t
 run_psql "select app_public.group_eval_sweep();" >/dev/null
 expect_sql "the sweep closed and settled G's due board" "select (closed_at is not null and settled_at is not null)::text
   from app_public.group_prediction_boards where group_id = '${GROUP}' and week_start = '${PAST}';" true

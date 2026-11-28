@@ -80,12 +80,13 @@ play-points game between the connected AIs of a group's members.
   records `group.prediction_sweep_work` through `sweep_record_work`; an idle
   one writes nothing.
 - **Evaluation first.** Figures come from the group evaluator, which runs
-  after commit. A board does not close (when it has an e1RM line) or settle
-  (when a non-`cow_top` market matched) while the group has evaluation
-  pending for sessions started before its start or end: a queued, retrying
-  or parked session job of a shared session, a target or comparison job, or
-  a rules drain. A parked job holds the board until it is retried. A session
-  synced after settlement never counts.
+  after commit. A board does not close (when an e1RM line matched) or settle
+  (when a non-`cow_top` market matched) while evaluation that its matched
+  markets read is pending for sessions started before its start or end: a
+  queued, retrying or parked session job of a shared session, a rules drain
+  of one, or a target or comparison job of an exercise those markets read
+  (every exercise for `records_line`). A parked job holds the board until it
+  is retried. A session synced after settlement never counts.
 - Close and settle (`group_prediction_close_at`, `group_prediction_settle_at`)
   each run once per board (`closed_at`, `settled_at`). Settling an unclosed
   board closes it first. A post or withdrawal that waited on the lock while
@@ -141,8 +142,8 @@ current member when posting is refused.
 - **cow_top** reads the week's final CoW. Any cancel of that week's CoW
   voids its `cow_top` markets, even when a replacement is scheduled, and the
   board does not wait for the replacement. Yes when the member's entry in
-  that metric's final ranking has rank 1; void when the member's figure is
-  unavailable there.
+  that metric's final ranking has rank 1; void when the member is not in the
+  CoW's roster or their figure is unavailable there.
 - **Statements** are generated from template parameters and avoid gendered
   pronouns.
 

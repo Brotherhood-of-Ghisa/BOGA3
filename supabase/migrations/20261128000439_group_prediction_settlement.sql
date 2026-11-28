@@ -187,9 +187,12 @@ begin
       return;
     end if;
     select r into _ranking from jsonb_array_elements(_cow.final_rankings) r where r ->> 'metric' = p_market.metric;
-    -- Nobody ranked, or this member's figure unavailable: the result is unknown.
+    -- Nobody ranked, the member not in the CoW's roster, or the member's
+    -- figure unavailable: the result is unknown.
     if _ranking is null or jsonb_array_length(_ranking -> 'entries') = 0
-       or (_ranking -> 'unavailableMemberIds') ? p_market.member_user_id::text then
+       or (_ranking -> 'unavailableMemberIds') ? p_market.member_user_id::text
+       or not exists (select 1 from app_public.group_cow_participants p
+         where p.cow_id = _cow.id and p.member_user_id = p_market.member_user_id) then
       return;
     end if;
     result_value := (select (e ->> 'rank')::numeric from jsonb_array_elements(_ranking -> 'entries') e
@@ -207,32 +210,55 @@ end $$;
 
 -- Pending group-eval work that can change one of the group's figures for
 -- sessions started before p_before_ms: a queued, retrying or parked session
--- job of a session shared into the group, a target or comparison job of the
--- group, or a shared session's facts awaiting a rules drain.
-create function app_public.group_prediction_eval_pending(p_group uuid, p_before_ms bigint) returns boolean
+-- job of a shared session, or a shared session's facts awaiting a rules drain
+-- (these feed every figure); and a target or comparison job of one of
+-- p_exercises (every exercise when p_exercises is null).
+create function app_public.group_prediction_eval_pending(p_group uuid, p_before_ms bigint, p_exercises uuid[])
+returns boolean
 language sql stable set search_path = app_public, pg_temp as $$
-  select exists (select 1 from app_public.group_eval_queue q where q.kind = 'target' and q.group_id = p_group)
-    or exists (select 1 from app_public.group_metric_eval_queue q where q.group_id = p_group)
+  select exists (select 1 from app_public.group_eval_queue q where q.kind = 'target' and q.group_id = p_group
+        and (p_exercises is null or q.group_exercise_id = any(p_exercises)))
+    or exists (select 1 from app_public.group_metric_eval_queue q where q.group_id = p_group
+        and (p_exercises is null or q.group_exercise_id = any(p_exercises)))
     or exists (select 1 from app_public.group_eval_queue q
         join app_public.group_session_shares sh on sh.member_user_id = q.member_user_id and sh.session_id = q.session_id
         left join app_public.sessions s on s.owner_user_id = q.member_user_id and s.id = q.session_id
        where q.kind = 'session' and sh.group_id = p_group and (s.id is null or s.started_at < p_before_ms))
-    or exists (select 1 from app_public.group_session_shares sh
+    -- The rules drain: probed by its index first, as group_eval_sweep does.
+    or ((select min(f.rules_version) from app_public.group_set_facts f)
+          < (select max(st.rules_version) from app_public.group_eval_rules_state st)
+      and exists (select 1 from app_public.group_session_shares sh
+        join app_public.sessions s on s.owner_user_id = sh.member_user_id and s.id = sh.session_id
         join app_public.group_set_facts f on f.member_user_id = sh.member_user_id and f.session_id = sh.session_id
-       where sh.group_id = p_group
-         and f.rules_version < (select max(st.rules_version) from app_public.group_eval_rules_state st));
+       where sh.group_id = p_group and s.started_at < p_before_ms
+         and f.rules_version < (select max(st.rules_version) from app_public.group_eval_rules_state st)));
 $$;
 
--- Why a board cannot close yet: its e1RM baselines have evaluation pending.
+-- The exercises a board's matched markets read (template filter given):
+-- null when a matched records_line reads every exercise.
+create function app_public.group_prediction_matched_exercises(p_board app_public.group_prediction_boards,
+  p_templates text[]) returns uuid[]
+language sql stable set search_path = app_public, pg_temp as $$
+  select case when bool_or(m.template = 'records_line') then null
+    else coalesce(array_agg(distinct m.group_exercise_id) filter (where m.group_exercise_id is not null), '{}') end
+    from app_public.group_prediction_markets m
+   where m.group_id = p_board.group_id and m.week_start = p_board.week_start and m.template = any(p_templates)
+     and exists (select 1 from app_public.group_prediction_matches x where x.market_id = m.id);
+$$;
+
+-- Why a board cannot close yet: a matched e1RM line's baseline has
+-- evaluation pending.
 create function app_public.group_prediction_close_waits(p_board app_public.group_prediction_boards) returns boolean
 language sql stable set search_path = app_public, pg_temp as $$
   select exists (select 1 from app_public.group_prediction_markets m
+        join app_public.group_prediction_matches x on x.market_id = m.id
       where m.group_id = p_board.group_id and m.week_start = p_board.week_start and m.template = 'e1rm_line')
-    and app_public.group_prediction_eval_pending(p_board.group_id, app_public.group_prediction_ms(p_board.starts_at));
+    and app_public.group_prediction_eval_pending(p_board.group_id, app_public.group_prediction_ms(p_board.starts_at),
+      app_public.group_prediction_matched_exercises(p_board, array['e1rm_line']));
 $$;
 
 -- Why a closed board cannot settle yet: a matched cow_top market's CoW is not
--- final (unless a cancel already voids the week's cow_top markets), or another
+-- final (unless a cancel already voids the week's cow_top markets), or a
 -- matched market's figures have evaluation pending.
 create function app_public.group_prediction_settle_waits(p_board app_public.group_prediction_boards) returns boolean
 language sql stable set search_path = app_public, pg_temp as $$
@@ -246,7 +272,9 @@ language sql stable set search_path = app_public, pg_temp as $$
     or (exists (select 1 from app_public.group_prediction_markets m
         join app_public.group_prediction_matches x on x.market_id = m.id
        where m.group_id = p_board.group_id and m.week_start = p_board.week_start and m.template <> 'cow_top')
-      and app_public.group_prediction_eval_pending(p_board.group_id, app_public.group_prediction_ms(p_board.ends_at)));
+      and app_public.group_prediction_eval_pending(p_board.group_id, app_public.group_prediction_ms(p_board.ends_at),
+        app_public.group_prediction_matched_exercises(p_board,
+          array['e1rm_line', 'sets_line', 'records_line', 'lead_change'])));
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -589,7 +617,8 @@ begin
        'group_prediction_close_at', 'group_prediction_settle_at', 'group_prediction_sweep_at', 'group_prediction_sweep',
        'group_prediction_open_board', 'agent_group_prediction_withdraw_at', 'group_prediction_all_time',
        'group_prediction_head_to_head', 'group_predictions_reset', 'group_prediction_eval_pending',
-       'group_prediction_close_waits', 'group_prediction_settle_waits', 'group_prediction_log_failure') loop
+       'group_prediction_close_waits', 'group_prediction_settle_waits', 'group_prediction_log_failure',
+       'group_prediction_matched_exercises') loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', f.signature);
     if f.proname = 'group_predictions_reset' then
       execute format('grant execute on function %s to service_role', f.signature);
