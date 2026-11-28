@@ -422,6 +422,9 @@ cleanup() {
       delete from app_public.gyms
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and id like 'agent-api-${RUN_TAG}-%';
+      delete from app_public.groups where name like 'agent-api-${RUN_TAG} %';
+      delete from app_public.group_prediction_bettors where user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      ${GP_RESTORE_SQL:-select 1;}
     commit;
   " >/dev/null 2>&1 || true
 }
@@ -3456,6 +3459,11 @@ echo "[agent-api-test] letting the per-minute request windows reset before the w
 sleep 61
 # shellcheck source=lib/agent-workout-contract.sh
 source "${SUPABASE_DIR}/tests/lib/agent-workout-contract.sh"
+
+echo "[agent-api-test] letting the per-minute request windows reset before the group predictions block"
+sleep 61
+# shellcheck source=lib/agent-group-prediction-contract.sh
+source "${SUPABASE_DIR}/tests/lib/agent-group-prediction-contract.sh"
 
 echo "[agent-api-test] verifying metadata-only audit records"
 AUDIT_COUNT="$(run_psql "

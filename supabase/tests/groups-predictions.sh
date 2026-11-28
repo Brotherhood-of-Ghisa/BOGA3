@@ -265,9 +265,12 @@ expect_sql "no FK into a Sync v2 table" "select count(*) from pg_constraint con 
   where con.contype = 'f' and c.relname in (${TABLES}) and n.nspname = 'app_public' and r.relname in (${SYNC_TABLES});" 0
 PRED_FUNCS="n.nspname = 'app_public' and (p.proname like 'group\_prediction\_%' or p.proname like 'agent\_group\_prediction\_%')"
 # The service-role agent RPCs: the writes here, the reads and the CoW schedule
-# (groups-predictions-agent-reads.sh proves those).
+# (groups-predictions-agent-reads.sh proves those) and the three receipted
+# wrappers the agent API calls (the agent-api lane proves their replay).
 AGENT_RPCS="'agent_group_prediction_post','agent_group_prediction_withdraw','agent_group_prediction_groups',
-  'agent_group_prediction_form','agent_group_prediction_board','agent_group_prediction_cow_schedule'"
+  'agent_group_prediction_form','agent_group_prediction_board','agent_group_prediction_cow_schedule',
+  'agent_group_prediction_post_receipted','agent_group_prediction_withdraw_receipted',
+  'agent_group_prediction_cow_schedule_receipted'"
 expect_sql "setting RPCs: definer, pinned, anon+authenticated only" "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where ${PRED_FUNCS} and p.proname in ('group_prediction_settings_get','group_prediction_settings_set') and p.prosecdef
     and 'search_path=app_public, pg_temp' = any(p.proconfig)
@@ -276,7 +279,7 @@ expect_sql "setting RPCs: definer, pinned, anon+authenticated only" "select coun
 expect_sql "agent RPCs: definer, pinned, service_role only" "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where ${PRED_FUNCS} and p.proname in (${AGENT_RPCS}) and p.prosecdef
     and 'search_path=app_public, pg_temp' = any(p.proconfig) and has_function_privilege('service_role', p.oid, 'EXECUTE')
-    and not has_function_privilege('anon', p.oid, 'EXECUTE') and not has_function_privilege('authenticated', p.oid, 'EXECUTE');" 6
+    and not has_function_privilege('anon', p.oid, 'EXECUTE') and not has_function_privilege('authenticated', p.oid, 'EXECUTE');" 9
 expect_sql "helpers: no API role executes them, all pinned, none definer" "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   cross join unnest(array['anon','authenticated','service_role']) r(role)
   where ${PRED_FUNCS} and p.proname not in ('group_prediction_settings_get','group_prediction_settings_set', ${AGENT_RPCS},
@@ -341,6 +344,11 @@ for bearer in "${ALEX_TOKEN}" "$(mint_token "${ALEX_TOKEN}" "${A1_CLIENT}")" "${
   rpc "${bearer}" agent_group_prediction_withdraw "$(jq -nc --arg o "${ALEX_UID}" --arg c "${A1_CLIENT}" --arg g "${GROUP}" \
     --arg x "${MISSING_GROUP}" '{p_owner:$o, p_client_id:$c, p_group_id:$g, p_offer_id:$x}')"
   [[ "$(jq -r '.code' <<<"${BODY}")" == 42501 ]] || fail "a client token must not execute agent_group_prediction_withdraw"
+  rpc "${bearer}" agent_group_prediction_post_receipted "$(jq -nc --arg o "${ALEX_UID}" --arg c "${A1_CLIENT}" --arg g "${GROUP}" \
+    --arg w "${OPEN_WEEK}" --arg h "$(printf 'a%.0s' $(seq 1 64))" '{p_owner:$o, p_client_id:$c, p_idempotency_key:"k", p_payload_sha256:$h, p_group_id:$g, p_week_start:$w,
+      p_template:"records_line", p_parameters:{line:3}, p_side:"yes", p_price:50, p_stake:1, p_walk_away_price:null,
+      p_note:null, p_answers_offer_id:null}')"
+  [[ "$(jq -r '.code' <<<"${BODY}")" == 42501 ]] || fail "a client token must not execute agent_group_prediction_post_receipted"
 done
 GROUP_SAVED="${GROUP}"
 GROUP="${MISSING_GROUP}"; post A1 records_line "$(records 3)" yes 50 1

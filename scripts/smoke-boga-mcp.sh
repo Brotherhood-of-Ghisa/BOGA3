@@ -176,6 +176,9 @@ cleanup() {
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.session_plans
           where owner_user_id = '${USER_UUID}'::uuid and id = 'mcp-smoke-${RUN_TAG}-sentinel-plan';
+        delete from app_public.groups where name = 'MCP Smoke ${RUN_TAG}' and created_by = '${USER_UUID}'::uuid;
+        delete from app_public.group_prediction_bettors where user_id = '${USER_UUID}'::uuid;
+        ${USERNAME_RESTORE_SQL:-select 1;}
       commit;
     " >/dev/null || { echo "[boga-mcp-smoke] fixture cleanup failed" >&2; status=1; }
   fi
@@ -377,6 +380,25 @@ if [[ -n "${USER_UUID}" ]]; then
     fail "local Auth does not advertise offline_access; check the Supabase CLI pin (./boga doctor)"
 fi
 
+GROUP_ID=""
+if [[ -n "${USER_UUID}" ]]; then
+  echo "[boga-mcp-smoke] seeding a group with predictions on (no per-agent switch gates its tools)"
+  group_rpc() {
+    curl --silent --show-error --fail -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${APP_ACCESS_TOKEN}" \
+      -H 'x-boga-group-contract: 4' -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-8}" \
+      -H 'Content-Type: application/json' -H 'Content-Profile: app_public' --data "$2" "${API_URL}/rest/v1/rpc/$1"
+  }
+  # Creating a group needs a username; give user_g one for this run (cleanup restores it).
+  USERNAME_RESTORE_SQL="update app_public.user_profiles set username = nullif('$(run_psql "
+    select coalesce((select username from app_public.user_profiles where id = '${USER_UUID}'), '');")', '')
+    where id = '${USER_UUID}';"
+  run_psql "insert into app_public.user_profiles (id, username) values ('${USER_UUID}', 'smoke${RUN_TAG//-/}')
+    on conflict (id) do update set username = excluded.username;" >/dev/null
+  GROUP_ID="$(group_rpc group_create "$(jq -nc --arg n "MCP Smoke ${RUN_TAG}" \
+    '{p_name:$n, p_description:null, p_time_zone:"UTC"}')" | jq -er '.group_id')"
+  group_rpc group_prediction_settings_set "$(jq -nc --arg g "${GROUP_ID}" '{p_group_id:$g, p_enabled:true}')" >/dev/null
+fi
+
 echo "[boga-mcp-smoke] phase 1: discovering tools and calling read tools with planning denied by default"
 BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \
 BOGA_MCP_SMOKE_URL="${MCP_URL}" \
@@ -494,6 +516,32 @@ if [[ -n "${USER_UUID}" ]]; then
     where owner_user_id='${USER_UUID}'::uuid and oauth_client_id='${AGENT_CLIENT_ID}';")"
   [[ "${AUDIT_COUNT}" -le 119 ]] || fail "smoke request budget exceeds 119: ${AUDIT_COUNT}; do not rely on elapsed time to reset limits"
   echo "[boga-mcp-smoke] audited requests: ${AUDIT_COUNT} (within the unchanged 120/minute API limit)"
+
+  # The prediction tools need no switch. A second OAuth client has its own agent API
+  # request window, so this round trip does not spend the first client's budget.
+  echo "[boga-mcp-smoke] group predictions: a second client lists, posts and reads the board"
+  GROUP_TOKEN_FILE="$(mktemp)"
+  chmod 600 "${GROUP_TOKEN_FILE}"
+  (
+    cd "${REPO_ROOT}/apps/agent-auth-web"
+    BOGA_LOCAL_SUPABASE_URL="${API_URL}" \
+    BOGA_LOCAL_SUPABASE_PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-${ANON_KEY}}" \
+    BOGA_LOCAL_OAUTH_EMAIL="${USER_G_EMAIL}" \
+    BOGA_LOCAL_OAUTH_PASSWORD="${USER_G_PASSWORD}" \
+    BOGA_LOCAL_OAUTH_CLIENT_NAME="BoGa MCP smoke groups ${RUN_TAG}" \
+    BOGA_LOCAL_OAUTH_MCP_URL="${MCP_URL}" \
+      npx tsx scripts/mint-local-oauth.ts
+  ) >"${GROUP_TOKEN_FILE}"
+  GROUP_CLIENT_ID="$(jq -er '.clientId' "${GROUP_TOKEN_FILE}")"
+  GROUP_APP_TOKEN="$(jq -er '.appAccessToken' "${GROUP_TOKEN_FILE}")"
+  BOGA_MCP_SMOKE_URL="${MCP_URL}" BOGA_MCP_SMOKE_ACCESS_TOKEN="$(jq -er '.accessToken' "${GROUP_TOKEN_FILE}")" \
+  BOGA_MCP_SMOKE_GROUP_ID="${GROUP_ID}" BOGA_MCP_SMOKE_USER_ID="${USER_UUID}" \
+    "${REPO_ROOT}/services/boga-mcp/node_modules/.bin/tsx" "${REPO_ROOT}/services/boga-mcp/scripts/group-smoke.ts"
+  rm -f "${GROUP_TOKEN_FILE}"
+  curl --silent --show-error --fail -X DELETE -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${GROUP_APP_TOKEN}" \
+    "${API_URL}/auth/v1/user/oauth/grants?client_id=${GROUP_CLIENT_ID}" >/dev/null
+  run_psql "delete from public.agent_plan_write_receipts where owner_user_id = '${USER_UUID}'::uuid and client_id = '${GROUP_CLIENT_ID}';
+    delete from public.agent_access_audit where owner_user_id = '${USER_UUID}'::uuid and oauth_client_id = '${GROUP_CLIENT_ID}';" >/dev/null
 
   echo "[boga-mcp-smoke] verifying pre-existing plan sentinel survived all test phases"
   SENTINEL_EXISTS="$(run_psql "

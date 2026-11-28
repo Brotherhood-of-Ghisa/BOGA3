@@ -10,15 +10,17 @@ Every route validates its bearer live with Supabase Auth and checks matching
 active consent using the service-only `public.agent_active_oauth_grant` RPC.
 The validated subject determines owner-filtered reads. Read routes accept `GET`;
 writes accept `POST` (`PUT` for muscle targets, `PATCH` for plan mutations) and
-require current-grant permission. GET bodies and caller identity fields
+require current-grant permission, except group predictions. GET bodies and caller identity fields
 (`user_id`, `userId`, `owner_user_id`) are rejected.
 
 For server verification and deployment order, load
 [OAuth diagnostics](../../../services/boga-mcp/AUTH-DIAGNOSTICS.md).
 
 Load [workout logging](../../../docs/specs/tech/agent-workout-contract.md) for
-active workouts, and [health activities](../../../docs/specs/tech/health-activities-contract.md)
-for `/activities` and training-status `cardio`.
+active workouts, [health activities](../../../docs/specs/tech/health-activities-contract.md)
+for `/activities` and training-status `cardio`, and the
+[prediction agent contract](../../../docs/specs/tech/group-predictions-agent-contract.md)
+for `/groups`.
 
 Success envelope:
 
@@ -423,8 +425,7 @@ owner's timeline. An enabled response may contain:
 ```
 
 Missing is `{"status":"missing","value":null,"unit":"kg","measured_at":null}`;
-malformed rows are skipped, so an older valid row may apply. There is no future
-estimate or session override.
+malformed rows are skipped, so an older valid row may apply.
 
 Performed sets keep raw and derived values apart:
 
@@ -445,8 +446,7 @@ contribute.
 Volume coverage stays explicit for invalid/overflow/truncated input; missing
 bodyweight under the personal policy is complete zero-fallback input. A null
 value is unavailable, never zero; records stay bounded by `history_truncated`.
-Reads are owner-filtered and batched (no per-set query); changes apply on the
-next read and no derived value is persisted.
+Reads are owner-filtered and batched; no derived value is persisted.
 
 ## Plan permission and write routes
 
@@ -537,7 +537,7 @@ re-score linked group exercises. Returns the RPC result (`exercise_id`, `revisio
 - `400` invalid argument, cursor, foreign reference, or active block edit (`IMMUTABLE_BLOCK_MUTATION`).
 - `401` missing, invalid, expired, normal-app, or revoked authorization.
 - `403` missing, disabled, or stale write access (`PLAN_PERMISSION_REQUIRED`, `PLAN_EDIT_PERMISSION_REQUIRED`).
-- `404` unknown route or nonexistent resource, exercise, or note.
+- `404` unknown route or nonexistent resource, exercise, note or group.
 - `405` unsupported method (`GET, POST, PUT, PATCH`).
 - `409` idempotency conflict, stale revision/version (`PLAN_CONCURRENT_MODIFICATION`), or deleted exercise.
 - `413` request or response exceeds size bound (256 KiB response cap).
@@ -545,5 +545,4 @@ re-score linked group exercises. Returns the RPC result (`exercise_id`, `revisio
 - `500` internal/database failure with no sensitive detail.
 - `503` `UPSTREAM_UNAVAILABLE` with `Retry-After`: Supabase Auth unavailable.
 
-`./boga test agent-api` runs the real OAuth/RLS contract and
-`./boga test mcp-smoke` the real MCP-to-API path.
+`./boga test agent-api` runs the OAuth/RLS contract, `./boga test mcp-smoke` the MCP path.

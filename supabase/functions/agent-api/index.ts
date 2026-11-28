@@ -49,6 +49,11 @@ import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, summarizeTrainingVolume, volumePayload,
   type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
 } from './training-metrics.ts';
+import {
+  canonicalJson, GROUP_READ_RATE_LIMIT_REQUESTS, GROUP_WRITE_RATE_LIMIT_REQUESTS, groupPredictionError,
+  GroupPredictionError, groupRouteFor, groupToolNameForPath, isWriteRoute, normalizeCowSchedule, normalizePostOffer,
+  normalizeWithdraw, withoutNotes, type GroupRoute,
+} from './group-predictions.ts';
 import { normalizeWorkoutInput, WorkoutInputError, type WorkoutOperation } from './workout-input.ts';
 
 const API_VERSION = 'v1';
@@ -177,6 +182,9 @@ const muscleTargetsWriteRateWindows = new Map<string, RateWindow>();
 const workoutWriteRateWindows = new Map<string, RateWindow>();
 const noteWriteRateWindows = new Map<string, RateWindow>();
 const injuryWriteRateWindows = new Map<string, RateWindow>();
+// Group prediction reads (the form and the board are heavy) and writes count apart from every other route.
+const groupReadRateWindows = new Map<string, RateWindow>();
+const groupWriteRateWindows = new Map<string, RateWindow>();
 
 const getRequiredEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
@@ -399,6 +407,8 @@ const canonicalAgentPath = (url: URL): string => {
 };
 
 const routeToolName = (path: string, method: string): string => {
+  const groupTool = groupToolNameForPath(path, method);
+  if (groupTool) return groupTool;
   if (path === '/v1/agent/workouts/active') return 'get_active_workout';
   const workoutOperation = workoutOperationFor(path);
   if (workoutOperation) return workoutOperation;
@@ -3879,6 +3889,83 @@ const mutateTrainingProgramme = async (
   };
 };
 
+const asGroupPrediction = <T>(fn: () => T): T => {
+  try {
+    return fn();
+  } catch (error) {
+    if (error instanceof GroupPredictionError) throw new ApiError(error.status, error.code, error.message);
+    throw error;
+  }
+};
+
+/** One prediction RPC; its refusals (`TOKEN: reason`) become the route's wire errors, notes never leave. */
+const callGroupPredictionRpc = async (
+  client: SupabaseClient, name: string, args: JsonObject,
+): Promise<JsonObject> => {
+  const { data, error } = await client.schema('app_public').rpc(name, args);
+  if (error) {
+    const refusal = groupPredictionError(error.message);
+    if (refusal) throw new ApiError(refusal.status, refusal.code, refusal.message);
+    throwDatabaseError(error);
+  }
+  return withoutNotes(data) as JsonObject;
+};
+
+/** The write's body, normalized, and the RPC arguments it becomes; the receipt hash covers both the path and the body. */
+const groupWriteCall = (route: GroupRoute, body: JsonObject): { rpc: string; args: JsonObject; hashed: JsonObject } => {
+  if (route.kind === 'withdraw') {
+    const input = asGroupPrediction(() => normalizeWithdraw(body));
+    return { rpc: 'agent_group_prediction_withdraw_receipted', args: { p_group_id: route.groupId, p_offer_id: route.offerId },
+      hashed: { ...input, group_id: route.groupId, offer_id: route.offerId } };
+  }
+  if (route.kind === 'cow') {
+    const input = asGroupPrediction(() => normalizeCowSchedule(body));
+    return { rpc: 'agent_group_prediction_cow_schedule_receipted',
+      args: { p_group_id: route.groupId, p_week_start: input.week_start, p_group_exercise_id: input.group_exercise_id,
+        p_metrics: input.metrics },
+      hashed: { ...input, group_id: route.groupId } };
+  }
+  const input = asGroupPrediction(() => normalizePostOffer(body));
+  return { rpc: 'agent_group_prediction_post_receipted',
+    args: { p_group_id: route.groupId, p_week_start: input.week_start, p_template: input.template,
+      p_parameters: input.parameters, p_side: input.side, p_price: input.price, p_stake: input.stake,
+      p_walk_away_price: input.walk_away_price, p_note: input.note, p_answers_offer_id: input.answers_offer_id },
+    hashed: { ...input, group_id: route.groupId } };
+};
+
+/** `post_prediction_offer`, `withdraw_prediction_offer` and `schedule_group_cow`, each with an idempotency receipt. */
+const writeGroupPrediction = async (
+  client: SupabaseClient, agent: AuthenticatedAgent, request: Request, route: GroupRoute,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const call = groupWriteCall(route, await readJsonBody(request));
+  return callGroupPredictionRpc(client, call.rpc, {
+    p_owner: agent.userId, p_client_id: agent.clientId, p_idempotency_key: idempotencyKey,
+    p_payload_sha256: await sha256Hex(canonicalJson(call.hashed)), ...call.args,
+  });
+};
+
+/** `list_prediction_groups`, `get_group_form` and `get_prediction_board`. */
+const readGroupPrediction = (client: SupabaseClient, agent: AuthenticatedAgent, route: GroupRoute): Promise<JsonObject> => {
+  const identity = { p_owner: agent.userId, p_client_id: agent.clientId };
+  if (route.kind === 'form' || route.kind === 'board') {
+    const rpc = route.kind === 'form' ? 'agent_group_prediction_form' : 'agent_group_prediction_board';
+    return callGroupPredictionRpc(client, rpc, { ...identity, p_group_id: route.groupId });
+  }
+  return callGroupPredictionRpc(client, 'agent_group_prediction_groups', identity);
+};
+
+const groupPredictionRequest = (
+  client: SupabaseClient, agent: AuthenticatedAgent, request: Request, route: GroupRoute,
+): Promise<JsonObject> => {
+  if (!isWriteRoute(route)) {
+    enforceRateLimit(groupReadRateWindows, agent, GROUP_READ_RATE_LIMIT_REQUESTS);
+    return readGroupPrediction(client, agent, route);
+  }
+  enforceRateLimit(groupWriteRateWindows, agent, GROUP_WRITE_RATE_LIMIT_REQUESTS);
+  return writeGroupPrediction(client, agent, request, route);
+};
+
 const dispatchAgentRequest = async (
   request: Request,
   agent: AuthenticatedAgent,
@@ -3906,6 +3993,12 @@ const dispatchAgentRequest = async (
       expires_at: agent.expiresAt,
       scopes: agent.scopes,
     };
+  }
+
+  const groupRoute = asGroupPrediction(() => groupRouteFor(path, method));
+  if (groupRoute) {
+    if (method === 'GET') rejectUnexpectedQuery(url, new Set());
+    return groupPredictionRequest(client, agent, request, groupRoute);
   }
 
   const workoutOperation = workoutOperationFor(path);

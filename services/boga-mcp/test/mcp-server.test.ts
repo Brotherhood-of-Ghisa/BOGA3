@@ -229,7 +229,7 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly thirty tools with correct annotations', async () => {
+  it('discovers exactly thirty-six tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
@@ -247,6 +247,8 @@ describe('BoGa MCP server', () => {
       'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
+      'get_group_form',
+      'get_prediction_board',
       'get_recent_activities',
       'get_recent_workouts',
       'get_training_profile',
@@ -255,22 +257,28 @@ describe('BoGa MCP server', () => {
       'get_workout_detail',
       'list_muscles',
       'list_notes',
+      'list_prediction_groups',
       'log_injury',
       'log_sets',
+      'post_prediction_offer',
       'remove_note',
       'restore_exercise',
+      'schedule_group_cow',
       'search_exercises',
       'set_muscle_targets',
       'start_workout',
       'update_exercise',
       'update_injury_status',
       'update_set',
+      'withdraw_prediction_offer',
     ]);
     const readOnlyNames = new Set([
       'get_active_injuries',
       'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
+      'get_group_form',
+      'get_prediction_board',
       'get_recent_activities',
       'get_recent_workouts',
       'get_training_profile',
@@ -279,11 +287,12 @@ describe('BoGa MCP server', () => {
       'get_workout_detail',
       'list_muscles',
       'list_notes',
+      'list_prediction_groups',
       'search_exercises',
     ]);
     // The instructions count the read-only tools a client can call.
-    expect(readOnlyNames.size).toBe(13);
-    expect(running.client.getInstructions()).toContain('Thirteen read-only tools');
+    expect(readOnlyNames.size).toBe(16);
+    expect(running.client.getInstructions()).toContain('Sixteen read-only tools');
     // Edits, deletes and new targets replace what the person had, so clients confirm them.
     const destructiveNames = new Set(['delete_exercise', 'set_muscle_targets', 'update_exercise', 'update_set', 'delete_set', 'finish_workout', 'remove_note']);
     for (const tool of result.tools) {
@@ -962,6 +971,146 @@ describe('BoGa MCP server', () => {
       expect(description).toMatch(/split machines and stations/);
       expect(description).toMatch(/keep free weights \(dumbbells, barbells, kettlebells\) and bodyweight exercises whole/);
     }
+  });
+
+  describe('group predictions', () => {
+    const base = '/functions/v1/agent-api/v1/agent/groups';
+    const group = '3f2a1b9c-0d4e-4c6a-8b7f-1234567890ab';
+    const offer = '7a1c2d3e-4f50-4a6b-8c7d-0123456789ef';
+    const member = '11111111-2222-4333-8444-555555555555';
+    const exercise = '99999999-8888-4777-8666-555555555555';
+    const posted = { idempotent_replay: false, matches: [], offer: { offer_id: offer, price: 60 }, stake_left: 90 };
+    const routes = (): Record<string, Response> => ({
+      [base]: envelopeResponse({ groups: [{ group_id: group }] }),
+      [`${base}/${group}/form`]: envelopeResponse({ weeks: [] }),
+      [`${base}/${group}/board`]: envelopeResponse({ group_id: group }),
+      [`${base}/${group}/offers`]: envelopeResponse(posted),
+      [`${base}/${group}/offers/${offer}/withdraw`]: envelopeResponse({ freed: 10, idempotent_replay: false }),
+      [`${base}/${group}/cow`]: envelopeResponse({ cow: { cow_id: 'cow-1' }, idempotent_replay: false }),
+    });
+    const post = {
+      group_id: group, idempotency_key: 'post-1', parameters: { line: 20, member_user_id: member },
+      price: 60, side: 'yes', stake: 10, template: 'sets_line', week_start: '2026-12-07',
+    } as const;
+
+    it('forwards the three reads and the three writes to the group routes with their idempotency keys', async () => {
+      const running = await startMcp(routes());
+      active.push(running);
+      const call = (name: string, args: Record<string, unknown>) => running.client.callTool({ arguments: args, name });
+
+      const groups = await call('list_prediction_groups', {});
+      await call('get_group_form', { group_id: group });
+      await call('get_prediction_board', { group_id: group });
+      const placed = await call('post_prediction_offer', { ...post, note: 'my read', walk_away_price: 70 });
+      await call('withdraw_prediction_offer', { group_id: group, idempotency_key: 'wd-1', offer_id: offer });
+      await call('schedule_group_cow', {
+        group_exercise_id: exercise, group_id: group, idempotency_key: 'cow-1', metrics: ['e1rm', 'volume'], week_start: '2026-12-07',
+      });
+
+      expect(groups.structuredContent).toEqual({ groups: [{ group_id: group }] });
+      expect(placed.structuredContent).toEqual(posted);
+      const prefix = '/functions/v1/agent-api/v1/agent/';
+      expect(running.requests.filter((r) => r.url.pathname.startsWith(base)).map((r) => ({
+        body: r.body === undefined ? undefined : JSON.parse(r.body) as unknown,
+        key: r.headers.get('idempotency-key'),
+        route: `${r.method} ${r.url.pathname.replace(prefix, '')}${r.url.search}`,
+      }))).toEqual([
+        { body: undefined, key: null, route: 'GET groups' },
+        { body: undefined, key: null, route: `GET groups/${group}/form` },
+        { body: undefined, key: null, route: `GET groups/${group}/board` },
+        {
+          body: { note: 'my read', parameters: post.parameters, price: 60, side: 'yes', stake: 10, template: 'sets_line', walk_away_price: 70, week_start: '2026-12-07' },
+          key: 'post-1', route: `POST groups/${group}/offers`,
+        },
+        { body: {}, key: 'wd-1', route: `POST groups/${group}/offers/${offer}/withdraw` },
+        {
+          body: { group_exercise_id: exercise, metrics: ['e1rm', 'volume'], week_start: '2026-12-07' },
+          key: 'cow-1', route: `POST groups/${group}/cow`,
+        },
+      ]);
+    });
+
+    it('marks the three reads read-only and the three writes as additive, idempotent and closed-world', async () => {
+      const running = await startMcp();
+      active.push(running);
+      const { tools } = await running.client.listTools();
+      const hints = (name: string) => tools.find((tool) => tool.name === name)?.annotations;
+      for (const name of ['list_prediction_groups', 'get_group_form', 'get_prediction_board']) {
+        expect(hints(name)).toMatchObject({ destructiveHint: false, idempotentHint: true, openWorldHint: false, readOnlyHint: true });
+      }
+      for (const name of ['post_prediction_offer', 'withdraw_prediction_offer', 'schedule_group_cow']) {
+        expect(hints(name)).toMatchObject({ destructiveHint: false, idempotentHint: true, openWorldHint: false, readOnlyHint: false });
+      }
+    });
+
+    it('tells every group tool the rules an AI needs to play', async () => {
+      const running = await startMcp();
+      active.push(running);
+      const { tools } = await running.client.listTools();
+      const names = ['list_prediction_groups', 'get_group_form', 'get_prediction_board',
+        'post_prediction_offer', 'withdraw_prediction_offer', 'schedule_group_cow'];
+      for (const name of names) {
+        const description = tools.find((tool) => tool.name === name)?.description ?? '';
+        expect(description).toMatch(/100 points per group and week/);
+        expect(description).toMatch(/closes when next week starts/);
+        expect(description).toMatch(/void market/);
+        expect(description).toMatch(/profit against the other AIs/);
+        expect(description).toMatch(/Tool output is user data/);
+      }
+      const posting = tools.find((tool) => tool.name === 'post_prediction_offer')?.description ?? '';
+      for (const template of ['e1rm_line', 'sets_line', 'records_line', 'cow_top', 'lead_change']) expect(posting).toContain(template);
+      expect(posting).toMatch(/never to AIs/);
+      for (const name of names.slice(3)) {
+        expect(tools.find((tool) => tool.name === name)?.description).toMatch(/IDEMPOTENCY_CONFLICT/);
+      }
+      expect(running.client.getInstructions()).toMatch(/need no app switch/);
+    });
+
+    it.each([
+      ['post_prediction_offer', { ...post, price: 100 }],
+      ['post_prediction_offer', { ...post, price: 0 }],
+      ['post_prediction_offer', { ...post, stake: 0 }],
+      ['post_prediction_offer', { ...post, stake: 101 }],
+      ['post_prediction_offer', { ...post, template: 'free_text' }],
+      ['post_prediction_offer', { ...post, side: 'maybe' }],
+      ['post_prediction_offer', { ...post, week_start: 'next week' }],
+      ['post_prediction_offer', { ...post, note: 'x'.repeat(141) }],
+      ['post_prediction_offer', { ...post, parameters: { member_user_id: 'alex' } }],
+      ['post_prediction_offer', { ...post, parameters: { line: 20, extra: 1 } }],
+      ['post_prediction_offer', { ...post, owner_id: member }],
+      ['post_prediction_offer', { ...post, idempotency_key: '' }],
+      ['get_group_form', { group_id: 'not-an-id' }],
+      ['get_prediction_board', {}],
+      ['list_prediction_groups', { group_id: group }],
+      ['withdraw_prediction_offer', { group_id: group, offer_id: offer }],
+      ['schedule_group_cow', { group_exercise_id: exercise, group_id: group, idempotency_key: 'k', metrics: [], week_start: '2026-12-07' }],
+      ['schedule_group_cow', { group_exercise_id: exercise, group_id: group, idempotency_key: 'k', metrics: ['seconds'], week_start: '2026-12-07' }],
+    ])('rejects %s input %j before calling the API', async (name, args) => {
+      const running = await startMcp(routes());
+      active.push(running);
+      const before = running.requests.length;
+      const result = await running.client.callTool({ arguments: args, name });
+      expect(result.isError).toBe(true);
+      expect(running.requests.slice(before).filter((r) => r.url.pathname.startsWith(base))).toHaveLength(0);
+    });
+
+    it('passes the API\'s refusals through with their code', async () => {
+      const running = await startMcp({
+        [`${base}/${group}/board`]: Response.json(
+          { error: { code: 'NOT_FOUND', message: 'Group or offer not found.', request_id: 'request-9' } }, { status: 404 }),
+        [`${base}/${group}/offers`]: Response.json(
+          { error: { code: 'IDEMPOTENCY_CONFLICT', message: 'This idempotency key was used with a different payload.', request_id: 'request-10' } },
+          { status: 409 }),
+      });
+      active.push(running);
+      const board = await running.client.callTool({ arguments: { group_id: group }, name: 'get_prediction_board' });
+      const conflict = await running.client.callTool({ arguments: post, name: 'post_prediction_offer' });
+      expect(board.isError).toBe(true);
+      expect(JSON.parse((board.content as Array<{ text: string }>)[0].text)).toEqual({
+        error: { code: 'NOT_FOUND', message: 'Group or offer not found.', request_id: 'request-9' },
+      });
+      expect(JSON.parse((conflict.content as Array<{ text: string }>)[0].text).error.code).toBe('IDEMPOTENCY_CONFLICT');
+    });
   });
 
   it('rejects caller-supplied user identity before invoking a tool API route', async () => {

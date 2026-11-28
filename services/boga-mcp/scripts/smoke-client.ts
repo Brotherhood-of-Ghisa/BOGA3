@@ -96,6 +96,8 @@ try {
     'get_active_workout',
     'get_exercise_context',
     'get_exercise_history',
+    'get_group_form',
+    'get_prediction_board',
     'get_recent_activities',
     'get_recent_workouts',
     'get_training_profile',
@@ -104,16 +106,20 @@ try {
     'get_workout_detail',
     'list_muscles',
     'list_notes',
+    'list_prediction_groups',
     'log_injury',
     'log_sets',
+    'post_prediction_offer',
     'remove_note',
     'restore_exercise',
+    'schedule_group_cow',
     'search_exercises',
     'set_muscle_targets',
     'start_workout',
     'update_exercise',
     'update_injury_status',
     'update_set',
+    'withdraw_prediction_offer',
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
     throw new Error(`Unexpected MCP tools: ${names.join(', ')}`);
@@ -634,5 +640,5 @@ try {
   await client.close();
 }
 
-console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-seven tools discovered and reads/denials verified');
+console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; thirty-six tools discovered and reads/denials verified');
 
