@@ -124,7 +124,10 @@ Group prediction writes are the exception to the per-agent permission row below
 ([[agents.group-predictions]]).
 An agent's offers, withdrawals and CoW scheduling are gated by the group's
 Predictions setting and by membership, not by `public.agent_plan_permissions`.
-Load [`tech/group-predictions-contract.md`](tech/group-predictions-contract.md).
+Load [`tech/group-predictions-contract.md`](tech/group-predictions-contract.md)
+for offers and withdrawals, and
+[`tech/group-predictions-agent-contract.md`](tech/group-predictions-agent-contract.md)
+for the agent reads and CoW scheduling.
 
 The base OAuth grant stays read-only. A coaching client may read the upcoming
 plan queue, create new plans/programmes, edit exercises and set weekly muscle

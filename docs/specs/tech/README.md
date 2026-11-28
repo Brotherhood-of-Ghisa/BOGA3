@@ -38,8 +38,10 @@ Current docs:
   the protocol-4 server surface.
 - `group-predictions-contract.md`: per-group AI prediction market — access and
   the predictions setting, weekly markets and templates, offers and matching,
-  settlement, the AI-scheduled CoW and the agent tools. Skeleton; load when
-  changing predictions.
+  settlement and the member screens. Load when changing predictions.
+- `group-predictions-agent-contract.md`: what a connected AI reads of group
+  predictions, the AI-scheduled CoW and its pick record, and the agent routes
+  and tools. Load when changing those.
 - `group-meet-contract.md`: group meets — meet and challenge storage, the
   session↔meet link, cutoff snapshot and refresh, meets leaderboard and
   notification delivery. Skeleton; load when changing meets.
