@@ -35,8 +35,10 @@ function MeetPage({ groupId, meetId, userId }: { groupId: string; meetId: string
     ? cancelMeet(groupId, meetId, resource.data!.meet.version) : setMeetJoined(groupId, meetId, command === 'join'));
   const pull = usePullToRefresh(resource.refresh);
   // The server never writes a member's session links: after the online Leave, tombstone the ones this device holds.
+  const loadedMeet = resource.data?.meet;
   const detachSessions = async () => {
-    const detached = await leaveMeetLinks(resource.data!.meet).catch(() => null);
+    if (!loadedMeet) return;
+    const detached = await leaveMeetLinks(loadedMeet).catch(() => null);
     if (!detached) setMessage("You left the meet, but couldn't remove your sessions from it. Open each session to remove it.");
     else if (!detached.pulled) setLeaveNote('You left the meet. Sessions from another device may still count until you remove them there.');
   };
