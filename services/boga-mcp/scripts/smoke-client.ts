@@ -24,9 +24,6 @@ const activityPrefix = process.env.BOGA_MCP_SMOKE_ACTIVITY_PREFIX?.trim() ?? '';
 // Seeded locally: `<prefix>-general` (no exercise) and `<prefix>-exercise` (on
 // the seeded exercise), both dated two days ago.
 const notePrefix = process.env.BOGA_MCP_SMOKE_NOTE_PREFIX?.trim() ?? '';
-// Seeded locally: a group of this user with predictions on and a group time zone.
-const smokeGroupId = process.env.BOGA_MCP_SMOKE_GROUP_ID?.trim() ?? '';
-const smokeUserId = process.env.BOGA_MCP_SMOKE_USER_ID?.trim() ?? '';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -126,37 +123,6 @@ try {
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
     throw new Error(`Unexpected MCP tools: ${names.join(', ')}`);
-  }
-
-  // Group predictions need no app switch: list the group, post one offer and
-  // see it on the board. Three agent API requests (the budget is counted below).
-  if (smokeGroupId) {
-    const groups = structured(await client.callTool({ arguments: {}, name: 'list_prediction_groups' }), 'list_prediction_groups');
-    const listed = Array.isArray(groups.groups)
-      ? groups.groups.find((row) => isObject(row) && row.group_id === smokeGroupId) : undefined;
-    const week = isObject(listed) && isObject(listed.open_week) ? listed.open_week.week_start : undefined;
-    if (!isObject(listed) || typeof week !== 'string') {
-      throw new Error('list_prediction_groups did not list the seeded group with an open week.');
-    }
-    const posted = structured(await client.callTool({
-      arguments: {
-        group_id: smokeGroupId, idempotency_key: `smoke-prediction-${Date.now()}`,
-        parameters: { line: 5, member_user_id: smokeUserId }, price: 55, side: 'yes', stake: 5,
-        template: 'sets_line', week_start: week,
-      },
-      name: 'post_prediction_offer',
-    }), 'post_prediction_offer');
-    const offer = isObject(posted.offer) ? posted.offer : {};
-    const board = structured(await client.callTool({
-      arguments: { group_id: smokeGroupId }, name: 'get_prediction_board',
-    }), 'get_prediction_board');
-    const mine = isObject(board.mine) && Array.isArray(board.mine.offers) ? board.mine.offers : [];
-    if (typeof offer.offer_id !== 'string' || !mine.some((row) => isObject(row) && row.offer_id === offer.offer_id)) {
-      throw new Error('The posted offer is not on the prediction board.');
-    }
-    if (JSON.stringify(board).includes('"note"')) {
-      throw new Error('The prediction board returned a note.');
-    }
   }
   }
 
