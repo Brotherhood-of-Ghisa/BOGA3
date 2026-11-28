@@ -170,6 +170,14 @@ begin
     result_unit := 'lead_changes';
     outcome := case when result_value > 0 then 'yes' else 'no' end;
   elsif p_market.template = 'cow_top' then
+    -- A cancel voids the markets matched before it; one first matched after a
+    -- replacement settles on the replacement.
+    if exists (select 1 from app_public.group_cows c where c.group_id = p_market.group_id
+        and c.week_start = p_market.week_start and c.cancelled_at is not null
+        and c.cancelled_at >= (select min(x.created_at) from app_public.group_prediction_matches x
+          where x.market_id = p_market.id)) then
+      return;
+    end if;
     _cow := app_public.group_prediction_week_cow(p_market.group_id, p_market.week_start);
     if _cow.id is null or _cow.final_outcome is distinct from 'ready' or not (p_market.metric = any(_cow.metrics)) then
       return;

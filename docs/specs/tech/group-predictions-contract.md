@@ -129,8 +129,10 @@ current member when posting is refused.
   previous leader, its record still stands, and the record's session counts
   for the week. Link, unlink and void lead changes never count, nor does the
   first #1 on an empty board: a member could cause those by editing.
-- **cow_top** reads the week's CoW that is not cancelled (a replacement
-  counts). Rank 1 is the first entry of that metric's final ranking.
+- **cow_top** reads the week's CoW that is not cancelled. A cancel voids the
+  markets first matched before it; a market first matched after a
+  replacement settles on the replacement. Rank 1 is the first entry of that
+  metric's final ranking.
 - **Statements** are generated from template parameters and avoid gendered
   pronouns.
 
@@ -218,7 +220,7 @@ current member when posting is refused.
   `auth.uid()`, which is null on the service-role path, so the implementing
   change passes the owner explicitly.
 - Owners and admins cancel or replace the CoW as they do today. A cancel voids
-  that week's `cow_top` markets.
+  that week's `cow_top` markets matched before it.
 
 ## Agent API and MCP tools
 

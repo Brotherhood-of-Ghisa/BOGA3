@@ -17,8 +17,9 @@
 #     closed; a session logged after close does not move a frozen baseline;
 #   - settlement: one yes and one no per template, and every void case
 #     (e1RM: no baseline, no counting set; cow_top: metric not selected,
-#     nobody ranked, no CoW, cancelled, unavailable); cow_top waits for a
-#     final CoW; settlement never runs before the week ends;
+#     nobody ranked, no CoW, cancelled, unavailable, matched before a cancel
+#     that was replaced) while a match after the replacement settles; cow_top
+#     waits for a final CoW; settlement never runs before the week ends;
 #   - points: each match moves exactly the loser's stake to the winner, a void
 #     moves nothing, a board's profits sum to zero; results rows (matched,
 #     wins, losses, voids, profit) per AI, including an AI that never matched;
@@ -295,6 +296,7 @@ W="$(sql_value "select (app_public.group_cow_week('UTC', clock_timestamp()) + 7)
 W7="$(sql_value "select ('${W}'::date + 7)::text;")"
 W14="$(sql_value "select ('${W}'::date + 14)::text;")"
 W21="$(sql_value "select ('${W}'::date + 21)::text;")"
+W28="$(sql_value "select ('${W}'::date + 28)::text;")"
 PAST="$(sql_value "select (app_public.group_cow_week('UTC', clock_timestamp()) - 14)::text;")"
 WS_MS="$(sql_value "select app_public.group_prediction_ms(lower(app_public.group_cow_bounds('UTC', '${W}')));")"
 
@@ -515,10 +517,25 @@ expect_outcome "CoW void: no CoW that week" "${M_COW_NONE}" "void:-:-"
 expect_outcome "sets no (Alex has no sessions that week)" "${M_W7_SETS}" "no:0:sets"
 expect_outcome "CoW void: cancelled" "${M_COW_CANCELLED}" "void:-:-"
 expect_outcome "CoW void: unavailable" "${M_COW_UNAVAILABLE}" "void:-:-"
+# A CoW cancelled 12 hours before its week and replaced: the market matched
+# before the cancel voids; one first matched after it settles on the
+# replacement (Blair #1).
+pair "$(DAY_BEFORE "${W28}")" "${W28}" cow_top "{\"member_user_id\":\"${ALEX_UID}\",\"metric\":\"e1rm\"}" A2 B1 50 1 1
+M_COW_BEFORE_CANCEL="${MARKET}"
+seed_cow "$(new_uuid)" "${W28}" "array['e1rm']" ", cancelled_at" ", lower(r) - interval '12 hours'"
+pair "$(week_clock "${W28}" '-6 hours')" "${W28}" cow_top "{\"member_user_id\":\"${BLAIR_UID}\",\"metric\":\"e1rm\"}" A2 B1 50 1 1
+M_COW_AFTER_REPLACE="${MARKET}"
+seed_cow "$(new_uuid)" "${W28}" "array['e1rm']" ", finalized_at, final_outcome, final_rankings" \
+  ", clock_timestamp(), 'ready', jsonb_build_array(jsonb_build_object('metric', 'e1rm', 'unit', 'kg',
+    'unavailableMemberIds', '[]'::jsonb, 'entries', jsonb_build_array(jsonb_build_object('memberId', '${BLAIR_UID}',
+    'value', 140, 'receivedAtUs', 1, 'rank', 1))))"
+[[ "$(settle_at "$(week_clock "${W28}" '7 days 1 hour')" "${W28}")" == t ]] || fail "settle ${W28}"
+expect_outcome "CoW void: matched before a cancel, even with a replacement" "${M_COW_BEFORE_CANCEL}" "void:-:-"
+expect_outcome "CoW yes: first matched after the replacement" "${M_COW_AFTER_REPLACE}" "yes:1:place"
 [[ "$(result_line "${W7}" A1)" == "-200/2/0/1/1" ]] || fail "A1's second week: $(result_line "${W7}" A1)"
 expect_sql "settling closes a board first" "select count(*) from app_public.group_prediction_boards
   where group_id = '${GROUP}' and week_start in ('${W7}', '${W14}', '${W21}') and closed_at is not null and settled_at >= closed_at;" 3
-pass "cow_top voids: no CoW, cancelled, unavailable; a board with no pending CoW settles without waiting"
+pass "cow_top voids: no CoW, cancelled (also when replaced after the match), unavailable; a replacement settles later matches"
 
 # --- ranking derivations ------------------------------------------------------------
 
@@ -617,7 +634,7 @@ H_BEFORE="$(sql_value "select count(*) from app_public.group_prediction_offers o
 BETTORS_BEFORE="$(sql_value "select count(*) from app_public.group_prediction_bettors where user_id in ('${ALEX_UID}', '${BLAIR_UID}');")"
 srpc group_predictions_reset "$(jq -nc --arg g "${GROUP}" '{p_group_id:$g}')"
 expect_ok "service role resets G"
-check "five boards deleted" '.boards_deleted == 5'
+check "six boards deleted" '.boards_deleted == 6'
 expect_sql "G holds no prediction data" "select (select count(*) from app_public.group_prediction_boards where group_id = '${GROUP}')
   + (select count(*) from app_public.group_prediction_markets where group_id = '${GROUP}')
   + (select count(*) from app_public.group_prediction_results where group_id = '${GROUP}')
