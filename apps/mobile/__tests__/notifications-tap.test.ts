@@ -223,12 +223,16 @@ test('a meet start carries no standings; the end allows a line break and a 400 c
   expect(isNotificationProjection({ ...notificationProjectionFixture(), detail: 'Ana' })).toBe(false);
 });
 test('a meet tap proves membership with the meet read and opens the meet, not a workout', async () => {
+  clearRecentLogs();
   native.decrypt = jest.fn(() => meetProjection());
   receiveNotificationTap(notificationEnvelopeFixture); await process();
   expect(mockMeetRead).toHaveBeenCalledWith(notificationProjectionFixture().route.groupId, MEET);
   expect(mockSessionRead).not.toHaveBeenCalled();
   expect(onOpenMeet).toHaveBeenCalledWith({ groupId: notificationProjectionFixture().route.groupId, meetId: MEET });
   expect(onOpen).not.toHaveBeenCalled();
+  const opened = getRecentLogs().find(log => log.event === 'notifications.tap_opened');
+  expect(opened?.context).toMatchObject({ meetId: MEET });
+  expect(opened?.context).not.toHaveProperty('sessionId');
 });
 test('a meet tap reports the meet as unavailable when offline or no longer reachable', async () => {
   native.decrypt = jest.fn(() => meetProjection('meet_start'));
