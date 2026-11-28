@@ -1,5 +1,6 @@
 import { isMeetDetailWire, isMeetListWire } from './meet-wire';
 import { isMeetLeaderboardWire } from './meet-results-wire';
+import { isPredictionBoardWire, isPredictionRankingWire, isPredictionSettingWire, isPredictionThreadWire } from './prediction-wire';
 import { isObservedCompetitionPolicy } from './competition-cache-policy';
 import { coWSummaryCacheKey, isCoWSummaryWire } from './cow-wire';
 import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionSessionDetailWire,
@@ -31,7 +32,7 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
       (value.selection === 'none' || (previous ? value.selection === 'previous' : value.selection !== 'previous')) &&
       key === coWSummaryCacheKey(value, previous);
   }
-  if (['meets', 'meet', 'meet-leaderboard'].includes(kind)) return meetCachePayload(kind, scope, value);
+  if (Object.hasOwn(SCOPED_PAYLOADS, kind)) return SCOPED_PAYLOADS[kind](kind, scope, value);
   if (kind === 'group-policy') return isObservedCompetitionPolicy(value);
   if (kind === 'group') return exact(value,['group','members']) && summary(value.group) && record(value.group) &&
     value.group.group_id === groupId && Array.isArray(value.members) && value.members.every(member);
@@ -46,6 +47,22 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
     value.session.member.user_id === scope[1] && value.session.session_id === scope.slice(2).join(':');
   if (kind === 'stream') return streamCachePayload(scope, value, groupId);
   return false;
+}
+
+/** Kinds whose key scope is `<groupId>:…:v1`: meets and group predictions. */
+const SCOPED_PAYLOADS: Record<string, (kind: string, scope: string[], value: unknown) => boolean> = {
+  meets: meetCachePayload, meet: meetCachePayload, 'meet-leaderboard': meetCachePayload,
+  'prediction-setting': predictionCachePayload, 'prediction-board': predictionCachePayload,
+  'prediction-ranking': predictionCachePayload, 'prediction-thread': predictionCachePayload,
+};
+
+function predictionCachePayload(kind: string, scope: string[], value: unknown): boolean {
+  const groupId = scope[0];
+  if (kind === 'prediction-thread') return scope.length === 3 && scope[2] === 'v1' && isPredictionThreadWire(value) && value.group_id === groupId && value.market.market_id === scope[1];
+  if (scope.length !== 2 || scope[1] !== 'v1') return false;
+  if (kind === 'prediction-setting') return isPredictionSettingWire(value) && value.group_id === groupId;
+  if (kind === 'prediction-board') return isPredictionBoardWire(value) && value.group_id === groupId;
+  return kind === 'prediction-ranking' && isPredictionRankingWire(value) && value.group_id === groupId;
 }
 
 function meetCachePayload(kind: string, scope: string[], value: unknown): boolean {

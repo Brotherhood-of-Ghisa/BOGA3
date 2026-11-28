@@ -38,6 +38,11 @@ export type GroupOnlinePagesOptions<TPage, TItem, TCursor> = {
   selectCursor: (page: TPage) => TCursor | null;
   selectHasMore: (page: TPage) => boolean;
   itemKey: (item: TItem) => string;
+  /**
+   * Any `NOT_FOUND` means this read is unavailable, not that the group is lost: it sets `resourceMissing` and
+   * evicts nothing. For reads a group setting can switch off (group predictions).
+   */
+  notFoundIsMissing?: boolean;
 };
 
 export type GroupOnlinePagesState<TPage, TItem> = {
@@ -119,6 +124,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
   selectCursor,
   selectHasMore,
   itemKey,
+  notFoundIsMissing = false,
 }: GroupOnlinePagesOptions<TPage, TItem, TCursor>): GroupOnlinePagesState<TPage, TItem> {
   const online = useNetworkOnline();
   const cacheGeneration = useSyncExternalStore(subscribeCompetitionCache,
@@ -168,7 +174,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
 
   const handleNotFound = useCallback(
     async (error: GroupApiError) => {
-      if (isGroupExerciseNotFound(error) || isCoWNotFound(error) || isMeetNotFound(error)) {
+      if (notFoundIsMissing || isGroupExerciseNotFound(error) || isCoWNotFound(error) || isMeetNotFound(error)) {
         setState({ ...initialState<TPage, TItem, TCursor>(identity), resourceMissing: true });
         return;
       }
@@ -177,7 +183,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
       if (identityRef.current === identity) setState({ ...initialState<TPage,TItem,TCursor>(identity),lostAccess: true,error });
       await cleanup;
     },
-    [groupId, identity, setState,userId],
+    [groupId, identity, notFoundIsMissing, setState,userId],
   );
 
   const handleUnsafe = useCallback(async (error: GroupApiError) => {

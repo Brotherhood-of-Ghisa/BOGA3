@@ -71,6 +71,8 @@ jest.mock('@/src/groups/api', () => {
   removeGroupMember: jest.fn(),
   setGroupMemberRole: jest.fn(),
   transferGroupOwnership: jest.fn(),
+  getPredictionSetting: jest.fn(),
+  setPredictionSetting: jest.fn(),
   };
 });
 
@@ -157,6 +159,7 @@ beforeEach(() => {
   api.getGroup.mockResolvedValue(detailFor('owner'));
   api.listCompetitionExercises.mockResolvedValue({ contract_version: 4,exercises: [] });
   api.getGroupInviteCode.mockResolvedValue({ code: 'ABCD2345' });
+  api.getPredictionSetting.mockResolvedValue({ group_id: GROUP_ID, enabled: false });
 });
 
 afterEach(() => {
