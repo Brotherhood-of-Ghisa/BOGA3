@@ -34,7 +34,7 @@ describe('week blocks and groups', () => {
     exerciseName: 'Bench Press', setId: 'set', setOrderIndex: 0, setType: 'rir_2', weightValue: '100', repsValue: '5', ...over,
   });
   const card = (id: string, name: string, record: CompletedSessionDetailCard['record'] = []): CompletedSessionDetailCard =>
-    ({ id, name, setCount: 2, rows: [], record });
+    ({ id, exerciseDefinitionId: null, name, setCount: 2, rows: [], record });
 
   it('lists a muscle week once per block that worked it, titled by the card\'s exercise', () => {
     const blocks = muscleWeekBlocks([

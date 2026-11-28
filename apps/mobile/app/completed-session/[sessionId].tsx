@@ -707,6 +707,11 @@ export function CompletedSessionDetailScreenShell({
         busy={isResuming || isTogglingDeletedState}
         onOpenActive={activeConflictId ? () => openActiveWorkout(activeConflictId) : undefined}
         onToggleDeleted={handleToggleDeletedState}
+        meetSession={isDeleted ? undefined : {
+          sessionId: session.id,
+          startedAt: new Date(session.startedAt),
+          completedAt: new Date(session.completedAt),
+        }}
         summary={{
           title: completedSessionTitle(new Date(session.startedAt), dateFormat),
           start: formattedStartedAt,

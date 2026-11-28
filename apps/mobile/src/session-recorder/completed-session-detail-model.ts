@@ -43,6 +43,8 @@ export type CompletedSessionDetailExerciseInput = {
 
 export type CompletedSessionDetailCard = {
   id: string;
+  // The exercise definition behind the card; null for a line without one.
+  exerciseDefinitionId: string | null;
   name: string;
   // The card's `<n> sets`: its working sets (`training-metrics-contract.md` "Counted set").
   setCount: number;
@@ -150,6 +152,7 @@ export const buildCompletedSessionDetailModel = (
     return [
       {
         id: exercise.id,
+        exerciseDefinitionId: definitionId,
         name: exercise.name,
         setCount: working.length,
         rows: performed.map(({ set, weight, reps }) =>
