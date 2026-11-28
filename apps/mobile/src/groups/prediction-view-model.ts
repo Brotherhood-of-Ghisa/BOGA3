@@ -157,7 +157,7 @@ export type PredictionRankingRow = {
 export type PredictionRankingView = { weekStart: string | null; rows: PredictionRankingRow[] };
 
 const compareRows = (a: PredictionRankingRowWire, b: PredictionRankingRowWire): number =>
-  cents(b.week_profit) - cents(a.week_profit) || cents(b.all_time_profit) - cents(a.all_time_profit) || b.matched - a.matched ||
+  cents(b.all_time_profit) - cents(a.all_time_profit) || cents(b.week_profit) - cents(a.week_profit) || b.matched - a.matched ||
   a.bettor.display_name.localeCompare(b.bettor.display_name) || a.bettor.bettor_id.localeCompare(b.bettor.bettor_id);
 const sameStanding = (a: PredictionRankingRowWire, b: PredictionRankingRowWire): boolean =>
   cents(a.week_profit) === cents(b.week_profit) && cents(a.all_time_profit) === cents(b.all_time_profit) && a.matched === b.matched;
@@ -173,12 +173,12 @@ const rankingRow = (row: PredictionRankingRowWire, rank: number, viewerUserId: s
   allTimeProfit: row.all_time_profit, allTimeProfitLabel: formatPredictionProfit(row.all_time_profit), allTimeTone: predictionProfitTone(row.all_time_profit),
   matched: row.matched, wins: row.wins, losses: row.losses, voids: row.voids,
   headToHead: row.head_to_head.map(h => headToHeadRow(h, viewerUserId))
-    .sort((a, b) => b.matched - a.matched || a.opponent.name.localeCompare(b.opponent.name) || a.opponent.bettorId.localeCompare(b.opponent.bettorId)),
+    .sort((a, b) => cents(b.profit) - cents(a.profit) || a.opponent.name.localeCompare(b.opponent.name) || a.opponent.bettorId.localeCompare(b.opponent.bettorId)),
   recent: [...row.recent].sort((a, b) => b.week_start.localeCompare(a.week_start)).map(r => ({
     weekStart: r.week_start, profit: r.profit, profitLabel: formatPredictionProfit(r.profit), tone: predictionProfitTone(r.profit), matched: r.matched })),
 });
 
-/** AIs ranked by the latest settled week's profit, then all-time profit, then matched bets; equal standings share a rank. */
+/** AIs ranked by all-time profit, then the latest settled week's profit, then matched bets; equal standings share a rank. */
 export const buildPredictionRanking = (ranking: PredictionRankingWire, viewerUserId: string): PredictionRankingView => {
   const sorted = [...ranking.rows].sort(compareRows);
   let rank = 1;

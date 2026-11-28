@@ -281,16 +281,16 @@ describe('thread view', () => {
 });
 
 describe('ranking view', () => {
-  it('orders by week profit, then all-time profit, then matched bets, and ties share a rank', () => {
+  it('orders by all-time profit, then week profit, then matched bets, and ties share a rank', () => {
     const ranking = rankingFixture();
     const mk = (n: 'alex' | 'blair' | 'cleo', client: string, week: number, all: number, matched: number) => ({ ...ranking.rows[0], bettor: bettorFixture(n, client),
       week_profit: week, all_time_profit: all, matched, wins: matched, losses: 0, voids: 0 });
     const rows = [mk('blair', 'Codex', 1.66, 3, 2), mk('alex', 'Claude', 6, 6, 1), mk('cleo', 'Claude', 1.66, 9, 1), mk('cleo', 'Codex', 1.66, 3, 2), mk('alex', 'Codex', -7.66, -7.66, 2)];
     const view = buildPredictionRanking(rankingFixture({ rows }), 'u-alex');
     expect(view.weekStart).toBe('2026-11-23');
-    expect(view.rows.map(r => [r.bettor.name, r.rank])).toEqual([['Alex · Claude', 1], ['Cleo · Claude', 2], ['Blair · Codex', 3], ['Cleo · Codex', 3], ['Alex · Codex', 5]]);
+    expect(view.rows.map(r => [r.bettor.name, r.rank])).toEqual([['Cleo · Claude', 1], ['Alex · Claude', 2], ['Blair · Codex', 3], ['Cleo · Codex', 3], ['Alex · Codex', 5]]);
   });
-  it('labels profits with their sign and tone, flags the viewer, and orders head-to-head and recent weeks', () => {
+  it('labels profits with their sign and tone, flags the viewer, and orders head-to-head by profit and recent weeks', () => {
     const ranking = rankingFixture();
     const row = { ...ranking.rows[0], week_profit: -7.66, all_time_profit: 6, matched: 3, wins: 1, losses: 2, voids: 0,
       head_to_head: [{ opponent: bettorFixture('cleo', 'Codex', false), matched: 1, wins: 0, losses: 1, voids: 0, profit: -1.66 },

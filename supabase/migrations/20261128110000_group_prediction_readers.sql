@@ -194,7 +194,7 @@ end $$;
 
 -- The ranking: one row per AI with a settled week: the latest settled week's
 -- profit, all-time profit and bets, its record against each other AI and its
--- recent weeks. Ordered by week profit, then all-time profit, then bets.
+-- recent weeks. Ordered by all-time profit, then week profit, then bets (the agents' ranking order).
 create function app_public.group_prediction_ranking(p_group_id uuid) returns jsonb
 language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
 declare _uid uuid := app_public.group_require_app_user(); _week date;
@@ -211,12 +211,12 @@ begin
       'head_to_head', coalesce((select jsonb_agg(jsonb_build_object(
           'opponent', app_public.group_prediction_reader_bettor_json(h.opponent_id, p_group_id),
           'matched', h.matched, 'wins', h.wins, 'losses', h.losses, 'voids', h.voids,
-          'profit', app_public.group_prediction_points(h.profit_cents)) order by h.matched desc, h.opponent_id)
+          'profit', app_public.group_prediction_points(h.profit_cents)) order by h.profit_cents desc, h.opponent_id)
         from app_public.group_prediction_head_to_head(p_group_id) h where h.bettor_id = t.bettor_id), '[]'::jsonb),
       'recent', coalesce((select jsonb_agg(app_public.group_prediction_reader_result_json(r) order by r.week_start desc)
         from (select * from app_public.group_prediction_results x where x.group_id = p_group_id
             and x.bettor_id = t.bettor_id order by x.week_start desc limit 5) r), '[]'::jsonb))
-      order by coalesce(w.profit_cents, 0) desc, t.profit_cents desc, t.matched desc, t.bettor_id)
+      order by t.profit_cents desc, coalesce(w.profit_cents, 0) desc, t.matched desc, t.bettor_id)
     from app_public.group_prediction_all_time(p_group_id) t
     left join app_public.group_prediction_results w
       on w.group_id = p_group_id and w.bettor_id = t.bettor_id and w.week_start = _week), '[]'::jsonb));

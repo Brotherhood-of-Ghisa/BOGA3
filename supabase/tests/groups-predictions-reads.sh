@@ -16,7 +16,7 @@
 #     matched bets; a withdrawn-only market is absent; this week's matched bets
 #     awaiting a result), the market thread (offers with notes, counters,
 #     withdrawals, matches, the week), the ranking (week and all-time profit,
-#     matched bets, head-to-head, recent weeks; ordered; profits sum to zero)
+#     matched bets, head-to-head, recent weeks; ordered by all-time then week profit; profits sum to zero)
 #     and the history (settled weeks, who won what, keyset pages, bad cursors);
 #   - privacy: no payload carries a walk-away price, and no agent-facing
 #     function was changed by this path (notes reach members only).
@@ -389,15 +389,15 @@ no_walk_away "ranking"
 # Records 3: 0 records, so no wins: B (no) takes A1's 6.00. Sets 10: 0 sets,
 # so no wins: A2 (no) takes A1's 1.66. C and D carry over from the first week.
 check "ranking order, profits, bets, head-to-head and recent weeks" \
-  '.week_start == $o and (.rows | map(.bettor.display_name | sub("reads-"; "") | sub("-\($r)"; "")) == ["blair · Claude", "alex · Codex", "admin · Claude", "owner · Claude", "alex · Claude"])
-   and (.rows | map(.week_profit) == [6, 1.66, 0, 0, -7.66]) and (.rows | map(.all_time_profit) == [6, 1.66, 5, -5, -7.66])
-   and (.rows | map(.matched) == [1, 1, 1, 1, 2]) and (.rows | map(.weeks) == [1, 1, 2, 2, 1])
+  '.week_start == $o and (.rows | map(.bettor.display_name | sub("reads-"; "") | sub("-\($r)"; "")) == ["blair · Claude", "admin · Claude", "alex · Codex", "owner · Claude", "alex · Claude"])
+   and (.rows | map(.week_profit) == [6, 0, 1.66, 0, -7.66]) and (.rows | map(.all_time_profit) == [6, 5, 1.66, -5, -7.66])
+   and (.rows | map(.matched) == [1, 1, 1, 1, 2]) and (.rows | map(.weeks) == [1, 2, 1, 2, 1])
    and ((.rows | map(.week_profit) | add) * 100 | round) == 0 and ((.rows | map(.all_time_profit) | add) * 100 | round) == 0
    and (.rows[0].head_to_head | length == 1) and .rows[0].head_to_head[0].wins == 1 and .rows[0].head_to_head[0].profit == 6
    and .rows[0].head_to_head[0].opponent.display_name == "reads-alex-\($r) · Claude"
    and (.rows[4].head_to_head | map(.matched) | add) == 2 and ((.rows[4].head_to_head | map(.profit) | add) * 100 | round) == -766
-   and (.rows[2].recent | map(.week_start) == [$o, $t]) and .rows[2].recent[0].profit == 0 and .rows[2].recent[1].profit == 5
-   and .rows[2].recent[0].matched == 0' --arg o "${OPEN_WEEK}" --arg t "${THIS_WEEK}" --arg r "${RUN_TAG}"
+   and (.rows[1].recent | map(.week_start) == [$o, $t]) and .rows[1].recent[0].profit == 0 and .rows[1].recent[1].profit == 5
+   and .rows[1].recent[0].matched == 0' --arg o "${OPEN_WEEK}" --arg t "${THIS_WEEK}" --arg r "${RUN_TAG}"
 expect_sql "the ranking's profits sum to zero in storage" "select coalesce(sum(profit_cents), 0) from app_public.group_prediction_results where group_id = '${GROUP}';" 0
 
 rpc "${BLAIR_TOKEN}" group_prediction_history "$(history_body "${GROUP}" null 4)"
@@ -430,7 +430,7 @@ for bad in 0 11 null; do
   rpc "${BLAIR_TOKEN}" group_prediction_history "$(history_body "${GROUP}" null "${bad}")"
   expect_error VALIDATION "history page size ${bad}"
 done
-pass "ranking: ordered by week then all-time profit, bets and head-to-head, profits sum to zero; history: settled weeks, who won what, keyset pages, bad cursors"
+pass "ranking: ordered by all-time then week profit, bets and head-to-head, profits sum to zero; history: settled weeks, who won what, keyset pages, bad cursors"
 
 # --- privacy ------------------------------------------------------------------------------
 
