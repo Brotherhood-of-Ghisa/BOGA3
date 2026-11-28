@@ -8,7 +8,6 @@ import type { MeetLeaderboardWire, MeetResultsWire, MeetStandingWire, MeetTrophy
 import type { MeetMetric } from './meet-wire';
 import { GROUP_OFFLINE_ACTION_MESSAGE } from './use-group-action';
 import { formatMemberName } from './stream-view-model';
-import type { GroupMemberRef } from './types';
 
 export const MEET_PODIUM_PLACES = 3;
 export const MEET_UNAVAILABLE_LABEL = 'Unavailable';
@@ -108,7 +107,6 @@ export const TROPHY_PLACE_WORDS: Record<MeetTrophyWire['place'], string> = { 1: 
 export const trophyLabel = (trophy: MeetTrophyWire, format: ExerciseDateFormat) =>
   `${trophy.title || 'Meet'} · ${formatBoardDate(trophy.starts_at_ms, format)}`;
 
-export const meetMemberName = (member: GroupMemberRef | null) => formatMemberName(member?.username);
 export const meetResultsRefreshMessage = (code: string, offline: boolean): string => {
   if (offline) return GROUP_OFFLINE_ACTION_MESSAGE;
   if (code === 'CONFLICT') return 'Results are not ready to refresh yet. Try again shortly.';

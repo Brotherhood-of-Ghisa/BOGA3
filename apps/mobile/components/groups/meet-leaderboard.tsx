@@ -11,7 +11,6 @@ import type { GroupResourceState } from '@/src/groups/use-group-resource';
 import { useDateFormat } from '@/src/preferences/hooks';
 import { GroupMedalBoard } from './group-medal-board';
 import { GroupInlineError, GroupMissingDataState, pickInlineError } from './group-state-view';
-import { GroupOfflineBanner } from './offline-banner';
 
 /**
  * The Meets leaderboard pinned on the Meets page: trophy counts per member
@@ -25,7 +24,6 @@ export function MeetLeaderboard({ groupId, userId, resource }: { groupId: string
   if (!board) return resource.lostAccess || !(error || resource.offline) ? null
     : <GroupMissingDataState error={error} offline={resource.offline} onRetry={() => void resource.refresh()} testIDPrefix="meet-leaderboard" />;
   return <>
-    {resource.offline ? <GroupOfflineBanner lastUpdatedAtMs={resource.lastUpdatedAtMs} /> : null}
     {error ? <GroupInlineError testID="meet-leaderboard-error" error={error} onRetry={() => void resource.refresh()} /> : null}
     <GroupMedalBoard board={board} title="Meets leaderboard" testIDPrefix="meet-leaderboard" emptyLabel="No trophies yet" medalMarks onOpenMember={setMember} />
     {member ? <MeetTrophiesSheet key={member.userId} groupId={groupId} userId={userId} member={member} onDismiss={() => setMember(null)} /> : null}
