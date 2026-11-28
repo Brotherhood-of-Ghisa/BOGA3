@@ -71,12 +71,21 @@ play-points game between the connected AIs of a group's members.
   up to an hour is accepted.
 - **The sweep** (`group_eval_sweep()` calls `group_prediction_sweep()` first,
   all in SQL) picks every board due to close (start passed) or settle (end
-  passed), oldest first. Instead of a lease it takes the group's prediction
-  lock with a try-lock: a busy group waits for the next sweep. Each board
-  runs in its own subtransaction; a failure is logged
-  (`group.prediction_sweep_failed`, with group, week and sqlstate) and
-  retried next hour without stopping the others. A sweep that did work logs
-  `group.prediction_sweep_work`; an idle one writes nothing.
+  passed), closes first, oldest first. A waiting board is counted and left
+  unlocked. Instead of a lease it takes the group's prediction lock with a
+  try-lock: a busy group waits for the next sweep. Each board runs in its own
+  subtransaction; a failure is logged (`group.prediction_sweep_failed`, with
+  group, week and sqlstate; without a board when the whole sweep failed) and
+  retried next hour without stopping the others. A sweep that did work
+  records `group.prediction_sweep_work` through `sweep_record_work`; an idle
+  one writes nothing.
+- **Evaluation first.** Figures come from the group evaluator, which runs
+  after commit. A board does not close (when it has an e1RM line) or settle
+  (when a non-`cow_top` market matched) while the group has evaluation
+  pending for sessions started before its start or end: a queued, retrying
+  or parked session job of a shared session, a target or comparison job, or
+  a rules drain. A parked job holds the board until it is retried. A session
+  synced after settlement never counts.
 - Close and settle (`group_prediction_close_at`, `group_prediction_settle_at`)
   each run once per board (`closed_at`, `settled_at`). Settling an unclosed
   board closes it first. A post or withdrawal that waited on the lock while

@@ -192,8 +192,56 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- Readiness. The figures come from the group evaluator, which runs after
+-- commit and on the hourly kick; a board never closes or settles on figures
+-- that still have evaluation work pending.
+-- ---------------------------------------------------------------------------
+
+-- Pending group-eval work that can change one of the group's figures for
+-- sessions started before p_before_ms: a queued, retrying or parked session
+-- job of a session shared into the group, a target or comparison job of the
+-- group, or a shared session's facts awaiting a rules drain.
+create function app_public.group_prediction_eval_pending(p_group uuid, p_before_ms bigint) returns boolean
+language sql stable set search_path = app_public, pg_temp as $$
+  select exists (select 1 from app_public.group_eval_queue q where q.kind = 'target' and q.group_id = p_group)
+    or exists (select 1 from app_public.group_metric_eval_queue q where q.group_id = p_group)
+    or exists (select 1 from app_public.group_eval_queue q
+        join app_public.group_session_shares sh on sh.member_user_id = q.member_user_id and sh.session_id = q.session_id
+        left join app_public.sessions s on s.owner_user_id = q.member_user_id and s.id = q.session_id
+       where q.kind = 'session' and sh.group_id = p_group and (s.id is null or s.started_at < p_before_ms))
+    or exists (select 1 from app_public.group_session_shares sh
+        join app_public.group_set_facts f on f.member_user_id = sh.member_user_id and f.session_id = sh.session_id
+       where sh.group_id = p_group
+         and f.rules_version < (select max(st.rules_version) from app_public.group_eval_rules_state st));
+$$;
+
+-- Why a board cannot close yet: its e1RM baselines have evaluation pending.
+create function app_public.group_prediction_close_waits(p_board app_public.group_prediction_boards) returns boolean
+language sql stable set search_path = app_public, pg_temp as $$
+  select exists (select 1 from app_public.group_prediction_markets m
+      where m.group_id = p_board.group_id and m.week_start = p_board.week_start and m.template = 'e1rm_line')
+    and app_public.group_prediction_eval_pending(p_board.group_id, app_public.group_prediction_ms(p_board.starts_at));
+$$;
+
+-- Why a closed board cannot settle yet: a matched cow_top market's CoW is not
+-- final, or another matched market's figures have evaluation pending.
+create function app_public.group_prediction_settle_waits(p_board app_public.group_prediction_boards) returns boolean
+language sql stable set search_path = app_public, pg_temp as $$
+  select (exists (select 1 from app_public.group_cows c where c.group_id = p_board.group_id
+        and c.week_start = p_board.week_start and c.cancelled_at is null and c.finalized_at is null)
+      and exists (select 1 from app_public.group_prediction_markets m
+        join app_public.group_prediction_matches x on x.market_id = m.id
+       where m.group_id = p_board.group_id and m.week_start = p_board.week_start and m.template = 'cow_top'))
+    or (exists (select 1 from app_public.group_prediction_markets m
+        join app_public.group_prediction_matches x on x.market_id = m.id
+       where m.group_id = p_board.group_id and m.week_start = p_board.week_start and m.template <> 'cow_top')
+      and app_public.group_prediction_eval_pending(p_board.group_id, app_public.group_prediction_ms(p_board.ends_at)));
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Close and settle. Each takes the clock (tests move it) and the group's
--- prediction lock, so it serializes with posts and withdrawals.
+-- prediction lock, so it serializes with posts and withdrawals, and rechecks
+-- readiness under it.
 -- ---------------------------------------------------------------------------
 
 -- At the board's start: expire every open remainder and freeze each e1RM
@@ -205,7 +253,8 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('group-prediction:' || p_group::text, 0));
   select * into _board from app_public.group_prediction_boards b
    where b.group_id = p_group and b.week_start = p_week for update;
-  if not found or _board.closed_at is not null or p_now < _board.starts_at then
+  if not found or _board.closed_at is not null or p_now < _board.starts_at
+     or app_public.group_prediction_close_waits(_board) then
     return false;
   end if;
   update app_public.group_prediction_offers o
@@ -229,12 +278,11 @@ begin
 end $$;
 
 -- After the board's end: settle every matched market once and store each
--- AI's week. Waits (returns false) while a matched `cow_top` market's CoW is
--- not final yet.
+-- AI's week. Returns false (the board waits) while it cannot close, or while
+-- group_prediction_settle_waits holds.
 create function app_public.group_prediction_settle_at(p_now timestamptz, p_group uuid, p_week date) returns boolean
 language plpgsql volatile set search_path = app_public, pg_temp as $$
 declare _board app_public.group_prediction_boards; _m app_public.group_prediction_markets; _o record;
-  _cow app_public.group_cows;
 begin
   perform pg_advisory_xact_lock(hashtextextended('group-prediction:' || p_group::text, 0));
   select * into _board from app_public.group_prediction_boards b
@@ -243,13 +291,12 @@ begin
     return false;
   end if;
   if _board.closed_at is null then
-    perform app_public.group_prediction_close_at(p_now, p_group, p_week);
+    if not app_public.group_prediction_close_at(p_now, p_group, p_week) then
+      return false;
+    end if;
     select * into strict _board from app_public.group_prediction_boards b where b.group_id = p_group and b.week_start = p_week;
   end if;
-  _cow := app_public.group_prediction_week_cow(p_group, p_week);
-  if _cow.id is not null and _cow.finalized_at is null and exists (select 1 from app_public.group_prediction_markets m
-      join app_public.group_prediction_matches x on x.market_id = m.id
-     where m.group_id = p_group and m.week_start = p_week and m.template = 'cow_top') then
+  if app_public.group_prediction_settle_waits(_board) then
     return false;
   end if;
   for _m in select m.* from app_public.group_prediction_markets m
@@ -286,17 +333,34 @@ begin
   return true;
 end $$;
 
--- The sweep's work: every board due to close or settle at p_now. A group
--- whose prediction lock is busy waits for the next sweep; a board that fails
--- is logged and retried by the next sweep without stopping the others.
+create function app_public.group_prediction_log_failure(p_context jsonb) returns void
+language plpgsql volatile set search_path = app_public, pg_temp as $$
+begin
+  insert into public.app_logs(level, source, event, message, context)
+  values ('error', 'database', 'group.prediction_sweep_failed',
+    'prediction boards failed to close or settle; the next sweep retries them', p_context);
+exception when others then
+  raise warning 'group.prediction_sweep_failed (app_logs unavailable): %', p_context;
+end $$;
+
+-- The sweep's work: every board due to close or settle at p_now, closing
+-- first. A waiting board is counted and left without a lock (an idle hour
+-- writes nothing); a group whose prediction lock is busy waits for the next
+-- sweep; a board that fails is logged and retried by the next sweep without
+-- stopping the others.
 create function app_public.group_prediction_sweep_at(p_now timestamptz) returns jsonb
 language plpgsql volatile set search_path = app_public, pg_temp as $$
-declare _b record; _closed integer := 0; _settled integer := 0; _waiting integer := 0; _failed integer := 0;
-  _state text; _work jsonb;
+declare _b app_public.group_prediction_boards; _closed integer := 0; _settled integer := 0; _waiting integer := 0;
+  _failed integer := 0; _state text; _work jsonb;
 begin
-  for _b in select b.group_id, b.week_start, b.closed_at, b.ends_at from app_public.group_prediction_boards b
+  for _b in select b.* from app_public.group_prediction_boards b
      where (b.closed_at is null and b.starts_at <= p_now) or (b.settled_at is null and b.ends_at <= p_now)
-     order by b.starts_at, b.group_id limit 100 loop
+     order by b.closed_at is not null, b.starts_at, b.group_id loop
+    if (_b.closed_at is null and app_public.group_prediction_close_waits(_b))
+       or (_b.closed_at is not null and app_public.group_prediction_settle_waits(_b)) then
+      _waiting := _waiting + 1;
+      continue;
+    end if;
     if not pg_try_advisory_xact_lock(hashtextextended('group-prediction:' || _b.group_id::text, 0)) then
       continue;
     end if;
@@ -314,33 +378,43 @@ begin
     exception when others then
       get stacked diagnostics _state = returned_sqlstate;
       _failed := _failed + 1;
-      begin
-        insert into public.app_logs(level, source, event, message, context)
-        values ('error', 'database', 'group.prediction_sweep_failed',
-          'a prediction board failed to close or settle; the next sweep retries it',
-          jsonb_build_object('group_id', _b.group_id, 'week_start', _b.week_start, 'sqlstate', _state));
-      exception when others then
-        raise warning 'group.prediction_sweep_failed (app_logs unavailable): %', _state;
-      end;
+      perform app_public.group_prediction_log_failure(
+        jsonb_build_object('group_id', _b.group_id, 'week_start', _b.week_start, 'sqlstate', _state));
     end;
   end loop;
   _work := jsonb_build_object('closed', _closed, 'settled', _settled, 'waiting', _waiting, 'failed', _failed);
   if _closed + _settled + _failed > 0 then
-    insert into public.app_logs(level, source, event, message, context)
-    values ('info', 'database', 'group.prediction_sweep_work', 'the backstop sweep closed or settled prediction boards', _work);
+    perform app_public.sweep_record_work('group.prediction_sweep_work', _work);
   end if;
   return _work;
 end $$;
 
--- The hourly sweep's entry: never lets a prediction failure stop the eval kick.
+-- The hourly sweep's entry: never lets a prediction failure stop the eval
+-- kick. A failure here rolls back the hour's prediction work; it is logged
+-- with its sqlstate and retried next hour.
 create function app_public.group_prediction_sweep() returns jsonb
 language plpgsql volatile set search_path = app_public, pg_temp as $$
+declare _state text;
 begin
   return app_public.group_prediction_sweep_at(clock_timestamp());
 exception when others then
-  raise warning 'group.prediction_sweep_failed';
+  get stacked diagnostics _state = returned_sqlstate;
+  perform app_public.group_prediction_log_failure(jsonb_build_object('sqlstate', _state));
   return null;
 end $$;
+
+-- Prediction sweeps record their work through the sweeps' one seam.
+create or replace function app_public.sweep_record_work(p_event text, p_work jsonb) returns void
+language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
+begin
+  if p_event is null or p_event not in ('group.eval_sweep_work', 'notification.sweep_work', 'group.prediction_sweep_work')
+    or jsonb_typeof(p_work) is distinct from 'object' or octet_length(p_work::text) > 2000 then
+    raise exception 'VALIDATION: invalid sweep work record' using errcode = 'P0001';
+  end if;
+  insert into public.app_logs (level, source, event, message, context)
+  values ('info', 'backend', p_event, 'a run started by the backstop sweep did work', p_work);
+end;
+$$;
 
 -- The hourly group-eval sweep closes and settles prediction boards first, in
 -- SQL, then kicks the evaluator as before.
@@ -501,7 +575,8 @@ begin
        'group_prediction_week_lead_changes', 'group_prediction_week_cow', 'group_prediction_market_outcome',
        'group_prediction_close_at', 'group_prediction_settle_at', 'group_prediction_sweep_at', 'group_prediction_sweep',
        'group_prediction_open_board', 'agent_group_prediction_withdraw_at', 'group_prediction_all_time',
-       'group_prediction_head_to_head', 'group_predictions_reset') loop
+       'group_prediction_head_to_head', 'group_predictions_reset', 'group_prediction_eval_pending',
+       'group_prediction_close_waits', 'group_prediction_settle_waits', 'group_prediction_log_failure') loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', f.signature);
     if f.proname = 'group_predictions_reset' then
       execute format('grant execute on function %s to service_role', f.signature);

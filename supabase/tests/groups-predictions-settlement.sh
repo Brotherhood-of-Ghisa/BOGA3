@@ -12,7 +12,8 @@
 #   - posture: the results table is closed to every API role; the reset is
 #     SECURITY DEFINER, pinned and service-role only; app tokens cannot run it;
 #   - close: at the board's start open remainders expire (partly matched ones
-#     too) and e1RM baselines freeze; a second close changes nothing; a post or
+#     too) and e1RM baselines freeze; close and settlement wait while group
+#     evaluation is pending; a second close changes nothing; a post or
 #     withdrawal whose clock predates the start is refused once the board has
 #     closed; a session logged after close does not move a frozen baseline;
 #   - settlement: one yes and one no per template, and every void case
@@ -396,6 +397,15 @@ pass "board: 14 matched markets (every template, yes/no/void cases), a partial f
 
 # --- close -------------------------------------------------------------------------
 
+# Pending evaluation of a pre-week session holds the close (the baselines
+# would read stale scores); once drained, the board closes.
+run_psql "insert into app_public.group_eval_queue(kind, member_user_id, session_id, causes)
+  values ('session', '${ALEX_UID}', '${T}-a0', '{set}');" >/dev/null
+[[ "$(close_at "$(week_clock "${W}" '1 hour')" "${W}")" == f ]] || fail "close must wait for pending evaluation"
+expect_sql "the sweep counts it as waiting without closing" "select (w ->> 'waiting')::int >= 1
+  and (select closed_at is null from app_public.group_prediction_boards where group_id = '${GROUP}' and week_start = '${W}')
+  from app_public.group_prediction_sweep_at($(week_clock "${W}" '1 hour')) w;" t
+drain2 "the pending baseline session"
 [[ "$(close_at "$(week_clock "${W}" '1 hour')" "${W}")" == t ]] || fail "close at the start + 1h"
 [[ "$(close_at "$(week_clock "${W}" '2 hours')" "${W}")" == f ]] || fail "a second close must change nothing"
 expect_sql "open remainders expired, matched stake kept" "select string_agg(o.remaining_cents || '/' || o.released_cents || '/' || o.release_reason, ',' order by o.seq)
@@ -452,6 +462,11 @@ run_psql "begin; set local session_replication_role = replica;
       jsonb_build_object('metric', 'volume', 'unit', 'kg_reps', 'unavailableMemberIds', '[]'::jsonb, 'entries', '[]'::jsonb))
    where id = '${COW_W}';
   commit;" >/dev/null
+# A pending comparison job of the group holds settlement; once drained, it settles.
+run_psql "insert into app_public.group_metric_eval_queue(group_id, group_exercise_id, causes)
+  values ('${GROUP}', '${ROW}', '{set}');" >/dev/null
+[[ "$(settle_at "$(week_clock "${W}" '7 days 2 hours')" "${W}")" == f ]] || fail "settlement must wait for pending evaluation"
+drain2 "the pending comparison"
 [[ "$(settle_at "$(week_clock "${W}" '7 days 2 hours')" "${W}")" == t ]] || fail "settlement once the CoW is final"
 
 expect_outcome "e1RM yes (110x5 vs 105% of 100x5)" "${M_E1RM_YES}" "yes:${A_WEEK}:kg"
