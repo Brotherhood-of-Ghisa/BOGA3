@@ -21,6 +21,7 @@
 //   output.groupsFirstSetId          first set of the live session (friend view)
 //   output.groupsBoardExerciseId     the active custom group exercise user_d links to
 //   output.groupsMeetId              the meet the device scheduled
+//   output.groupsDeviceUserId        user_c's id (the device's going row)
 //
 // The meet steps also act as the device's own user (fixture user_c) from a
 // second device: `meet-edit-elsewhere` passes DEVICE_EMAIL / DEVICE_PASSWORD
@@ -364,7 +365,9 @@ var steps = {
   // A second device of the device's own user (user_c) changes the venue while
   // the device has the edit form open, so the device's save is a stale write.
   'meet-edit-elsewhere': function () {
-    output.groupsDeviceToken = signIn(DEVICE_EMAIL, DEVICE_PASSWORD).token;
+    var device = signIn(DEVICE_EMAIL, DEVICE_PASSWORD);
+    output.groupsDeviceToken = device.token;
+    output.groupsDeviceUserId = device.userId;
     var list = rpcOk(output.groupsDeviceToken, 'group_meet_list', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 20 });
     var meets = (list.upcoming || []).filter(function (meet) {
       return meet.title === MEET_TITLE;
@@ -380,9 +383,11 @@ var steps = {
   // The test clock: the second device moves the meet's start just before the
   // counterparty's session started (an owner may move a meet that has not
   // started into the past), so the meet is Live and that session overlaps it.
-  // The real edit RPC with seeded times: no test-only server path.
+  // The real edit RPC with seeded times: no test-only server path. The join
+  // time is the server's, so the start is past on both clocks whatever the
+  // host/VM skew.
   'meet-live': function () {
-    var startsAt = Math.min(Date.now(), output.groupsSessionStartedAt) - 60 * 1000;
+    var startsAt = Math.min(Date.now(), output.groupsSessionStartedAt, output.groupsJoinedAtMs) - 60 * 1000;
     var written = updateMeetElsewhere({ starts_at_ms: startsAt, ends_at_ms: Date.now() + 2 * 3600 * 1000 });
     if (written.state !== 'live') {
       fail('expected a live meet, got ' + JSON.stringify(written));

@@ -32,12 +32,13 @@ appId: com.dinoderek.mobile
 #      challenge Modal, group preview, and fifth Meets tab open the same meet;
 #   8b. an edit saved after the device's own user changed the meet from a
 #      second device is refused with the typed note kept; Check status
-#      rebases it and the save lands;
+#      rebases it and the reviewed draft saves, venue included;
 #   8c. moved Live by that second device, the counterparty's session joined
 #      with a Sync v2 link alone (no online join) puts it on the going list
 #      and the live podium, and lists its session;
-#   8d. Leave through the native confirmation turns the button back to Join,
-#      the link-only counterparty still going;
+#   8d. Leave through the native confirmation turns the button back to Join
+#      and takes the device's user off the going list, the link-only
+#      counterparty still going;
 #   9. removing the counterparty through the native confirmation alert shows
 #      `was removed` and one member.
 # Why device: two real users and real round trips through the app; 1 the cold
@@ -45,8 +46,9 @@ appId: com.dinoderek.mobile
 #   7 the searchable native Modal/keyboard, stack Back and server refresh;
 #   8 the new form keyboard, scrolling native challenge Modal, replacement
 #     route/native Back and fifth-tab fit;
-#   8b two writers on the real version check, a real round trip, the native
-#     header options button and the keyboard (Jest mocks the CONFLICT);
+#   8b the native header options button, the form's keyboard, and the typed
+#     input kept through a real second writer's CONFLICT and refresh (the
+#     client's CONFLICT itself is groups-api-live's);
 #   8c another user's synced link reaching the device through the server's
 #     roster union and live scoring (Jest mocks both reads);
 #   8d the native Alert;
@@ -511,7 +513,7 @@ appId: com.dinoderek.mobile
 - tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 
-# --- Meet: native keyboard, replacement/Back, and the fifth pager tab ----------
+# --- 8. Meet: native keyboard, replacement/Back, and the fifth pager tab -------
 - openLink: "boga3://group/${output.groupsGroupId}"
 - extendedWaitUntil:
     visible: { id: "group-meets-preview" }
@@ -658,6 +660,10 @@ appId: com.dinoderek.mobile
     visible: { id: "meet-screen" }
     timeout: 15000
 - assertVisible: "Bring chalk and a belt"
+# Check status rebases only the version: the reviewed draft is what saves,
+# so the other device's venue is replaced by the draft's.
+- assertVisible: "Riverside strength and conditioning room"
+- assertNotVisible: "Riverside annex"
 - takeScreenshot: "meet-edit-saved"
 
 # --- 8c. Live: the counterparty's synced session link counts ------------------
@@ -717,9 +723,10 @@ appId: com.dinoderek.mobile
     visible: { id: "meet-join-leave", text: "Join meet" }
     timeout: 15000
 - assertVisible: { id: "meet-going-${output.groupsCounterpartyUserId}" }
+- assertNotVisible: { id: "meet-going-${output.groupsDeviceUserId}" }
 - takeScreenshot: "meet-left"
 
-# --- 7. The device removes the counterparty -> "was removed" -------------------
+# --- 9. The device removes the counterparty -> "was removed" -------------------
 - openLink: "boga3://group/${output.groupsGroupId}"
 # Members live behind the header's member count.
 - extendedWaitUntil:

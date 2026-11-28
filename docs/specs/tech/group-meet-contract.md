@@ -253,7 +253,8 @@ lifecycle", "Challenges" and online Join and Leave against the local stack:
 posture, the role and denial matrix, versions and retries, state refusals,
 `DUPLICATE`, concurrent adds, the cutoff, list paging and the stream items.
 `supabase/tests/groups-meet-links.sh` (same lane) proves the counting cases and
-the roster union; the `sync-v2-*` lanes prove the link's sync behaviour, and
+the roster union; the `sync-v2-*` lanes and `sync-infra`
+(`apps/mobile/__tests__/sync/cycle-round-trip.test.ts`) prove the link's sync behaviour, and
 `apps/mobile/__tests__/session-meet-links-repository.test.ts` the client join,
 leave and overlap check. `supabase/tests/groups-meet-scoring.sh` (lane
 `groups-competitions`) proves "Scoring, snapshot and refresh" and "Meets
