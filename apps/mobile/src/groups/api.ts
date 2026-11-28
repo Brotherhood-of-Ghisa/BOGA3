@@ -1,3 +1,4 @@
+import { isMeetLeaderboardWire, isMeetResultsWire, isMeetTrophiesWire } from './meet-results-wire';
 import { isMeetWriteWire, isMeetDetailWire, isMeetListWire, isMeetChallengeWriteWire, isMeetChallengeRemoveWire, isMeetJoinWire, type MeetWire, type MeetMetric } from './meet-wire';
 import { isCompetitionCachePayload } from './competition-cache-guards';
 import { isCompetitionBoardWire } from './competition-wire-guards';
@@ -143,7 +144,8 @@ export type GroupRpcName =
   | 'group_cow_summary'
   | 'group_cow_previous_summary'
   | 'group_competition_stream_v7' | 'group_meet_get' | 'group_meet_list' | 'group_meet_create' | 'group_meet_update'
-  | 'group_meet_cancel' | 'group_meet_join' | 'group_meet_leave' | 'group_meet_challenge_add' | 'group_meet_challenge_update' | 'group_meet_challenge_remove';
+  | 'group_meet_cancel' | 'group_meet_join' | 'group_meet_leave' | 'group_meet_challenge_add' | 'group_meet_challenge_update' | 'group_meet_challenge_remove'
+  | 'group_meet_results' | 'group_meet_refresh_results' | 'group_meet_leaderboard' | 'group_meet_trophies';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -502,4 +504,11 @@ export const saveMeetChallenge = (input: { groupId: string; meetId: string; chal
     isMeetChallengeWriteWire, p => p.challenge.meet_id === input.meetId && p.challenge.challenge_id === input.challengeId);
 export const removeMeetChallenge = (groupId: string, meetId: string, challengeId: string, version: number) => competitionRpc('group_meet_challenge_remove',
   { p_group_id: groupId, p_meet_id: meetId, p_challenge_id: challengeId, p_expected_version: version }, isMeetChallengeRemoveWire, p => p.challenge_id === challengeId);
+export const getMeetResults = (groupId: string, meetId: string) => competitionRpc('group_meet_results',
+  { p_group_id: groupId, p_meet_id: meetId }, isMeetResultsWire, p => p.meet.group_id === groupId && p.meet.meet_id === meetId);
+export const refreshMeetResults = (groupId: string, meetId: string) => competitionRpc('group_meet_refresh_results',
+  { p_group_id: groupId, p_meet_id: meetId }, isMeetResultsWire, p => p.meet.group_id === groupId && p.meet.meet_id === meetId);
+export const getMeetLeaderboard = (groupId: string) => competitionRpc('group_meet_leaderboard', { p_group_id: groupId }, isMeetLeaderboardWire);
+export const listMeetTrophies = (groupId: string, memberUserId: string, before: string | null = null) => competitionRpc('group_meet_trophies',
+  { p_group_id: groupId, p_member_user_id: memberUserId, p_before: before, p_limit: 20 }, isMeetTrophiesWire);
 export const isMeetNotFound = (error: unknown) => isNotFoundMessage(error, 'meet not found');

@@ -10,7 +10,7 @@
 //   - items are deduplicated by `itemKey`, keeping the first seen, so a rank
 //     shift between pages never shows a row twice;
 //   - a response for a stale identity, or one overtaken by a refresh, is dropped;
-//   - A missing exercise or CoW target sets `resourceMissing`; any other
+//   - A missing exercise, CoW or meet target sets `resourceMissing`; any other
 //     `NOT_FOUND` evicts the group's cache and sets `lostAccess`.
 //
 // Group code never runs inside the sync cycle.
@@ -20,7 +20,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 
-import { GroupApiError, isCoWNotFound, isGroupExerciseNotFound, toGroupApiError } from './api';
+import { GroupApiError, isCoWNotFound, isGroupExerciseNotFound, isMeetNotFound, toGroupApiError } from './api';
 import { getCompetitionCacheGeneration, subscribeCompetitionCache,observeGroupCompetitionPolicy } from './cache';
 import { retireCompetitionAccount } from './competition-cache-retirement';
 import { useNetworkOnline } from './use-network-online';
@@ -168,7 +168,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
 
   const handleNotFound = useCallback(
     async (error: GroupApiError) => {
-      if (isGroupExerciseNotFound(error) || isCoWNotFound(error)) {
+      if (isGroupExerciseNotFound(error) || isCoWNotFound(error) || isMeetNotFound(error)) {
         setState({ ...initialState<TPage, TItem, TCursor>(identity), resourceMissing: true });
         return;
       }

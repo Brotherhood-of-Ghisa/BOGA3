@@ -76,3 +76,16 @@ Why: compare who wins meets, not who holds boards.
 Code: `group_meet_leaderboard`, `group_meet_trophies` and the
 `group_meet_standings_tally` trigger in
 `supabase/migrations/20261127223000_group_meet_scoring.sql`.
+
+### meets.today-card · presentation · accepted
+
+Today → Groups shows at most one meet card per group, from 7 days before the
+meet starts until 7 days after it ends, never a cancelled meet. It names the
+meet's state (Scheduled, Live, Standings so far, Final) and opens the meet.
+Several meets in range: the live one, else the nearest to now, an upcoming
+meet before a past one at equal distance.
+
+Why: a meet near in time is what the group is about to do or just did; one card
+keeps Today short.
+Code: `apps/mobile/src/groups/meet-today.ts`;
+`apps/mobile/components/today/group-meet-card.tsx`.

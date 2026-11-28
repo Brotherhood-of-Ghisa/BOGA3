@@ -1,6 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { TodayWeekBoardCard } from './today-week-board';
 import { TodayCoWSummaries } from './group-cow-summary';
+import { TodayMeetCard } from './group-meet-card';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -178,6 +179,7 @@ export function TodayGroupCard({
         accessibilityRange={formatWeekRange(localWeekWindow(new Date(nowMs)), dateFormat)}
       />
       <TodayCoWSummaries key={`${myUserId}:${selectedGroupId}`} groupId={selectedGroupId} userId={myUserId} />
+      <TodayMeetCard key={`meet:${myUserId}:${selectedGroupId}`} groupId={selectedGroupId} userId={myUserId} />
       {/* Members training now, then the latest completed sessions: a card each. */}
       {sessions.live.length > 0 ? (
         <SessionsCard fill={!showRecent} testID="today-group-live">

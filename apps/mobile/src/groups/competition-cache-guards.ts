@@ -1,4 +1,5 @@
 import { isMeetDetailWire, isMeetListWire } from './meet-wire';
+import { isMeetLeaderboardWire } from './meet-results-wire';
 import { isObservedCompetitionPolicy } from './competition-cache-policy';
 import { coWSummaryCacheKey, isCoWSummaryWire } from './cow-wire';
 import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionSessionDetailWire,
@@ -30,7 +31,7 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
       (value.selection === 'none' || (previous ? value.selection === 'previous' : value.selection !== 'previous')) &&
       key === coWSummaryCacheKey(value, previous);
   }
-  if (['meets', 'meet'].includes(kind)) return meetCachePayload(kind, scope, value);
+  if (['meets', 'meet', 'meet-leaderboard'].includes(kind)) return meetCachePayload(kind, scope, value);
   if (kind === 'group-policy') return isObservedCompetitionPolicy(value);
   if (kind === 'group') return exact(value,['group','members']) && summary(value.group) && record(value.group) &&
     value.group.group_id === groupId && Array.isArray(value.members) && value.members.every(member);
@@ -48,6 +49,7 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
 }
 
 function meetCachePayload(kind: string, scope: string[], value: unknown): boolean {
+  if (kind === 'meet-leaderboard') return scope.length === 2 && scope[1] === 'v1' && isMeetLeaderboardWire(value);
   if (kind === 'meets') return scope.length === 2 && scope[1] === 'v1' && isMeetListWire(value) && [...value.upcoming, ...value.past].every(m => m.group_id === scope[0]);
   return scope.length === 3 && scope[2] === 'v1' && isMeetDetailWire(value) && value.meet.group_id === scope[0] && value.meet.meet_id === scope[1];
 }
