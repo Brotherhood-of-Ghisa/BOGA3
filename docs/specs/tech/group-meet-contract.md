@@ -6,8 +6,9 @@
 > **Not here:** product rules (they live in [[meets.linking]], [[meets.results]]
 > and [[notifications.meets]]), and what the code states (columns, SQL, wire
 > shapes, messages, tests). **Status:** storage, challenges, the roster, the
-> session link and the stream kind are built; the other sections are filled by
-> the cards that build them. **Load when:** changing meets, meet challenges, the
+> session link, the stream kind, scoring, the snapshot, refresh and the meets
+> leaderboard are built; the other sections are filled by the cards that build
+> them. **Load when:** changing meets, meet challenges, the
 > meet session link, or `supabase/functions/group-eval/` meet scoring.
 
 ## Storage and lifecycle
@@ -48,7 +49,7 @@ without one) and the server never applies.
   scores or private context). `scheduled`, `cancelled`, `on` and `results`
   are written once per meet; `results_refreshed` and `challenge_changed` once
   per write. `on`, `results` and `results_refreshed` belong to the timed jobs
-  and refresh, which are not built yet. Only the opt-in `group_competition_stream_v7` page
+  and refresh. Only the opt-in `group_competition_stream_v7` page
   lists them; earlier pages are unchanged.
 
 ## Challenges
@@ -121,11 +122,77 @@ come first, in join order.
 
 ## Scoring, snapshot and refresh
 
-Live scoring, rescoring on challenge change and Refresh results, under [[meets.results]]. The [[meets.results]] cutoff snapshot is the accepted exception to [groups-contract.md](groups-contract.md)'s "Nothing is copied".
+Implements [[meets.results]]. The cutoff snapshot is the accepted exception
+to [groups-contract.md](groups-contract.md)'s "Nothing is copied".
+
+**Scores are the evaluator's** ([[meets.challenge-metrics]]). A set scores
+on the group exercise its exercise is live-linked to in the meet's group. 1RM, Volume and seconds are
+its published counting comparison scores (the TS scorer under the strict
+group policy: effort, units, bodyweight), at the current revision and only
+while they still describe the live set; a rebuilding comparison or an edit not
+yet evaluated scores nothing yet. Weight is that Volume per rep: the
+total-load kg halved for a per-side comparison or, normalized, the added load
+%BW the set display shows. Max reps are the set facts' for a performed working
+set. SQL computes no load, bodyweight or 1RM from raw values: its only
+arithmetic is that per-rep derivation from the published Volume, as
+`group_competition_set_display` derives added load; if changing these, load
+[group-competition-contract.md](group-competition-contract.md).
+
+**Ranking.** Each member's best qualifying set per challenge (a member's own
+ties break in board order), placed on the full-precision value as
+[[meets.results]] says.
+
+**Live, then the snapshot.** Until the snapshot exists, results are computed
+on each read from the counting links. Server finality, never the clock, makes
+them final: the results read's own state says so, while the embedded meet's
+clock-derived state can already read final.
+
+**✓** follows [[meets.results-display]]: live, the set's witness (any of its
+certifications matching one of its current scores, so one certification marks
+every metric of the set); final, stored with the snapshot's scores.
+
+**Timed transitions.** Each group-eval run, after its queues, fires what is
+due: the `on` item at `starts_at`, `results` at `ends_at`, the snapshot at the
+cutoff. The kick or the hourly sweep starts the run, so a transition can lag
+by up to an hour; items sort at their boundary. The worker advances one meet
+per call, so each meet commits in its own transaction under its group then
+meet row locks, with a marker on the meet: a crash or failure rolls back and
+retries after a backoff (parked, and logged, at the evaluator's attempt cap),
+a concurrent run skips a meet or group another holds, and nothing fires
+twice. A cancelled meet or deleted group fires nothing. The
+snapshot waits (a minute at a time) while the evaluator still has unparked
+work for a counting session, a counting member's targets or the group's
+comparisons, checked again after it is taken.
+
+**The snapshot** copies every live set of every counting session (all
+exercises; unlinked ones keep a null mapping) with its raw values, mapping and
+qualifying scores, then ranks every challenge into stored standings. Results
+then come only from it. Adding, editing or removing a challenge reranks that
+challenge from it; deleting a member's rows (account deletion cascades,
+`dev_wipe_my_data` deletes them) reranks their meets.
+
+**Refresh results** (owners and admins, from the cutoff) re-snapshots the
+counting sessions as they stand now, reranks, and writes one
+`results_refreshed` item per call. Before the cutoff results are still live,
+and while the evaluator is behind, so both are `CONFLICT`; so is a cancelled
+meet.
+
+**Reads** (current members): one meet's results, per live challenge its ranked
+rows with the set, value, unit and ✓, a caption state (`scheduled`, `live`,
+`so_far` with the final time, `final`, `refreshed` with when and who,
+`cancelled`), the counting sessions, and the group records set in them, read
+live ([[meets.results-display]]). Every read applies
+[[groups.kg-disclosure]] per row, plus a kg score's exercise now counting
+bodyweight (as CoW): hidden kg figures are null with `unavailable`, places
+kept, and the raw weight is withheld whenever the rule hides kg.
 
 ## Meets leaderboard
 
-Medal counting across final meets, tie ranking and former-member handling.
+Implements [[meets.leaderboard]] for current members. A trigger keeps one
+trophy tally per member and group from the stored standings, so rescoring,
+Refresh and deletion update it without a job and the leaderboard reads one
+row per member. Each member's trophies, with their meets and challenges, are a
+separate keyset page, newest meet first.
 
 ## Notifications
 
@@ -164,4 +231,8 @@ posture, the role and denial matrix, versions and retries, state refusals,
 `supabase/tests/groups-meet-links.sh` (same lane) proves the counting cases and
 the roster union; the `sync-v2-*` lanes prove the link's sync behaviour, and
 `apps/mobile/__tests__/session-meet-links-repository.test.ts` the client join,
-leave and overlap check.
+leave and overlap check. `supabase/tests/groups-meet-scoring.sh` (lane
+`groups-competitions`) proves "Scoring, snapshot and refresh" and "Meets
+leaderboard" against evaluator-published scores: every metric, the window,
+ties, the transitions, the snapshot's once-only write, Refresh, rescoring,
+deletion, access and disclosure.

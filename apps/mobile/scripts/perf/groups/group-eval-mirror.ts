@@ -20,12 +20,14 @@ import { evaluateCoWGraph, type CoWEvaluationGraph } from '../../../src/groups/c
 export const CLAIM_LIMIT = 20;
 export const MAX_CLAIM_ROUNDS = 10;
 export const RULES_REQUEUE_LIMIT = 50;
+export const MEET_ADVANCE_LIMIT = 50;
 
 export type Rpc = <T>(name: string, args: Record<string, unknown>) => Promise<T>;
 
 type Job = { job_id: number; kind: 'session' | 'target'; member_user_id: string; session_id: string | null; generation: number };
 type MetricJob = { job_id: number; generation: number; claim_id: string };
 type CoWJob = { cow_id: string; generation: number; claim_id: string };
+type MeetStep = { advanced?: boolean; done?: string[]; failed?: boolean };
 
 export type DrainSummary = {
   claimed: number;
@@ -40,12 +42,15 @@ export type DrainSummary = {
   graphBytes: number;
   /** Sets in those graphs: every set each evaluation scored. */
   setsScored: number;
+  /** Meet transitions fired (start and end items, cutoff snapshots) and meet advances that failed. */
+  meetTransitions: number;
+  meetFailed: number;
   failures: string[];
 };
 
 const emptySummary = (): DrainSummary => ({
   claimed: 0, metricClaimed: 0, completed: 0, requeued: 0, failed: 0, metricRequeued: 0, metricFailed: 0,
-  graphBytes: 0, setsScored: 0, failures: [],
+  graphBytes: 0, setsScored: 0, meetTransitions: 0, meetFailed: 0, failures: [],
 });
 
 /** The DB error class of a failed RPC, for `group_eval_fail`; the Edge function records the same. */
@@ -138,7 +143,7 @@ const processCoWJob = async (rpc: Rpc, job: CoWJob, summary: DrainSummary): Prom
   }
 };
 
-/** One group-eval invocation: rules requeue, session/target jobs, then comparison jobs. */
+/** One group-eval invocation: rules requeue, session/target jobs, comparison jobs, CoW jobs, then meet transitions. */
 export const runGroupEval = async (rpc: Rpc): Promise<DrainSummary> => {
   const summary = emptySummary();
   await rpc<number>('group_eval_requeue_rules', { p_rules_version: GROUP_EVAL_RULES_VERSION, p_limit: RULES_REQUEUE_LIMIT });
@@ -160,6 +165,12 @@ export const runGroupEval = async (rpc: Rpc): Promise<DrainSummary> => {
     if (jobs.length === 0) break;
     summary.claimed += jobs.length;
     for (const job of jobs) await processCoWJob(rpc, job, summary);
+  }
+  for (let call = 0; call < MEET_ADVANCE_LIMIT; call += 1) {
+    const step = await rpc<MeetStep>('group_meet_eval_advance', {});
+    if (!step?.advanced) break;
+    summary.meetTransitions += (step.done ?? []).filter((transition) => transition !== 'deferred').length;
+    summary.meetFailed += step.failed ? 1 : 0;
   }
   return summary;
 };
