@@ -8,6 +8,7 @@ import { isCompetitionCachePayload } from '@/src/groups/competition-cache-guards
 import { groupCacheKeys } from '@/src/groups/cache';
 import { buildMeetLeaderboard, buildMeetRecordRows, buildMeetSessionRows, buildMeetStandingRows, meetResultsCaption, meetResultsRefreshMessage,
   meetSetFigure, splitMeetStandings } from '@/src/groups/meet-results-view-model';
+import { GROUP_OFFLINE_ACTION_MESSAGE } from '@/src/groups/use-group-action';
 import { isMeetLeaderboardWire, isMeetResultsWire, isMeetTrophiesWire } from '@/src/groups/meet-results-wire';
 import { isTodayMeet, pickTodayMeet, TODAY_MEET_WINDOW_MS } from '@/src/groups/meet-today';
 import { meetPermissions } from '@/src/groups/meet-presentation';
@@ -88,15 +89,17 @@ describe('leaderboard', () => {
 });
 
 describe('refresh visibility and messages', () => {
-  const meet = meetFixture(); const end = meet.ends_at_ms;
-  it('offers Refresh results to managers only from the end', () => {
-    expect(meetPermissions(meet, 'owner', end - 1).refreshResults).toBe(false);
-    expect(meetPermissions(meet, 'admin', end + 1).refreshResults).toBe(true);
-    expect(meetPermissions(meet, 'member', end + 1).refreshResults).toBe(false);
-    expect(meetPermissions(meetFixture({ cancelled_at_ms: 1, state: 'cancelled' }), 'owner', end + 1).refreshResults).toBe(false);
+  const meet = meetFixture(); const cutoff = meet.cutoff_at_ms;
+  it('offers Refresh results to managers only from the cutoff', () => {
+    expect(meetPermissions(meet, 'owner', meet.ends_at_ms + 1).refreshResults).toBe(false);
+    expect(meetPermissions(meet, 'owner', cutoff - 1).refreshResults).toBe(false);
+    expect(meetPermissions(meet, 'owner', cutoff).refreshResults).toBe(true);
+    expect(meetPermissions(meet, 'admin', cutoff + 1).refreshResults).toBe(true);
+    expect(meetPermissions(meet, 'member', cutoff + 1).refreshResults).toBe(false);
+    expect(meetPermissions(meetFixture({ cancelled_at_ms: 1, state: 'cancelled' }), 'owner', cutoff + 1).refreshResults).toBe(false);
   });
   it('words its refusals', () => {
-    expect(meetResultsRefreshMessage('NETWORK', true)).toMatch(/offline/);
+    expect(meetResultsRefreshMessage('NETWORK', true)).toBe(GROUP_OFFLINE_ACTION_MESSAGE);
     expect(meetResultsRefreshMessage('CONFLICT', false)).toMatch(/not ready/);
     expect(meetResultsRefreshMessage('FORBIDDEN', false)).toMatch(/can't refresh/);
     expect(meetResultsRefreshMessage('INTERNAL', false)).toMatch(/Couldn't refresh/);
@@ -137,6 +140,8 @@ describe('wire guards and RPCs', () => {
     expect(isMeetLeaderboardWire({ rows: [{ rank: 0 }] })).toBe(false);
     expect(isMeetTrophiesWire({ trophies: [{ ...trophiesFixture().trophies[0], place: 4 }], next_cursor: null })).toBe(false);
     expect(isMeetTrophiesWire({ trophies: [], next_cursor: '' })).toBe(false);
+    expect(isMeetTrophiesWire({ trophies: [{ ...trophiesFixture().trophies[0], place: '1' }], next_cursor: null })).toBe(false);
+    expect(isMeetResultsWire({ ...base, results: { ...base.results, state: ['live'] } })).toBe(false);
   });
   it('calls the readers and Refresh with their exact arguments and matches the target', async () => {
     respond(meetResultsFixture()); await api.getMeetResults('g1', 'm1');

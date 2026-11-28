@@ -7,15 +7,11 @@ export const TODAY_MEET_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const distanceMs = (meet: MeetWire, now: number): number =>
   now < meet.starts_at_ms ? meet.starts_at_ms - now : now > meet.ends_at_ms ? now - meet.ends_at_ms : 0;
 
-/** A meet is on Today from 7 days before its start to 7 days after its end, both edges included; never once cancelled. */
+/** [[meets.today-card]]: both window edges are included; a cancelled meet is never shown. */
 export const isTodayMeet = (meet: MeetWire, now: number): boolean =>
   meet.cancelled_at_ms === null && now >= meet.starts_at_ms - TODAY_MEET_WINDOW_MS && now <= meet.ends_at_ms + TODAY_MEET_WINDOW_MS;
 
-/**
- * The one meet Today's card shows: the live one first, then the nearest to
- * now (an upcoming meet before a past one at equal distance), then the earlier
- * start and the ID, so the choice never flickers between renders.
- */
+/** The one meet Today's card shows ([[meets.today-card]]); the earlier start and the ID break remaining ties so the choice never flickers. */
 export function pickTodayMeet(list: MeetListWire, now: number): MeetWire | null {
   const candidates = [...list.upcoming, ...list.past].filter(meet => isTodayMeet(meet, now));
   candidates.sort((a, b) => distanceMs(a, now) - distanceMs(b, now) || Number(b.starts_at_ms > now) - Number(a.starts_at_ms > now) ||

@@ -198,13 +198,11 @@ list shows every roster row, joined or link-only.
 Results reads are online-only and never cached: full standings are not
 (`useMeetResults`, one page of `useGroupOnlinePages`), as is a member's
 trophies page. The leaderboard is one row per trophy holder and is cache-first
-under its own versioned key, evicted with the group. The caption comes from
-the results read's own state, never the clock. `Refresh results` (owners and
-admins, offered from `ends_at`) uses `useGroupAction`; a `CONFLICT` before the
-cutoff or while the evaluator is behind is shown, not retried. Today's meet
-card reads the cached meet list and shows the live meet, else the nearest
-(an upcoming meet before a past one at equal distance), from 7 days before its
-start to 7 days after its end, never a cancelled one.
+under its own versioned key, evicted with the group. The meet page's caption
+comes from the results read's own state, never the clock. `Refresh results`
+(owners and admins, offered from the cutoff) uses `useGroupAction`; a
+`CONFLICT` while the evaluator is behind is shown, not retried. Today's meet
+card ([[meets.today-card]]) reads the cached meet list.
 
 Meet/challenge/roster writes use `useGroupAction`, refused offline and never
 queued. Editors retain input across refresh and conflict; explicit status

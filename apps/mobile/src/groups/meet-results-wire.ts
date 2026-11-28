@@ -39,7 +39,7 @@ const UNITS = ['kg', 'percent_bw', 'kg_reps', 'percent_bw_reps', 'reps', 'second
 function isStanding(v: unknown): v is MeetStandingWire {
   if (!exact(v, ['place', 'member', 'current_member', 'value', 'unit', 'unavailable', 'set', 'certified'])) return false;
   const set = v.set;
-  return positive(v.place) && member(v.member) && typeof v.current_member === 'boolean' && UNITS.includes(String(v.unit)) &&
+  return positive(v.place) && member(v.member) && typeof v.current_member === 'boolean' && typeof v.unit === 'string' && UNITS.includes(v.unit) &&
     typeof v.unavailable === 'boolean' && (v.value === null ? v.unavailable : finite(v.value) && !v.unavailable) &&
     typeof v.certified === 'boolean' && exact(set, ['set_id', 'session_id', 'recording_mode', 'reps_value', 'duration_sec', 'weight_value']) &&
     id(set.set_id) && id(set.session_id) && id(set.recording_mode) && text(set.reps_value) && text(set.weight_value) &&
@@ -56,7 +56,7 @@ export function isMeetResultsWire(v: unknown): v is MeetResultsWire {
   if (!exact(v, ['meet', 'results', 'challenges', 'sessions', 'records']) || !isMeetWire(v.meet)) return false;
   const meetId = v.meet.meet_id; const results = v.results;
   return exact(results, ['state', 'final_at_ms', 'refreshed_at_ms', 'refreshed_by']) &&
-    ['scheduled', 'live', 'so_far', 'final', 'refreshed', 'cancelled'].includes(String(results.state)) && integer(results.final_at_ms) &&
+    typeof results.state === 'string' && ['scheduled', 'live', 'so_far', 'final', 'refreshed', 'cancelled'].includes(results.state) && integer(results.final_at_ms) &&
     (results.refreshed_at_ms === null || integer(results.refreshed_at_ms)) && nullableMember(results.refreshed_by) &&
     Array.isArray(v.challenges) && v.challenges.every(c => exact(c, ['challenge', 'standings']) && isMeetChallengeWire(c.challenge) &&
       c.challenge.meet_id === meetId && Array.isArray(c.standings) && c.standings.every(isStanding)) &&
@@ -68,6 +68,6 @@ export const isMeetLeaderboardWire = (v: unknown): v is MeetLeaderboardWire => e
     typeof r.current_member === 'boolean' && integer(r.gold) && integer(r.silver) && integer(r.bronze));
 export const isMeetTrophiesWire = (v: unknown): v is MeetTrophiesWire => exact(v, ['trophies', 'next_cursor']) && Array.isArray(v.trophies) &&
   v.trophies.every(t => exact(t, ['place', 'meet_id', 'title', 'venue_name', 'starts_at_ms', 'challenge_id', 'group_exercise_id', 'exercise_name', 'metric']) &&
-    [1, 2, 3].includes(Number(t.place)) && id(t.meet_id) && text(t.title) && id(t.venue_name) && integer(t.starts_at_ms) && id(t.challenge_id) &&
+    [1, 2, 3].includes(t.place as number) && id(t.meet_id) && text(t.title) && id(t.venue_name) && integer(t.starts_at_ms) && id(t.challenge_id) &&
     id(t.group_exercise_id) && id(t.exercise_name) && ['e1rm', 'weight', 'reps', 'volume', 'seconds'].includes(String(t.metric))) &&
   (v.next_cursor === null || id(v.next_cursor));

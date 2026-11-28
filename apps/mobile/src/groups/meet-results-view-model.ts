@@ -6,6 +6,7 @@ import type { MedalBoard, MedalRow } from './medal-view-model';
 import { meetDate, MEET_METRICS } from './meet-presentation';
 import type { MeetLeaderboardWire, MeetResultsWire, MeetStandingWire, MeetTrophyWire } from './meet-results-wire';
 import type { MeetMetric } from './meet-wire';
+import { GROUP_OFFLINE_ACTION_MESSAGE } from './use-group-action';
 import { formatMemberName } from './stream-view-model';
 import type { GroupMemberRef } from './types';
 
@@ -109,7 +110,7 @@ export const trophyLabel = (trophy: MeetTrophyWire, format: ExerciseDateFormat) 
 
 export const meetMemberName = (member: GroupMemberRef | null) => formatMemberName(member?.username);
 export const meetResultsRefreshMessage = (code: string, offline: boolean): string => {
-  if (offline) return "You're offline. Connect to the internet and try again.";
+  if (offline) return GROUP_OFFLINE_ACTION_MESSAGE;
   if (code === 'CONFLICT') return 'Results are not ready to refresh yet. Try again shortly.';
   if (code === 'FORBIDDEN') return "You can't refresh these results.";
   return "Couldn't refresh the results. Try again.";

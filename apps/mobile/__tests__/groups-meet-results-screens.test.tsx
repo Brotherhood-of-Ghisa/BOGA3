@@ -27,7 +27,8 @@ import { renderWithTheme } from './helpers/theme';
 const api = groupApi as jest.Mocked<typeof groupApi>;
 const online = (value: boolean) => act(() => { mockOnline = value; mockListeners.forEach(listener => listener({ isConnected: value, isInternetReachable: value })); });
 const OWNER = { ...competitionGroupDetail, group: { ...competitionGroupDetail.group, my_role: 'owner' as const } };
-const ended = () => { const end = Date.now() - 3600_000; return meetFixture({ starts_at_ms: end - 10800_000, ends_at_ms: end, cutoff_at_ms: end + 86400_000, state: 'finalizing' }); };
+const ended = () => { const end = Date.now() - 25 * 3600_000; return meetFixture({ starts_at_ms: end - 10800_000, ends_at_ms: end, cutoff_at_ms: end + 86400_000, state: 'final' }); };
+const finalizing = () => { const end = Date.now() - 3600_000; return meetFixture({ starts_at_ms: end - 10800_000, ends_at_ms: end, cutoff_at_ms: end + 86400_000, state: 'finalizing' }); };
 const detailFor = (meet = meetFixture(), role: 'owner' | 'member' = 'owner') => ({ ...meetDetailFixture(), meet, viewer: { role, joined: true } });
 beforeEach(() => {
   mockFixture = createInMemoryDatabase(); forgetGroupCacheMemory(); jest.clearAllMocks(); mockListeners.clear(); mockOnline = true;
@@ -64,14 +65,23 @@ describe('meet page results', () => {
   });
   it.each([['scheduled', 'Standings appear once the meet starts'], ['cancelled', 'This meet was cancelled']] as const)('explains empty %s standings', async (state, copy) => {
     api.getMeetResults.mockResolvedValue({ ...meetResultsFixture({ state }), challenges: [{ ...meetResultsFixture().challenges[0], standings: [] }] });
-    renderWithTheme(<MeetRoute />); expect(await screen.findByText(copy)).toBeTruthy(); expect(screen.queryByTestId('meet-sessions')).toBe(state === 'cancelled' ? null : screen.queryByTestId('meet-sessions'));
-    if (state === 'cancelled') expect(screen.queryByTestId('meet-records')).toBeNull();
+    renderWithTheme(<MeetRoute />); expect(await screen.findByText(copy)).toBeTruthy();
+    if (state === 'cancelled') { expect(screen.queryByTestId('meet-sessions')).toBeNull(); expect(screen.queryByTestId('meet-records')).toBeNull(); }
+    else { expect(screen.getByTestId('meet-sessions')).toBeTruthy(); expect(screen.getByTestId('meet-records')).toBeTruthy(); }
   });
   it('never draws standings from the cache: offline it says they need a connection', async () => {
     api.getMeetResults.mockRejectedValue(new groupApi.GroupApiError('NETWORK', 'offline'));
     writeGroupCache(mockFixture.database, { cacheKey: groupCacheKeys.meet('g1', 'm1'), userId: 'u1', payload: detailFor(), fetchedAtMs: Date.now() });
     mockOnline = false; renderWithTheme(<MeetRoute />);
     expect(await screen.findByTestId('meet-results-offline')).toBeTruthy(); expect(screen.queryByTestId('meet-standings-c1')).toBeNull();
+  });
+  it('keeps the group cache and shows no lost access when the meet disappears under the results read', async () => {
+    writeGroupCache(mockFixture.database, { cacheKey: groupCacheKeys.group('g1'), userId: 'u1', payload: competitionGroupDetail, fetchedAtMs: Date.now() });
+    api.getMeetResults.mockRejectedValue(new groupApi.GroupApiError('NOT_FOUND', 'meet not found'));
+    renderWithTheme(<MeetRoute />); await screen.findByTestId('meet-caption'); await waitFor(() => expect(api.getMeetResults).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(screen.queryByTestId('meet-lost-access')).toBeNull(); expect(screen.queryByTestId('meet-results-error')).toBeNull();
+    expect(mockFixture.client.prepare('select cache_key from group_cache where cache_key = ?').get(groupCacheKeys.group('g1'))).toMatchObject({ cache_key: groupCacheKeys.group('g1') });
   });
   it('shows a retry when the results read fails', async () => {
     api.getMeetResults.mockRejectedValueOnce(new groupApi.GroupApiError('INTERNAL', 'boom'));
@@ -82,9 +92,17 @@ describe('meet page results', () => {
 
 describe('Refresh results', () => {
   const options = async () => { renderWithTheme(<MeetRoute />); await screen.findByTestId('meet-caption'); };
-  it.each([['owner', true], ['member', false]] as const)('is offered to a %s only after the end: %s', async (role, shown) => {
-    const meet = ended(); api.getMeet.mockResolvedValue(detailFor(meet, role)); api.getMeetResults.mockResolvedValue(meetResultsFixture({ state: 'so_far' }, meet));
-    await options(); expect(screen.queryByTestId('meet-refresh-results')).toBeNull();
+  it('is offered to an owner from the cutoff', async () => {
+    const meet = ended(); api.getMeet.mockResolvedValue(detailFor(meet)); api.getMeetResults.mockResolvedValue(meetResultsFixture({ state: 'final' }, meet));
+    await options(); fireEvent.press(screen.getByLabelText('Meet options')); expect(await screen.findByTestId('meet-refresh-results')).toBeTruthy();
+  });
+  it('is never offered to a member, who has no meet options', async () => {
+    const meet = ended(); api.getMeet.mockResolvedValue(detailFor(meet, 'member')); api.getMeetResults.mockResolvedValue(meetResultsFixture({ state: 'final' }, meet));
+    await options(); expect(screen.queryByLabelText('Meet options')).toBeNull(); expect(screen.queryByTestId('meet-refresh-results')).toBeNull();
+  });
+  it('is not offered to an owner while results are still finalizing', async () => {
+    const meet = finalizing(); api.getMeet.mockResolvedValue(detailFor(meet)); api.getMeetResults.mockResolvedValue(meetResultsFixture({ state: 'so_far' }, meet));
+    await options(); fireEvent.press(screen.getByLabelText('Meet options')); await screen.findByText('Edit meet'); expect(screen.queryByTestId('meet-refresh-results')).toBeNull();
   });
   it('refreshes through the admin overflow and rereads the results', async () => {
     const meet = ended(); api.getMeet.mockResolvedValue(detailFor(meet)); api.getMeetResults.mockResolvedValue(meetResultsFixture({ state: 'final' }, meet));
@@ -95,9 +113,6 @@ describe('Refresh results', () => {
     await waitFor(() => expect(api.refreshMeetResults).toHaveBeenCalledWith('g1', 'm1'));
     await waitFor(() => expect(api.getMeetResults.mock.calls.length).toBeGreaterThan(calls));
     await waitFor(() => expect(screen.getByTestId('meet-caption').props.children).toMatch(/^Results refreshed/));
-  });
-  it('is hidden before the end and refused offline without calling the server', async () => {
-    await options(); fireEvent.press(screen.getByLabelText('Meet options')); expect(screen.queryByTestId('meet-refresh-results')).toBeNull();
   });
   it('refuses offline and words a server conflict', async () => {
     const meet = ended(); api.getMeet.mockResolvedValue(detailFor(meet)); api.getMeetResults.mockResolvedValue(meetResultsFixture({ state: 'so_far' }, meet));

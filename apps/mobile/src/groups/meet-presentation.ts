@@ -21,7 +21,7 @@ export function meetPermissions(meet: MeetWire, role: GroupRole, now = Date.now(
   const state = meetState(meet, now);
   const manager = role === 'owner' || role === 'admin';
   return { manager, fields: manager && ['scheduled', 'live'].includes(state),
-    cancel: manager && state === 'scheduled', refreshResults: manager && ['finalizing', 'final'].includes(state), challenges: state !== 'cancelled',
+    cancel: manager && state === 'scheduled', refreshResults: manager && state === 'final', challenges: state !== 'cancelled',
     join: state !== 'cancelled' && now < meet.cutoff_at_ms };
 }
 export const canEditMeetChallenge = (challenge: MeetChallengeWire, role: GroupRole, userId: string) =>

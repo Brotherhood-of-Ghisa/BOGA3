@@ -81,7 +81,8 @@ Code: `group_meet_leaderboard`, `group_meet_trophies` and the
 
 Today → Groups shows at most one meet card per group, from 7 days before the
 meet starts until 7 days after it ends, never a cancelled meet. It names the
-meet's state (Scheduled, Live, Standings so far, Final) and opens the meet.
+meet's state by the clock (Scheduled, Live, Standings so far, Final; the
+meet page shows the server's, [[meets.results]]) and opens the meet.
 Several meets in range: the live one, else the nearest to now, an upcoming
 meet before a past one at equal distance.
 
