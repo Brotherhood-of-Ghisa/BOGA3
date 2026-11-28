@@ -196,7 +196,25 @@ separate keyset page, newest meet first.
 
 ## Notifications
 
-Start and end push delivery on the existing notification pipeline, and the per-group Meets preference.
+Implements [[notifications.meets]] on the durable notification pipeline
+(`notification-delivery-contract.md`). The meet's own timed transitions
+(`group_meet_advance_meet`) fire the producer in their transaction, so there is
+no second scheduler; a producer failure is logged and never blocks the
+transition. One `notification_intents` row exists per recipient × meet ×
+`meet_start`/`meet_end` (a unique key makes a retry return it). Recipients are
+the group's current members whose Meets preference is on and whose group is
+not muted. Preparation and handoff recheck membership, preference, mute and
+that the meet is not cancelled; an edited `starts_at` moves the start because
+the transition fires from the stored time. A moment older than 24 hours, or a
+start after the meet's end, sends nothing.
+
+The preference is the `meets` column of `notification_group_preferences`
+(`notification_group_meets_set`; no row means on). The payload is the closed
+projection with `kind` `meet_start`/`meet_end`: `heading` ("<meet> is on at
+<venue>", "<meet>: results so far"), `detail` holding the end's standings so
+far (top three of each challenge, current names, no figures; empty on a
+start), zero counts, and the recipient and meet ids as `memberId` and
+`sessionId`. A tap opens the meet after a live `group_meet_get` read.
 
 ## Mobile reads and writes
 

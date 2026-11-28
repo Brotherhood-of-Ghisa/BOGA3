@@ -63,7 +63,7 @@ const response = (data: unknown, error: { message: string } | null = null, statu
 
 beforeEach(async () => {
   mockUserId = USER;
-  preferences = { activity: true, bests: true, ranks: true, muted: false };
+  preferences = { activity: true, bests: true, ranks: true, muted: false, meets: true };
   failRpc = null;
   mockPush.mockReset();
   native = fakeNotificationNative();
@@ -83,6 +83,9 @@ beforeEach(async () => {
         return response({ ...preferences });
       case 'notification_group_mute':
         preferences = { ...preferences, muted: args.p_muted as boolean };
+        return response({ ...preferences });
+      case 'notification_group_meets_set':
+        preferences = { ...preferences, meets: args.p_meets as boolean };
         return response({ ...preferences });
       case 'notification_register': return response({ binding_id: BINDING, permission: true, opted_in: true, payload_version: 1 });
       case 'notification_unregister': return response({ ok: true });
@@ -182,7 +185,7 @@ it('keeps confirmed categories after a failed write and retries the requested va
   fireEvent.press(retryButton());
   await waitFor(() => expect(category('bests').props.accessibilityState.checked).toBe(false));
   expect(mockRpc).toHaveBeenLastCalledWith('notification_preferences_set', { p_activity: true, p_bests: false, p_ranks: true });
-  expect(preferences).toEqual({ activity: true, bests: false, ranks: true, muted: false });
+  expect(preferences).toEqual({ activity: true, bests: false, ranks: true, muted: false, meets: true });
 });
 
 it('does not claim registration succeeded after failure and retries the native opt-in', async () => {
@@ -316,6 +319,24 @@ it('keeps a confirmed group mute after failure, retries it and disables changes 
   expect(mockRpc).toHaveBeenLastCalledWith('notification_group_mute', { p_group_id: GROUP, p_muted: true });
   rerender(<GroupNotificationMuteRow groupId={GROUP} offline />);
   expect(screen.getByRole('switch', { name: 'Mute notifications' })).toBeDisabled();
+});
+
+it('toggles the per-group Meets preference, keeps the confirmed value on failure and retries it', async () => {
+  renderWithTheme(<GroupNotificationMuteRow groupId={GROUP} offline={false} />);
+  const toggle = await screen.findByRole('switch', { name: 'Meets' });
+  expect(toggle.props.accessibilityState.checked).toBe(true);
+  fireEvent.press(toggle);
+  await waitFor(() => expect(screen.getByRole('switch', { name: 'Meets' }).props.accessibilityState.checked).toBe(false));
+  expect(mockRpc).toHaveBeenLastCalledWith('notification_group_meets_set', { p_group_id: GROUP, p_meets: false });
+  expect(screen.getByRole('switch', { name: 'Mute notifications' }).props.accessibilityState.checked).toBe(false);
+
+  failRpc = { name: 'notification_group_meets_set', message: 'offline', status: 0 };
+  fireEvent.press(screen.getByRole('switch', { name: 'Meets' }));
+  expect(await screen.findByTestId('group-notifications-error')).toBeTruthy();
+  expect(screen.getByRole('switch', { name: 'Meets' }).props.accessibilityState.checked).toBe(false);
+  fireEvent.press(screen.getByTestId('group-notifications-retry'));
+  await waitFor(() => expect(screen.getByRole('switch', { name: 'Meets' }).props.accessibilityState.checked).toBe(true));
+  expect(mockRpc).toHaveBeenLastCalledWith('notification_group_meets_set', { p_group_id: GROUP, p_meets: true });
 });
 
 it('removes the stale group control when the server reports lost membership', async () => {

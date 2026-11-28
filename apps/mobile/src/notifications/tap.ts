@@ -1,8 +1,9 @@
-import { getCompetitionSession, GroupApiError } from '@/src/groups/api';
+import { getCompetitionSession, getMeet, GroupApiError } from '@/src/groups/api';
 import { logEvent } from '@/src/logging';
 import { getNotificationNativeAdapter } from './native-adapter';
 import { getNotificationAccount, getNotificationAccountRevision, subscribeNotificationAccount } from './auth-boundary';
-import type { NotificationEnvelope, NotificationProjection, NotificationTarget } from './types';
+import type { NotificationEnvelope, NotificationMeetTarget, NotificationProjection, NotificationTarget,
+  NotificationUnavailableSubject } from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 export const notificationEnvelope = (value: unknown): NotificationEnvelope | null => {
@@ -21,15 +22,29 @@ const isNotificationHeading = (value: unknown): value is string => {
   const location = value.slice(prefix.length);
   return location.length > 0 && Array.from(location).length <= 100 && !/[\u0000-\u001f\u007f-\u009f]/.test(location);
 };
+const isMeetKind = (kind: unknown): kind is 'meet_start' | 'meet_end' => kind === 'meet_start' || kind === 'meet_end';
+// A meet push's heading and standings are free text from the server's current names: bounded, never control characters.
+// Only the standings (`detail`) may hold line breaks; the heading is one line.
+const isMeetText = (value: unknown, max: number, empty: boolean, lines = false): value is string =>
+  typeof value === 'string' && (empty || value.length > 0) && Array.from(value).length <= max &&
+  !(lines ? /[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/ : /[\u0000-\u001f\u007f-\u009f]/).test(value);
+const isNotificationSubject = (value: Record<string, unknown>): boolean => {
+  const route = value.route as Record<string, unknown>;
+  if (isMeetKind(value.kind)) {
+    return isMeetText(value.heading, 160, false) && isMeetText(value.detail, 400, true, true) && value.bestCount === 0 && value.rankCount === 0 &&
+      uuid(route.sessionId) && value.detail !== undefined && (value.kind === 'meet_end' || value.detail === '');
+  }
+  return (value.kind === 'start' || value.kind === 'completion') && isNotificationHeading(value.heading) && value.detail === undefined &&
+    typeof route.sessionId === 'string' && route.sessionId.length > 0 && route.sessionId.length <= 160 && !/[\u0000-\u001f]/.test(route.sessionId);
+};
 export const isNotificationProjection = (value: unknown): value is NotificationProjection => {
   if (!isRecord(value) || !isRecord(value.route)) return false;
   return value.v === 1 && uuid(value.bindingId) && uuid(value.recipientUserId) && typeof value.notificationId === 'string' && /^\d{1,20}$/.test(value.notificationId) &&
     typeof value.expiresAt === 'number' && Number.isSafeInteger(value.expiresAt) && value.expiresAt > Date.now() &&
-    (value.kind === 'start' || value.kind === 'completion') && typeof value.identity === 'string' && value.identity.length > 0 && Array.from(value.identity).length <= 220 &&
-    isNotificationHeading(value.heading) &&
+    typeof value.identity === 'string' && value.identity.length > 0 && Array.from(value.identity).length <= 220 &&
+    isNotificationSubject(value) &&
     Number.isSafeInteger(value.bestCount) && (value.bestCount as number) >= 0 && Number.isSafeInteger(value.rankCount) && (value.rankCount as number) >= 0 &&
-    uuid(value.route.groupId) && uuid(value.route.memberId) && typeof value.route.sessionId === 'string' &&
-    value.route.sessionId.length > 0 && value.route.sessionId.length <= 160 && !/[\u0000-\u001f]/.test(value.route.sessionId) &&
+    uuid(value.route.groupId) && uuid(value.route.memberId) &&
     Object.keys(value.route).sort().join(',') === 'groupId,memberId,sessionId';
 };
 let pending: NotificationEnvelope | null = null;
@@ -124,7 +139,7 @@ const verifyPostFetch = (
   return 'valid';
 };
 
-const recordTapOpened = (identity: string, projection: NotificationProjection, onOpen: (target: NotificationTarget) => void): void => {
+const recordTapOpened = (identity: string, projection: NotificationProjection, open: () => void): void => {
   opened.add(identity);
   if (opened.size > 100) opened.delete(opened.values().next().value!);
   discardPendingNotificationTap();
@@ -133,7 +148,7 @@ const recordTapOpened = (identity: string, projection: NotificationProjection, o
     event: 'notifications.tap_opened',
     context: { groupId: projection.route.groupId, sessionId: projection.route.sessionId, notificationId: projection.notificationId },
   });
-  onOpen(projection.route);
+  open();
 };
 
 const handleTapAuthError = (
@@ -152,9 +167,15 @@ const handleTapAuthError = (
   onUnavailable(offline ? 'offline' : 'unavailable');
 };
 
+// The live authorized read that proves the recipient may still open this target.
+const readTapSubject = (projection: NotificationProjection): Promise<unknown> => isMeetKind(projection.kind)
+  ? getMeet(projection.route.groupId, projection.route.sessionId)
+  : getCompetitionSession(projection.route.groupId, projection.route.memberId, projection.route.sessionId);
+
 export const processPendingNotificationTap = async (input: {
   userId: string | null; ready: boolean; onOpen: (target: NotificationTarget) => void;
-  onUnavailable: (reason: 'offline' | 'unavailable') => void;
+  onOpenMeet?: (target: NotificationMeetTarget) => void;
+  onUnavailable: (reason: 'offline' | 'unavailable', subject?: NotificationUnavailableSubject) => void;
 }): Promise<void> => {
   if (!pending || !input.userId || !input.ready || processing) return;
   const envelope = pending;
@@ -168,11 +189,14 @@ export const processPendingNotificationTap = async (input: {
     input.onUnavailable('unavailable');
     return;
   }
+  const meet = isMeetKind(projection.kind);
+  const unavailable = (reason: 'offline' | 'unavailable') => meet ? input.onUnavailable(reason, 'meet') : input.onUnavailable(reason);
   const identity = `${envelope.bindingId}:${projection.notificationId}`;
   if (opened.has(identity)) { discardPendingNotificationTap(); return; }
+  if (meet && !input.onOpenMeet) { discardPendingNotificationTap(); unavailable('unavailable'); return; }
   processing = true;
   try {
-    await getCompetitionSession(projection.route.groupId, projection.route.memberId, projection.route.sessionId);
+    await readTapSubject(projection);
     if (!current()) return;
     const postStatus = verifyPostFetch(envelope, projection, native, input.userId);
     if (postStatus === 'expired' || postStatus === 'mismatch') {
@@ -182,7 +206,7 @@ export const processPendingNotificationTap = async (input: {
         message: postStatus === 'expired' ? 'Notification expired during live authorization.' : 'Projection revalidation failed.',
       });
       discardPendingNotificationTap();
-      input.onUnavailable('unavailable');
+      unavailable('unavailable');
       return;
     }
     if (postStatus === 'unbound') {
@@ -190,9 +214,11 @@ export const processPendingNotificationTap = async (input: {
       discardPendingNotificationTap();
       return;
     }
-    recordTapOpened(identity, projection, input.onOpen);
+    recordTapOpened(identity, projection, () => meet
+      ? input.onOpenMeet?.({ groupId: projection.route.groupId, meetId: projection.route.sessionId })
+      : input.onOpen(projection.route));
   } catch (error) {
-    if (current()) handleTapAuthError(error, projection, input.onUnavailable);
+    if (current()) handleTapAuthError(error, projection, unavailable);
   } finally {
     processing = false;
     if (pending && pending !== envelope) emit();

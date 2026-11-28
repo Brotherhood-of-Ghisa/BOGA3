@@ -193,6 +193,10 @@ result; an accepted or uncertain summary freezes content and cancels stale
 unsent installation deliveries. Each intent captures eligible installation bindings once;
 re-registration never replays historical deliveries.
 
+Meet pushes ([[notifications.meets]]) use the same pipeline with one intent per
+recipient/meet/start-or-end and no lifter or generation; their rules are in
+`group-meet-contract.md`, "Notifications".
+
 Four jobs run concurrently per fresh claim, with at most five claim rounds
 per receipt/send phase; no claimed job waits behind a serial twenty-job batch.
 Claims are fenced by random claim UUIDs. Admission and the sending lease use

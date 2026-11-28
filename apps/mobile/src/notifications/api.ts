@@ -44,7 +44,7 @@ const mutateInstallation = (name: string, args: Record<string, unknown>, accessT
 };
 
 const preferences = (value: unknown): NotificationPreferences => {
-  if (!record(value) || !['activity', 'bests', 'ranks', 'muted'].every(key => typeof value[key] === 'boolean')) {
+  if (!record(value) || !['activity', 'bests', 'ranks', 'muted', 'meets'].every(key => typeof value[key] === 'boolean')) {
     throw new NotificationApiError('UNAVAILABLE');
   }
   return value as NotificationPreferences;
@@ -56,6 +56,8 @@ export const setNotificationCategories = async (value: NotificationCategories): 
 export const getGroupNotificationPreferences = (groupId: string): Promise<NotificationPreferences> => getNotificationPreferences(groupId);
 export const setGroupNotificationMuted = async (groupId: string, muted: boolean): Promise<NotificationPreferences> =>
   preferences(await call('notification_group_mute', { p_group_id: groupId, p_muted: muted }));
+export const setGroupNotificationMeets = async (groupId: string, meets: boolean): Promise<NotificationPreferences> =>
+  preferences(await call('notification_group_meets_set', { p_group_id: groupId, p_meets: meets }));
 
 export const registerNotificationInstallation = async (input: NotificationRegistrationMaterial & {
   token: string; environment: NotificationEnvironment | 'local'; projectId: string; bundleId: string; permission: boolean; optedIn: boolean;
