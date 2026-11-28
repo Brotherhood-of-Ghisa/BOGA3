@@ -10,11 +10,13 @@ import type { MeetChallengeWire, MeetDetailWire, MeetMetric } from '@/src/groups
 import { useGroupAction } from '@/src/groups/use-group-action';
 import { useGroupResource } from '@/src/groups/use-group-resource';
 import { useMeetClock } from '@/src/groups/use-meets';
+import type { MeetResultsWire } from '@/src/groups/meet-results-wire';
+import { MeetStandings } from './meet-standings';
 import { GroupWriteNotice } from './write-notice';
 import { GroupMissingDataState, pickInlineError } from './group-state-view';
 
 /** Online-only challenge editor; author/admin actions and per-challenge versions. */
-export function MeetChallenges({ data, userId, onChanged }: { data: MeetDetailWire; userId: string; onChanged: () => Promise<void> }) {
+export function MeetChallenges({ data, userId, onChanged, results = null }: { data: MeetDetailWire; userId: string; onChanged: () => Promise<void>; results?: MeetResultsWire | null }) {
   const catalogueRead = useCallback(() => listCompetitionExercises(data.meet.group_id), [data.meet.group_id]);
   const catalogue = useGroupResource({ userId, cacheKey: groupCacheKeys.groupExercises(data.meet.group_id), fetcher: catalogueRead, evictGroupIdOnNotFound: data.meet.group_id });
   const [editing, setEditing] = useState<MeetChallengeWire | 'new' | null>(null);
@@ -33,6 +35,7 @@ export function MeetChallenges({ data, userId, onChanged }: { data: MeetDetailWi
         <Text allowFontScaling={false} style={text.bodyStrong}>{challenge.exercise_name}</Text>
         <Text allowFontScaling={false} style={text.body}>{MEET_METRICS[challenge.metric]}</Text>
         <Text allowFontScaling={false} style={text.meta}>{`Added by ${challenge.author?.username ?? 'Former member'}`}</Text>
+        {results ? <MeetStandings results={results} challenge={challenge} userId={userId} /> : null}
         {permissions.challenges && canEditMeetChallenge(challenge, data.viewer.role, userId) ? <>
           <ActionButton label="Edit challenge" variant="text" disabled={remove.pending || !catalogue.data} onPress={() => setEditing(challenge)} />
           <ActionButton label="Remove challenge" variant="text" tone="danger" disabled={remove.pending || !catalogue.data} onPress={() => Alert.alert('Remove challenge?', challenge.exercise_name,

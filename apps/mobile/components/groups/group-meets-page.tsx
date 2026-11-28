@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
 import { ActionButton, ScreenScroll, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
@@ -7,16 +7,19 @@ import { canManageGroup, getGroup, groupCacheKeys, useGroupResource } from '@/sr
 import { listMeets, toGroupApiError } from '@/src/groups/api';
 import type { MeetListWire } from '@/src/groups/meet-wire';
 import { meetScheduleHref } from '@/src/groups/meet-presentation';
+import { useMeetLeaderboard } from '@/src/groups/use-meet-results';
 import { useMeets } from '@/src/groups/use-meets';
+import { MeetLeaderboard } from './meet-leaderboard';
 import { MeetSummaryCard } from './meet-summary-card';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, pickInlineError } from './group-state-view';
 import { GroupOfflineBanner } from './offline-banner';
 import { usePullToRefresh } from './use-pull-to-refresh';
 
-/** Cache-first current/archive browser, with a results-owned leaderboard extension slot. */
-export function GroupMeetsPage({ groupId, userId, embedded = false, leaderboard }: { groupId: string; userId: string; embedded?: boolean; leaderboard?: ReactNode }) {
+/** Cache-first current/archive browser with the pinned Meets leaderboard. */
+export function GroupMeetsPage({ groupId, userId, embedded = false }: { groupId: string; userId: string; embedded?: boolean }) {
   const text = useUiText(); const tone = useUiTextTone(); const router = useRouter();
   const meets = useMeets(groupId, userId);
+  const leaderboard = useMeetLeaderboard(groupId, userId);
   const read = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource({ userId, cacheKey: groupCacheKeys.group(groupId), fetcher: read, evictGroupIdOnNotFound: groupId });
   const [older, setOlder] = useState<MeetListWire | null>(null);
@@ -24,7 +27,7 @@ export function GroupMeetsPage({ groupId, userId, embedded = false, leaderboard 
   const [loading, setLoading] = useState(false);
   const [base, setBase] = useState(meets.data);
   if (base !== meets.data) { setBase(meets.data); setOlder(null); }
-  const refresh = usePullToRefresh(async () => { await Promise.all([meets.refresh(), group.refresh()]); });
+  const refresh = usePullToRefresh(async () => { await Promise.all([meets.refresh(), group.refresh(), leaderboard.refresh()]); });
   const currentBase = useRef(meets.data);
   useLayoutEffect(() => { currentBase.current = meets.data; }, [meets.data]);
   const cursor = older ? older.next_cursor : meets.data?.next_cursor;
@@ -47,7 +50,7 @@ export function GroupMeetsPage({ groupId, userId, embedded = false, leaderboard 
       <Text allowFontScaling={false} style={[text.label, tone.pageMuted]}>Next meets</Text>
       {meets.data.upcoming.length ? meets.data.upcoming.map(meet => <MeetSummaryCard key={meet.meet_id} meet={meet} />) : <Text allowFontScaling={false} style={[text.body, tone.page]}>Nothing scheduled</Text>}
       {group.data && canManageGroup(group.data.group.my_role) ? <ActionButton label="Schedule meet" variant="text" testID="meets-schedule" onPress={() => router.push(meetScheduleHref(groupId))} /> : null}
-      {leaderboard}
+      <MeetLeaderboard groupId={groupId} userId={userId} resource={leaderboard} />
       <Text allowFontScaling={false} style={[text.label, tone.pageMuted]}>Past meets</Text>
       <View style={{ gap: uiSpace.sm }}>{past.map(meet => <MeetSummaryCard key={meet.meet_id} meet={meet} />)}</View>
       {!past.length ? <Text allowFontScaling={false} style={[text.body, tone.page]}>No past meets</Text> : null}
