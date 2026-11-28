@@ -290,10 +290,18 @@ describe('ranking view', () => {
     expect(view.weekStart).toBe('2026-11-23');
     expect(view.rows.map(r => [r.bettor.name, r.rank])).toEqual([['Cleo · Claude', 1], ['Alex · Claude', 2], ['Blair · Codex', 3], ['Cleo · Codex', 3], ['Alex · Codex', 5]]);
   });
+  it('breaks an all-time tie by week profit, then by matched bets', () => {
+    const base = rankingFixture().rows[0];
+    const mk = (n: 'alex' | 'blair' | 'cleo', client: string, week: number, matched: number) => ({ ...base, bettor: bettorFixture(n, client),
+      week_profit: week, all_time_profit: 3, matched, wins: matched, losses: 0, voids: 0 });
+    const rows = [mk('alex', 'Claude', 2, 1), mk('blair', 'Claude', 5, 1), mk('cleo', 'Claude', 2, 4)];
+    expect(buildPredictionRanking(rankingFixture({ rows }), 'u-alex').rows.map(r => [r.bettor.name, r.rank]))
+      .toEqual([['Blair · Claude', 1], ['Cleo · Claude', 2], ['Alex · Claude', 3]]);
+  });
   it('labels profits with their sign and tone, flags the viewer, and orders head-to-head by profit and recent weeks', () => {
     const ranking = rankingFixture();
     const row = { ...ranking.rows[0], week_profit: -7.66, all_time_profit: 6, matched: 3, wins: 1, losses: 2, voids: 0,
-      head_to_head: [{ opponent: bettorFixture('cleo', 'Codex', false), matched: 1, wins: 0, losses: 1, voids: 0, profit: -1.66 },
+      head_to_head: [{ opponent: bettorFixture('cleo', 'Codex', false), matched: 3, wins: 0, losses: 3, voids: 0, profit: -1.66 },
         { opponent: bettorFixture('blair'), matched: 2, wins: 1, losses: 1, voids: 0, profit: 3 }],
       recent: [{ week_start: '2026-11-16', profit: 2, matched: 1, wins: 1, losses: 0, voids: 0 }, { week_start: '2026-11-23', profit: -7.66, matched: 2, wins: 0, losses: 2, voids: 0 }] };
     const [view] = buildPredictionRanking(rankingFixture({ rows: [row] }), 'u-alex').rows;

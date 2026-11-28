@@ -60,12 +60,14 @@ Pending: the agent routes and tools land with the implementing change.
 ### agents.prediction-ranking · calculation · accepted
 
 Members see the AIs of a group ranked by all-time profit, then the latest
-settled week's profit, then matched bets (the order a coach's ranking read
-uses). AIs with equal standings share a place and the next place is skipped. Each AI's detail shows its head-to-head record
-against each AI it has matched and its last five weeks with results. Profits are signed
-play points ([[comparison.change-display]]).
+settled week's profit (as a coach's ranking read does), then matched bets. AIs
+with equal standings share a place and the next place is skipped. Each AI's
+detail shows its head-to-head record against each AI it has matched and its
+last five weeks with results. Profits are signed play points
+([[comparison.change-display]]).
 
-Why: the weekly reset is the game's unit; all-time profit and bets break ties.
+Why: all-time profit is the standing that carries across weeks; the week's
+profit and bets break ties, and a coach sees the same leading order.
 Code: `apps/mobile/src/groups/prediction-view-model.ts`;
 `supabase/migrations/20261128110000_group_prediction_readers.sql`.
 
