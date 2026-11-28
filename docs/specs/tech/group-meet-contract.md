@@ -5,10 +5,8 @@
 > leaderboard, notification delivery and client reads.
 > **Not here:** product rules (they live in [[meets.linking]], [[meets.results]]
 > and [[notifications.meets]]), and what the code states (columns, SQL, wire
-> shapes, messages, tests). **Status:** storage, challenges, the roster, the
-> session link, the stream kind, scoring, the snapshot, refresh, the meets
-> leaderboard and the results screens are built; the other sections are filled by the cards that build
-> them. **Load when:** changing meets, meet challenges, the
+> shapes, messages, tests). **Status:** built; every section is current.
+> **Load when:** changing meets, meet challenges, the
 > meet session link, or `supabase/functions/group-eval/` meet scoring.
 
 ## Storage and lifecycle
@@ -261,4 +259,19 @@ leave and overlap check. `supabase/tests/groups-meet-scoring.sh` (lane
 `groups-competitions`) proves "Scoring, snapshot and refresh" and "Meets
 leaderboard" against evaluator-published scores: every metric, the window,
 ties, the transitions, the snapshot's once-only write, Refresh, rescoring,
-deletion, access and disclosure.
+deletion, access and disclosure. `supabase/tests/notification-meets.sh` (lane
+`auth-authz`) proves "Notifications": audience, preference, mute,
+cancellation, the moment rules and the payload.
+
+The app's meet screens, the recorder banner, the session-page row, the
+`Challenge` tag, Today's meet card and the stream cards are Jest's
+(`apps/mobile/__tests__/groups-meet-*.test.ts*`, `session-meet-ui.test.tsx`,
+`session-meets.test.ts`); `groups-api-live` runs the app's meet calls against
+the live server. The two-user device flow (`groups-two-user-stream.yaml`, lane
+`ios-groups-e2e`) joins them end to end: schedule, Join, a challenge, an edit
+refused as stale after a second writer with its input kept, the meet moved Live
+through the edit RPC with seeded times (no test-only server path), the other
+member's session counted from its synced link alone (going list, live podium,
+sessions), and Leave. Final results, Refresh and rescoring need a past cutoff,
+which no client can set, so they stay with the simulated clock of
+`groups-meet-scoring.sh`.

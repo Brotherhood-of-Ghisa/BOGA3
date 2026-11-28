@@ -102,6 +102,17 @@ it('does not evict the group when a meet target disappears', async () => {
   expect(mockFixture.client.prepare('select cache_key from group_cache where cache_key = ?').get(groupCacheKeys.group('g1'))).toMatchObject({ cache_key: groupCacheKeys.group('g1') });
 });
 
+it('lists every roster row as going: joined, link-only and former members', async () => {
+  const detail = meetDetailFixture();
+  detail.roster = [...detail.roster,
+    { member: { user_id: 'u2', username: 'Sam' }, joined: false, joined_at_ms: null, linked: true, current_member: true },
+    { member: { user_id: 'u3', username: 'Kim' }, joined: true, joined_at_ms: 1700000001000, linked: false, current_member: false }];
+  api.getMeet.mockResolvedValue(detail); renderWithTheme(<MeetRoute />);
+  expect(await screen.findByTestId('meet-going-u1')).toHaveTextContent('Alex');
+  expect(screen.getByTestId('meet-going-u2')).toHaveTextContent('Sam');
+  expect(screen.getByTestId('meet-going-u3')).toHaveTextContent('Kim · Former member');
+  expect(screen.queryByText('No one yet')).toBeNull();
+});
 it('confirms Leave and refuses its online RPC when offline', async () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   try {
