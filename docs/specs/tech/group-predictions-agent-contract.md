@@ -131,7 +131,8 @@ Routes live under `v1/agent/groups` and call only the service-role
   transaction: a replay returns the first result with `idempotent_replay`
   true, the same key with another body (or group) is `409
   IDEMPOTENCY_CONFLICT`, and a refused write keeps no receipt. The CoW's ID is
-  derived from owner, client and key.
+  derived from owner, client and key. A replay returns before the gate runs,
+  so a former member can replay a key to read their own earlier result.
 - **Rate limits.** Per user and client, apart from other routes: reads 60 a
   minute, writes 30 a minute (`429 RATE_LIMITED`), on top of the API's 120.
 - **Wire errors.** `NOT_FOUND` 404 (not a member, setting off, missing group or

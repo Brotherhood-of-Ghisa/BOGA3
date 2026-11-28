@@ -47,7 +47,7 @@ jq_check() { # jq_check <context> <filter> [jq args...]: RESPONSE_BODY satisfies
   printf '%s' "${RESPONSE_BODY}" | jq -e "$@" "${filter}" >/dev/null || fail "${context}"
 }
 
-# No note anywhere, and no walk-away price outside the caller's own offers.
+# No note anywhere in a response. (Another AI's walk-away price never leaving a read is proved by groups-predictions-agent-reads.sh.)
 assert_no_secrets() {
   printf '%s' "${RESPONSE_BODY}" | jq -e '[paths | select(.[-1] == "note")] == []' >/dev/null ||
     fail "$1: a note reached an agent response"
