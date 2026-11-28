@@ -8,9 +8,9 @@
 > tests). Names not fixed yet (tables, RPCs, routes, error tokens) are written
 > as "named by the implementing change" until that change fills them in.
 > **Status:** the setting, offers, matching, counters, withdrawal, the stake
-> limit, close, settlement, weekly results, the reset and the agent routes and
-> tools are built (names below). Member reads and screens are not yet; their
-> names are still to be filled in.
+> limit, close, settlement, weekly results, the reset, the agent routes and
+> tools, the member readers, the mobile data layer and the Group Edit row are
+> built (names below). The screens are not yet.
 > **Load when:** changing group predictions, the predictions setting, or the
 > Predictions screens. If changing the agent reads, the AI-scheduled CoW or the
 > agent routes and tools, load
@@ -37,8 +37,8 @@ play-points game between the connected AIs of a group's members.
   Predictions setting on. A missing, expired or revoked grant is the agent
   API's usual `401`. Non-membership and the setting being off are both
   `NOT_FOUND` and look the same.
-- **Members** read the Predictions screens under the group's ordinary rules.
-  Members never write predictions.
+- **Members** read through the readers under "Member screens". Members never
+  write predictions.
 - **Agent tokens** still never call `group_*` RPCs. The one exception is the
   service-role `agent_group_prediction_*` RPCs, called only by the agent API
   (`docs/specs/10-api-authn-authz-guidelines.md` rules 15 and 17). They take a
@@ -237,22 +237,34 @@ Members read; nothing here writes.
 | History | Past weeks: each settled market, its outcome and who won what |
 | Group Edit | `Predictions` Off/On row for owners and admins, rendered only under `isDevMode()` until launch |
 
-- Reads go through the group resource cache with new versioned keys and closed
-  wire guards.
-- The setting has its own get and set RPCs. `group_get` and every existing
-  group reader keep their exact shapes, because shipped apps reject unknown
-  keys.
+- **Readers** (`group_prediction_board`, `_market`, `_ranking`, `_history`)
+  are client-executable. An OAuth claim is `AGENT_FORBIDDEN`; a non-member and
+  the setting off are one `NOT_FOUND`, so the app never evicts a group on a
+  prediction read's `NOT_FOUND` (an unknown market is `NOT_FOUND: market not
+  found`). Notes reach members only; no payload carries a walk-away price.
+  - *Board:* next week's markets with an open offer or a bet (best resting
+    prices, open stake, bets, last price) and this week's matched bets.
+  - *Market:* every offer (notes, counters, withdrawals, expiries) and match,
+    the week, the frozen baseline and the settled figure.
+  - *Ranking:* each AI with a settled week: the latest settled week's profit,
+    all-time profit and bets, head-to-head and its last five weeks; ordered
+    by all-time profit, then week profit, as the agents' ranking.
+  - *History:* settled weeks, one to ten a page (default four), each with its
+    matched markets, who won what and every AI's week.
+- Reads go through the group resource cache with versioned keys (setting,
+  board, ranking, market) and closed wire guards; history is never cached.
+  `group_get` and every existing reader keep their exact shapes: shipped apps
+  reject unknown keys.
 - Layout, copy, captions and empty states follow `docs/product/copy.md`. The
   UI card writes a design brief with a rendered mock and keeps it with the PR.
 
 ## Verification ownership
 
 - **Setting, offers, matching, counters, stake limit:**
-  `supabase/tests/groups-predictions.sh`, a body of the `groups-contract`
-  lane. Close, settlement, results, the sweep and the reset:
-  `supabase/tests/groups-predictions-settlement.sh`, a body of the
-  `groups-competitions` lane.
+  `supabase/tests/groups-predictions.sh`; **readers:**
+  `groups-predictions-reads.sh` (both in the `groups-contract` lane). Close,
+  settlement, results, the sweep and the reset:
+  `supabase/tests/groups-predictions-settlement.sh` (`groups-competitions`).
 - **Group isolation:** the group authorization lanes, with negative tests for
   non-members, the setting off, and agent tokens.
 - **Acceptance:** one full week through two AIs of one user, moving the clock.
-  Named by the acceptance change.

@@ -1,5 +1,7 @@
 import { isMeetLeaderboardWire, isMeetResultsWire, isMeetTrophiesWire } from './meet-results-wire';
 import { isMeetWriteWire, isMeetDetailWire, isMeetListWire, isMeetChallengeWriteWire, isMeetChallengeRemoveWire, isMeetJoinWire, type MeetWire, type MeetMetric } from './meet-wire';
+import { isPredictionBoardWire, isPredictionHistoryWire, isPredictionRankingWire, isPredictionSettingWire, isPredictionThreadWire,
+  type PredictionBoardWire, type PredictionHistoryWire, type PredictionRankingWire, type PredictionThreadWire } from './prediction-wire';
 import { isCompetitionCachePayload } from './competition-cache-guards';
 import { isCompetitionBoardWire } from './competition-wire-guards';
 import { isCompetitionCertificationResultWire, isCompetitionCertifyResultWire, isCompetitionExerciseListWire,
@@ -145,7 +147,9 @@ export type GroupRpcName =
   | 'group_cow_previous_summary'
   | 'group_competition_stream_v7' | 'group_meet_get' | 'group_meet_list' | 'group_meet_create' | 'group_meet_update'
   | 'group_meet_cancel' | 'group_meet_join' | 'group_meet_leave' | 'group_meet_challenge_add' | 'group_meet_challenge_update' | 'group_meet_challenge_remove'
-  | 'group_meet_results' | 'group_meet_refresh_results' | 'group_meet_leaderboard' | 'group_meet_trophies';
+  | 'group_meet_results' | 'group_meet_refresh_results' | 'group_meet_leaderboard' | 'group_meet_trophies'
+  | 'group_prediction_settings_get' | 'group_prediction_settings_set' | 'group_prediction_board' | 'group_prediction_market'
+  | 'group_prediction_ranking' | 'group_prediction_history';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -512,3 +516,23 @@ export const getMeetLeaderboard = (groupId: string) => competitionRpc('group_mee
 export const listMeetTrophies = (groupId: string, memberUserId: string, before: string | null = null) => competitionRpc('group_meet_trophies',
   { p_group_id: groupId, p_member_user_id: memberUserId, p_before: before, p_limit: 20 }, isMeetTrophiesWire);
 export const isMeetNotFound = (error: unknown) => isNotFoundMessage(error, 'meet not found');
+
+// Group predictions: members read only (`docs/specs/tech/group-predictions-contract.md`). The readers answer
+// `NOT_FOUND: group not found` both for a lost membership and for the setting being off, so callers must not
+// evict the group on it (`useGroupResource` without `evictGroupIdOnNotFound`).
+export const getPredictionSetting = (groupId: string) => competitionRpc('group_prediction_settings_get',
+  { p_group_id: groupId }, isPredictionSettingWire, p => p.group_id === groupId);
+export const setPredictionSetting = (groupId: string, enabled: boolean) => competitionRpc('group_prediction_settings_set',
+  { p_group_id: groupId, p_enabled: enabled }, isPredictionSettingWire, p => p.group_id === groupId && p.enabled === enabled);
+export const getPredictionBoard = (groupId: string): Promise<PredictionBoardWire> => competitionRpc('group_prediction_board',
+  { p_group_id: groupId }, isPredictionBoardWire, p => p.group_id === groupId &&
+    [...(p.this_week?.markets ?? []).map(m => m.market), ...(p.next_week?.markets ?? []).map(m => m.market)].every(m => m.group_id === groupId));
+export const getPredictionThread = (groupId: string, marketId: string): Promise<PredictionThreadWire> => competitionRpc('group_prediction_market',
+  { p_group_id: groupId, p_market_id: marketId }, isPredictionThreadWire, p => p.group_id === groupId && p.market.group_id === groupId && p.market.market_id === marketId);
+export const getPredictionRanking = (groupId: string): Promise<PredictionRankingWire> => competitionRpc('group_prediction_ranking',
+  { p_group_id: groupId }, isPredictionRankingWire, p => p.group_id === groupId);
+export const listPredictionHistory = (groupId: string, before: string | null = null, limit = 4): Promise<PredictionHistoryWire> => competitionRpc('group_prediction_history',
+  { p_group_id: groupId, p_before: before, p_limit: limit }, isPredictionHistoryWire,
+  p => p.group_id === groupId && p.weeks.every(w => w.markets.every(m => m.market.group_id === groupId)));
+/** `NOT_FOUND: market not found`: a market of this group that does not exist (not a lost group). */
+export const isPredictionMarketNotFound = (error: unknown) => isNotFoundMessage(error, 'market not found');

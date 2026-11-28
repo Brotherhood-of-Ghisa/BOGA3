@@ -341,6 +341,18 @@ describe('useGroupOnlinePages', () => {
     expect(fixture.database.select().from(groupCache).all().filter(row => !row.cacheKey.startsWith('group-policy:'))).toHaveLength(1);
   });
 
+  it('notFoundIsMissing: any NOT_FOUND is an unavailable read that evicts nothing', async () => {
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: { contract_version: 4,certified: false,podiums: [] }, fetchedAtMs: 1 });
+    const fetchPage = jest.fn<Promise<Page>, [Cursor | null]>().mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
+    const { result } = renderHook(() => useGroupOnlinePages<Page, Item, Cursor>({ userId: USER, groupId: GROUP, viewKey: 'v1', fetchPage,
+      selectItems: (p) => p.items, selectCursor: (p) => p.next_cursor, selectHasMore: (p) => p.has_more, itemKey: (item) => item.id, notFoundIsMissing: true }));
+    await flush();
+
+    expect(result.current.resourceMissing).toBe(true);
+    expect(result.current.lostAccess).toBe(false);
+    expect(fixture.database.select().from(groupCache).all().filter(row => !row.cacheKey.startsWith('group-policy:'))).toHaveLength(1);
+  });
+
   it('never writes group_cache', async () => {
     const fetchPage = jest
       .fn<Promise<Page>, [Cursor | null]>()
