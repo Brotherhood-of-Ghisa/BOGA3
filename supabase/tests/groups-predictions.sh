@@ -279,7 +279,8 @@ expect_sql "agent RPCs: definer, pinned, service_role only" "select count(*) fro
     and not has_function_privilege('anon', p.oid, 'EXECUTE') and not has_function_privilege('authenticated', p.oid, 'EXECUTE');" 6
 expect_sql "helpers: no API role executes them, all pinned, none definer" "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   cross join unnest(array['anon','authenticated','service_role']) r(role)
-  where ${PRED_FUNCS} and p.proname not in ('group_prediction_settings_get','group_prediction_settings_set', ${AGENT_RPCS})
+  where ${PRED_FUNCS} and p.proname not in ('group_prediction_settings_get','group_prediction_settings_set', ${AGENT_RPCS},
+      'group_prediction_board','group_prediction_market','group_prediction_ranking','group_prediction_history')
     and (has_function_privilege(r.role, p.oid, 'EXECUTE') or p.prosecdef
       or not 'search_path=app_public, pg_temp' = any(p.proconfig));" 0
 for name in group_prediction_settings group_prediction_bettors group_prediction_boards group_prediction_markets \

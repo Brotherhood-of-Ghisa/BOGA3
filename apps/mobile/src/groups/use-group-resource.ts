@@ -24,7 +24,7 @@ import { useCallback, useEffect, useLayoutEffect,useRef, useState, useSyncExtern
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 
 import { subscribeToAfterPushRefresh } from './after-push-refresh';
-import { GroupApiError, isMeetNotFound, toGroupApiError } from './api';
+import { GroupApiError, isMeetNotFound, isPredictionMarketNotFound, toGroupApiError } from './api';
 import { deleteGroupCacheEntry, getCompetitionCacheGeneration, peekGroupCache,
   readGroupCache, subscribeCompetitionCache, writeGroupCache } from './cache';
 import { retireCompetitionAccount } from './competition-cache-retirement';
@@ -219,7 +219,7 @@ export function useGroupResource<T>({
         }
 
         if (error.code === 'NOT_FOUND') {
-          const cleanup=evictGroupIdOnNotFound && !isMeetNotFound(error)?retireCompetitionAccount(userId,evictGroupIdOnNotFound):
+          const cleanup=evictGroupIdOnNotFound && !isMeetNotFound(error) && !isPredictionMarketNotFound(error)?retireCompetitionAccount(userId,evictGroupIdOnNotFound):
             bootstrapLocalDataLayer().then(database=>deleteGroupCacheEntry(database,cacheKey)).catch(()=>undefined);
           if (identityRef.current !== identity) return;
           const publishedGeneration=getCompetitionCacheGeneration(userId);

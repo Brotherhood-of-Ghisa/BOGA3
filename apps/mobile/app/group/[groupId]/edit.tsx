@@ -1,4 +1,5 @@
 import { CoWTimeZone } from '@/components/groups/cow-time-zone';
+import { PredictionsSettingRow } from '@/components/groups/predictions-setting-row';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 
@@ -13,6 +14,7 @@ import { listCompetitionExercises } from '@/src/groups/api';
 import type { CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import { ScreenScroll } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import { isDevMode } from '@/src/utils/isDevMode';
 import {
   canManageGroup,
   describeGroupWriteError,
@@ -112,6 +114,7 @@ function EditGroupContent({ userId, groupId }: { userId: string; groupId: string
   return (
     <ScreenScroll keyboardShouldPersistTaps="handled" testID="group-edit-screen">
       {body}
+      {isDevMode() && group.data && canManageGroup(group.data.group.my_role) && !group.lostAccess ? <PredictionsSettingRow groupId={groupId} userId={userId} /> : null}
       {group.data && canManageGroup(group.data.group.my_role) && !group.lostAccess ? <CoWTimeZone groupId={groupId} userId={userId} autoFocus={focusTimeZone} onAccessChange={() => void group.refresh()} /> : null}
     </ScreenScroll>
   );
