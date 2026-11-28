@@ -176,6 +176,8 @@ cleanup() {
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.session_plans
           where owner_user_id = '${USER_UUID}'::uuid and id = 'mcp-smoke-${RUN_TAG}-sentinel-plan';
+        delete from app_public.groups where name = 'MCP Smoke ${RUN_TAG}' and created_by = '${USER_UUID}'::uuid;
+        delete from app_public.group_prediction_bettors where user_id = '${USER_UUID}'::uuid;
       commit;
     " >/dev/null || { echo "[boga-mcp-smoke] fixture cleanup failed" >&2; status=1; }
   fi
@@ -377,6 +379,19 @@ if [[ -n "${USER_UUID}" ]]; then
     fail "local Auth does not advertise offline_access; check the Supabase CLI pin (./boga doctor)"
 fi
 
+GROUP_ID=""
+if [[ -n "${USER_UUID}" ]]; then
+  echo "[boga-mcp-smoke] seeding a group with predictions on (no per-agent switch gates its tools)"
+  group_rpc() {
+    curl --silent --show-error --fail -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${APP_ACCESS_TOKEN}" \
+      -H 'x-boga-group-contract: 4' -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-8}" \
+      -H 'Content-Type: application/json' -H 'Content-Profile: app_public' --data "$2" "${API_URL}/rest/v1/rpc/$1"
+  }
+  GROUP_ID="$(group_rpc group_create "$(jq -nc --arg n "MCP Smoke ${RUN_TAG}" \
+    '{p_name:$n, p_description:null, p_time_zone:"UTC"}')" | jq -er '.group_id')"
+  group_rpc group_prediction_settings_set "$(jq -nc --arg g "${GROUP_ID}" '{p_group_id:$g, p_enabled:true}')" >/dev/null
+fi
+
 echo "[boga-mcp-smoke] phase 1: discovering tools and calling read tools with planning denied by default"
 BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \
 BOGA_MCP_SMOKE_URL="${MCP_URL}" \
@@ -388,6 +403,8 @@ BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
 BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
 BOGA_MCP_SMOKE_NOTE_PREFIX="${NOTE_PREFIX:-}" \
 BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
+BOGA_MCP_SMOKE_GROUP_ID="${GROUP_ID}" \
+BOGA_MCP_SMOKE_USER_ID="${USER_UUID}" \
 BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
   npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
 

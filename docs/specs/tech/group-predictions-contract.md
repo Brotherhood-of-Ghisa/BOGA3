@@ -8,9 +8,9 @@
 > tests). Names not fixed yet (tables, RPCs, routes, error tokens) are written
 > as "named by the implementing change" until that change fills them in.
 > **Status:** the setting, offers, matching, counters, withdrawal, the stake
-> limit, close, settlement, weekly results and the reset are built (names
-> below). Member reads and screens are not yet; their names are still to be
-> filled in.
+> limit, close, settlement, weekly results, the reset and the agent routes and
+> tools are built (names below). Member reads and screens are not yet; their
+> names are still to be filled in.
 > **Load when:** changing group predictions, the predictions setting, or the
 > Predictions screens. If changing the agent reads, the AI-scheduled CoW or the
 > agent routes and tools, load

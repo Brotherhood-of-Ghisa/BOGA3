@@ -157,6 +157,7 @@ const renderConsent = (details: ConsentDetails): void => {
           <li>Your training setup, gyms and equipment</li>
           <li>Your exercise library, workout history and personal records</li>
           <li>Your training notes and imported health activities</li>
+          <li>Members' form and the prediction board of your groups that have predictions on</li>
         </ul>
         <p class="permission-title identity-permission-title">With your permission, it can also</p>
         <ul>
@@ -164,12 +165,17 @@ const renderConsent = (details: ConsentDetails): void => {
           <li>Manage exercises, muscle targets and training notes</li>
           <li>Start, log and update workouts</li>
         </ul>
+        <p class="permission-title identity-permission-title">Without a separate switch, in groups with predictions on</p>
+        <ul>
+          <li>Post, take, counter and withdraw group prediction offers in play points</li>
+          <li>Schedule the group's next weekly CoW</li>
+        </ul>
         <p class="permission-title identity-permission-title">Identity permissions requested</p>
         <ul>${identityPermissions}</ul>
       </div>
       <div class="denied-panel">
         <span class="denied-icon" aria-hidden="true">×</span>
-        <p><strong>You control write access.</strong> Connecting enables reading. To allow changes, enable the permissions you want in <strong>BoGa → Settings → Connected agents</strong>.</p>
+        <p><strong>You control write access.</strong> Connecting enables reading, and group predictions in groups that turn them on. To allow other changes, enable the permissions you want in <strong>BoGa → Settings → Connected agents</strong>.</p>
       </div>
       <div class="button-row">
         <button id="deny-button" class="secondary-button" type="button">Cancel</button>

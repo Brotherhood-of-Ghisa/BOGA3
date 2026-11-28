@@ -8,9 +8,8 @@
 > [group-predictions-contract.md](group-predictions-contract.md) (load it when
 > changing those), and what the code states (wire shapes, SQL, messages,
 > tests).
-> **Status:** the read RPCs and the schedule RPC are built (names below).
-> Routes, idempotency receipts and tools are not yet; their names are filled
-> in by the change that builds them.
+> **Status:** built: the read and schedule RPCs, the routes, receipts, audit
+> names and the six tools (names below).
 > **Load when:** changing the prediction agent reads, the AI-scheduled CoW,
 > or the prediction agent routes or tools.
 >
@@ -116,8 +115,30 @@
 
 ## Agent API and MCP tools
 
-Routes live under `v1/agent/groups`. Route paths, audit names, rate limits and
-idempotency receipts are named by the implementing change.
+Routes live under `v1/agent/groups` and call only the service-role
+`agent_group_prediction_*` RPCs with the validated owner and client ID:
+
+| Route | Tool (audit name) |
+| --- | --- |
+| `GET groups` | `list_prediction_groups` |
+| `GET groups/{group}/form`, `GET groups/{group}/board` | `get_group_form`, `get_prediction_board` |
+| `POST groups/{group}/offers` | `post_prediction_offer` (body: `week_start`, `template`, `parameters`, `side`, `price`, `stake`, optional `walk_away_price`, `note`, `answers_offer_id`) |
+| `POST groups/{group}/offers/{offer}/withdraw` | `withdraw_prediction_offer` (empty body) |
+| `POST groups/{group}/cow` | `schedule_group_cow` (body: `week_start`, `group_exercise_id`, `metrics`) |
+
+- **Receipts.** A write needs an `Idempotency-Key` header. Its `…_receipted`
+  RPC claims the key, runs the write and stores the result in one
+  transaction: a replay returns the first result with `idempotent_replay`
+  true, the same key with another body (or group) is `409
+  IDEMPOTENCY_CONFLICT`, and a refused write keeps no receipt. The CoW's ID is
+  derived from owner, client and key.
+- **Rate limits.** Per user and client, apart from other routes: reads 60 a
+  minute, writes 30 a minute (`429 RATE_LIMITED`), on top of the API's 120.
+- **Wire errors.** `NOT_FOUND` 404 (not a member, setting off, missing group or
+  offer: identical), `INVALID_ARGUMENT` 400 (bad shape or a market rule),
+  `CONFLICT` 409, `DUPLICATE` 409, `FORBIDDEN` 403, `IDEMPOTENCY_CONFLICT`
+  409. An unknown route is 404, a wrong method 405, a query on a read 400.
+- **No notes.** The routes strip any `note` key from a response.
 
 | Tool | Kind | Does |
 | --- | --- | --- |
@@ -140,4 +161,8 @@ idempotency receipts are named by the implementing change.
 - **Reads and the AI-scheduled CoW:**
   `supabase/tests/groups-predictions-agent-reads.sh`, a body of the
   `groups-competitions` lane.
-- **Agent routes and tools:** the agent API tests and the MCP smoke lane.
+- **Agent routes and tools:** the shape rules by
+  `apps/mobile/__tests__/agent-api-group-predictions.test.ts`; the routes,
+  gate, receipts, rate limit and audit names by the `agent-api` lane
+  (`supabase/tests/lib/agent-group-prediction-contract.sh`); the tools by the
+  MCP unit tests and the `mcp-smoke` lane's post-to-board round trip.

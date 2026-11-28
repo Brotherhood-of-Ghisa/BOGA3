@@ -228,6 +228,46 @@ export class BogaAgentApi {
     );
   }
 
+  async listPredictionGroups(accessToken: string): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/groups', accessToken);
+  }
+
+  async getGroupForm(accessToken: string, input: { group_id: string }): Promise<Record<string, unknown>> {
+    return this.#getObject(`v1/agent/groups/${encodeURIComponent(input.group_id)}/form`, accessToken);
+  }
+
+  async getPredictionBoard(accessToken: string, input: { group_id: string }): Promise<Record<string, unknown>> {
+    return this.#getObject(`v1/agent/groups/${encodeURIComponent(input.group_id)}/board`, accessToken);
+  }
+
+  async postPredictionOffer(
+    accessToken: string,
+    input: { group_id: string; idempotency_key: string } & Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const { group_id, idempotency_key, ...body } = input;
+    return this.#postObject(`v1/agent/groups/${encodeURIComponent(group_id)}/offers`, accessToken, idempotency_key, body);
+  }
+
+  async withdrawPredictionOffer(
+    accessToken: string,
+    input: { group_id: string; idempotency_key: string; offer_id: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject(
+      `v1/agent/groups/${encodeURIComponent(input.group_id)}/offers/${encodeURIComponent(input.offer_id)}/withdraw`,
+      accessToken,
+      input.idempotency_key,
+      {},
+    );
+  }
+
+  async scheduleGroupCow(
+    accessToken: string,
+    input: { group_id: string; idempotency_key: string } & Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const { group_id, idempotency_key, ...body } = input;
+    return this.#postObject(`v1/agent/groups/${encodeURIComponent(group_id)}/cow`, accessToken, idempotency_key, body);
+  }
+
   async setMuscleTargets(
     accessToken: string,
     input: MuscleTargetFields & { idempotency_key: string },

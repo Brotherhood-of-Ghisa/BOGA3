@@ -112,14 +112,23 @@ describe('agent authorization web rendering', () => {
       'Your training setup, gyms and equipment',
       'Your exercise library, workout history and personal records',
       'Your training notes and imported health activities',
+      'Members\' form and the prediction board of your groups that have predictions on',
     ]);
     expect(Array.from(lists[1].children, item => item.textContent)).toEqual([
       'Create training plans and programmes',
       'Manage exercises, muscle targets and training notes',
       'Start, log and update workouts',
     ]);
+    // Group predictions have no per-agent switch: the consent names what a coach does without one.
+    expect(lists[2].previousElementSibling?.textContent).toBe(
+      'Without a separate switch, in groups with predictions on',
+    );
+    expect(Array.from(lists[2].children, item => item.textContent)).toEqual([
+      'Post, take, counter and withdraw group prediction offers in play points',
+      'Schedule the group\'s next weekly CoW',
+    ]);
     expect(document.querySelector('.denied-panel p')?.textContent).toBe(
-      'You control write access. Connecting enables reading. To allow changes, enable the permissions you want in BoGa → Settings → Connected agents.',
+      'You control write access. Connecting enables reading, and group predictions in groups that turn them on. To allow other changes, enable the permissions you want in BoGa → Settings → Connected agents.',
     );
     expect(document.querySelector('.security-note')?.textContent).toBe(
       'Your password is never shared with the coach. You can change permissions or revoke access at any time from Connected agents.',
@@ -130,7 +139,7 @@ describe('agent authorization web rendering', () => {
   it('keeps every requested identity permission visible alongside the training-access disclosure', async () => {
     await renderSignedInConsent();
 
-    const identityList = document.querySelectorAll('.permission-panel ul')[2];
+    const identityList = document.querySelectorAll('.permission-panel ul')[3];
     expect(Array.from(identityList.children, item => item.textContent)).toEqual(
       BOGA_OAUTH_SCOPES.map(scope => `${scope} — ${OAUTH_SCOPE_DISCLOSURES[scope]}`),
     );

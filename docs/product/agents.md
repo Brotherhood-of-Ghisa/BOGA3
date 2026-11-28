@@ -55,7 +55,9 @@ hide the market from the people it is for, and CoW scheduling crosses agents,
 groups and CoW.
 Code: `supabase/functions/agent-api/index.ts`; `supabase/migrations/20261029204606_group_cow_lifecycle.sql`;
 `supabase/migrations/20261128100000_group_prediction_agent_reads.sql`.
-Pending: the agent routes and tools land with the implementing change.
+Code: `supabase/functions/agent-api/group-predictions.ts`;
+`supabase/migrations/20261128120000_group_prediction_agent_receipts.sql`;
+`services/boga-mcp/src/group-tools.ts`; consent copy in `apps/agent-auth-web/src/main.ts`.
 
 ### agents.health-activities · definition · accepted
 

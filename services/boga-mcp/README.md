@@ -1,8 +1,8 @@
 # BoGa MCP Virtual Coach
 
 `services/boga-mcp` is the public, authenticated MCP resource server for the
-BoGa Virtual Coach. It exposes twenty-seven tools over stateless Streamable HTTP
-(twelve read-only tools and fifteen mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
+BoGa Virtual Coach. It exposes thirty-six tools over stateless Streamable HTTP
+(sixteen read-only tools and twenty mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
 Supabase data credentials, SQL, or service-role key.
 
 ## Public endpoints
@@ -31,7 +31,7 @@ For repeated consent investigations, load [OAuth diagnostics](AUTH-DIAGNOSTICS.m
 
 ## Tool surface
 
-Twelve read-only tools:
+Read-only tools (group predictions are below):
 - `get_training_status` — one bounded check-in: per tracked muscle, sets on the
   three recovery days, today, this week and the four weeks before, with its
   weekly target and last trained date (Today's Plan's counting and order, under
@@ -64,6 +64,15 @@ Twelve read-only tools:
   workout permission even though read-only. A selected ID also reports
   finished/deleted state; `requires_app` directs plan-backed work to BoGa.
   Pages use the same `session_id` and `revision` with `next_cursor`.
+
+Group predictions ([[agents.group-predictions]]; rules in the
+[agent contract](../../docs/specs/tech/group-predictions-agent-contract.md)),
+with no per-agent switch, only a group with predictions on:
+`list_prediction_groups`, `get_group_form`, `get_prediction_board` (read-only)
+and `post_prediction_offer`, `withdraw_prediction_offer`, `schedule_group_cow`
+(idempotent by `idempotency_key`). Descriptions state the weekly 100 points, the
+close time, void rules and that the goal is profit against the other AIs.
+Market parameters name a group member by `member_user_id`.
 
 Two create-only planning tools (require write access, idempotent):
 - `create_session_plan` — create one authored session plan with pending blocks.
@@ -181,7 +190,7 @@ off returns ordinary metrics and no reading context; preference on returns an
 applicable reading only when a positive contribution makes the result
 bodyweight-aware, with missing reading following the personal zero fallback.
 The adapter adds no bodyweight write tools,
-measurement-timeline reads, group access or database credentials. See the
+measurement-timeline reads, other group reads or database credentials. See the
 [agent API contract](../../supabase/functions/agent-api/README.md#optional-bodyweight-calculation-response).
 
 ## Tool catalogue changes and client refresh
