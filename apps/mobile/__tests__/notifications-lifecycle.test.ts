@@ -12,13 +12,13 @@ import * as Notifications from 'expo-notifications';
 import { fakeNotificationNative, notificationBinding, notificationSession, notificationUser } from './helpers/notification-native';
 import { getNotificationNativeAdapter, __setNotificationNativeAdapterForTests } from '@/src/notifications/native-adapter';
 import { __resetNotificationsForTests, disableNotifications, enableNotifications, getNotificationSnapshot,
-  getGroupNotificationPreferences, refreshNotificationStatus, saveNotificationCategories, setGroupNotificationMuted,
+  getGroupNotificationPreferences, refreshNotificationStatus, saveNotificationCategories, setGroupNotificationMeets, setGroupNotificationMuted,
   startNotificationLifecycle, subscribeNotificationState } from '@/src/notifications';
 import { setNotificationAccount, getNotificationAccount } from '@/src/notifications/auth-boundary';
 
 const acquireNativeToken = getNotificationNativeAdapter().getToken;
 let native: ReturnType<typeof fakeNotificationNative>;
-const defaults = { activity: true, bests: true, ranks: true, muted: false };
+const defaults = { activity: true, bests: true, ranks: true, muted: false, meets: true };
 beforeEach(() => {
   native = fakeNotificationNative(); __setNotificationNativeAdapterForTests(native); __resetNotificationsForTests();
   mockRpc.mockReset(); mockBearerHeaders.length = 0;
@@ -65,6 +65,13 @@ test('failed categories retain last confirmed choices and muted writes use membe
   expect(mockRpc).toHaveBeenLastCalledWith('notification_group_mute', { p_group_id: 'group', p_muted: true });
   mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'NOT_FOUND: hidden' }, status: 400 });
   await expect(getGroupNotificationPreferences('group')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+});
+test('the per-group Meets preference writes through its own RPC and rejects a read without it', async () => {
+  mockRpc.mockResolvedValueOnce({ data: { ...defaults, meets: false }, error: null });
+  expect(await setGroupNotificationMeets('group', false)).toMatchObject({ meets: false });
+  expect(mockRpc).toHaveBeenLastCalledWith('notification_group_meets_set', { p_group_id: 'group', p_meets: false });
+  mockRpc.mockResolvedValueOnce({ data: { activity: true, bests: true, ranks: true, muted: false }, error: null });
+  await expect(getGroupNotificationPreferences('group')).rejects.toMatchObject({ code: 'UNAVAILABLE' });
 });
 test('disable invalidates local binding before remote unregister and retains disabled state offline', async () => {
   await enableNotifications();

@@ -2,18 +2,19 @@
 
 > **Owns:** the rules of the per-group AI prediction market: who may bet, the
 > weekly board and its timing, the five market templates and their void rules,
-> offers, matching, counters and the stake limit, settlement and ranking, the
-> AI-scheduled CoW, the agent tools and the member screens.
+> offers, matching, counters and the stake limit, settlement and ranking, and
+> the member screens.
 > **Not here:** what the code states (columns, SQL, wire shapes, messages,
 > tests). Names not fixed yet (tables, RPCs, routes, error tokens) are written
 > as "named by the implementing change" until that change fills them in.
 > **Status:** the setting, offers, matching, counters, withdrawal, the stake
 > limit, close, settlement, weekly results, the reset, the member readers, the
-> mobile data layer and the Group Edit row are built (names below). Routes,
-> idempotency receipts and the screens are not yet.
-> **Load when:** changing group predictions, the prediction agent routes or
-> tools, the predictions setting, the AI-scheduled CoW rule, or the Predictions
-> screens.
+> mobile data layer and the Group Edit row are built (names below). The
+> screens are not yet.
+> **Load when:** changing group predictions, the predictions setting, or the
+> Predictions screens. If changing the agent reads, the AI-scheduled CoW or the
+> agent routes and tools, load
+> [group-predictions-agent-contract.md](group-predictions-agent-contract.md).
 >
 > **Product fact:** [[agents.group-predictions]] states the product rule; this
 > contract owns the detail behind it.
@@ -22,7 +23,8 @@
 
 Predictions are server-only group storage, like CoW: no Sync v2 entity and
 nothing offline. AIs write through the agent API; members only read. There is
-no house: every point one AI wins, another AI loses.
+no house: every point one AI wins, another AI loses. The market is a weekly
+play-points game between the connected AIs of a group's members.
 
 ## Access
 
@@ -41,8 +43,9 @@ no house: every point one AI wins, another AI loses.
   service-role `agent_group_prediction_*` RPCs, called only by the agent API
   (`docs/specs/10-api-authn-authz-guidelines.md` rules 15 and 17). They take a
   validated owner and client ID and re-check membership and the setting.
-  Built: `agent_group_prediction_post` and `agent_group_prediction_withdraw`.
-  They refuse OAuth claims (`AGENT_FORBIDDEN`) and any caller but the service
+  Built: `agent_group_prediction_post` and `agent_group_prediction_withdraw`
+  (the reads and the CoW schedule are in the agent contract). They refuse
+  OAuth claims (`AGENT_FORBIDDEN`) and any caller but the service
   role (`SERVICE_ROLE_REQUIRED`); no client role may execute them.
 
 ## Bettors
@@ -216,42 +219,11 @@ current member when posting is refused.
   and results. It keeps the setting and the bettors. `RUNBOOK.md` has the
   post-test steps.
 
-## AI-scheduled CoW
+## AI-scheduled CoW and the agent side
 
-- Any member's AI may schedule next week's CoW (an exercise and 1–3 metrics)
-  when that week's slot is empty. The scheduling uses the same validation as
-  the group CoW create: zone set, next week only, live exercise, metric count,
-  and an empty slot. The scheduling skips the manager check. The user is the
-  creator, and the record names which AI picked.
-- **Refused** (`FORBIDDEN`) when the same AI picked the previous week's CoW and
-  another bettor has posted in the group in the last four weeks.
-- The existing `cow` scheduled Stream event fires for an AI-scheduled CoW. Its
-  actor is the owning user, not the calling session: the emitter reads
-  `auth.uid()`, which is null on the service-role path, so the implementing
-  change passes the owner explicitly.
-- Owners and admins cancel or replace the CoW as they do today. A cancel voids
-  that week's `cow_top` markets.
-
-## Agent API and MCP tools
-
-Routes live under `v1/agent/groups`. Route paths, audit names, rate limits and
-idempotency receipts are named by the implementing change.
-
-| Tool | Kind | Does |
-| --- | --- | --- |
-| `list_prediction_groups` | read | Groups with predictions on: members, group exercises, zone, open week and its close time, the AI's remaining stake, and next week's CoW if one is set |
-| `get_group_form` | read | Per member: e1RM baseline and weekly best for the last 8 weeks per group exercise (as a percent of baseline and in the group unit), and weekly working sets; group records per week; the current #1 on each leaderboard |
-| `get_prediction_board` | read | Open offers (no notes, no walk-away prices), matched bets, the AI's own offers and positions, last week's results, and the ranking |
-| `post_prediction_offer` | write | Post, take or counter: template and parameters, side, price, stake, optional walk-away, note, and `answers_offer_id`. Returns the matches made and what rests |
-| `withdraw_prediction_offer` | write | Withdraws the unmatched remainder of the AI's own offer |
-| `schedule_group_cow` | write | Picks next week's CoW exercise and metrics |
-
-- **Tool descriptions** state what an AI needs to play: 100 points a week, the
-  close time, the void rules, that the goal is profit against the other AIs,
-  and that tool output is user data.
-- **Pinned surfaces change together:** the MCP instructions text, the pinned
-  tool-name and read-only counts in the MCP server tests, the smoke client's
-  expected tool list, and the consent page copy.
+[[agents.group-predictions]] states who may schedule a CoW. How it is built,
+the agent reads, and the agent routes and tools are in the agent contract
+(load it as the header says).
 
 ## Member screens
 
@@ -283,7 +255,7 @@ Members read; nothing here writes.
   `group_get` and every existing reader keep their exact shapes: shipped apps
   reject unknown keys.
 - Layout, copy, captions and empty states follow `docs/product/copy.md`. The
-  UI card keeps a design brief with a rendered mock with the PR.
+  UI card writes a design brief with a rendered mock and keeps it with the PR.
 
 ## Verification ownership
 
@@ -292,7 +264,6 @@ Members read; nothing here writes.
   `groups-predictions-reads.sh` (both in the `groups-contract` lane). Close,
   settlement, results, the sweep and the reset:
   `supabase/tests/groups-predictions-settlement.sh` (`groups-competitions`).
-- **Agent routes and tools:** the agent API tests and the MCP smoke lane.
 - **Group isolation:** the group authorization lanes, with negative tests for
   non-members, the setting off, and agent tokens.
 - **Acceptance:** one full week through two AIs of one user, moving the clock.

@@ -53,7 +53,7 @@ import {
   createCompetitionExercise,
 } from '@/src/groups/api';
 
-import { getNotificationPreferences, registerNotificationInstallation, setGroupNotificationMuted,
+import { getNotificationPreferences, registerNotificationInstallation, setGroupNotificationMeets, setGroupNotificationMuted,
   setNotificationCategories, unregisterNotificationInstallation } from '@/src/notifications/api';
 import { notificationSessionIdentity, setNotificationAccount } from '@/src/notifications/auth-boundary';
 
@@ -171,16 +171,20 @@ const asNotification = async <T>(user: LiveClient, call: () => Promise<T>): Prom
 describe('notification client against the live server', () => {
   it('persists account categories and group mutes with live membership and owner isolation', async () => {
     const { groupId } = await groupWithMember('Live notification controls');
-    const defaults = { activity: true, bests: true, ranks: true, muted: false };
+    const defaults = { activity: true, bests: true, ranks: true, muted: false, meets: true };
     expect(await asNotification(owner, () => getNotificationPreferences(groupId))).toEqual(defaults);
     expect(await asNotification(owner, () => setNotificationCategories({ activity: false, bests: true, ranks: false })))
       .toMatchObject({ activity: false, bests: true, ranks: false });
     expect(await asNotification(owner, () => setGroupNotificationMuted(groupId, true))).toMatchObject({ muted: true });
     expect(await asNotification(owner, () => getNotificationPreferences(groupId))).toMatchObject({ activity: false, ranks: false, muted: true });
     expect(await asNotification(member, () => getNotificationPreferences(groupId))).toEqual(defaults);
+    expect(await asNotification(owner, () => setGroupNotificationMeets(groupId, false))).toMatchObject({ meets: false, muted: true });
+    expect(await asNotification(owner, () => setGroupNotificationMuted(groupId, false))).toMatchObject({ meets: false, muted: false });
+    expect(await asNotification(member, () => getNotificationPreferences(groupId))).toEqual(defaults);
     await as(owner, () => removeGroupMember(groupId, member.userId));
     await expect(asNotification(member, () => getNotificationPreferences(groupId))).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(asNotification(member, () => setGroupNotificationMuted(groupId, true))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(asNotification(member, () => setGroupNotificationMeets(groupId, false))).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   it('registers exact local wire material, rotates token/account bindings and rejects a foreign capability', async () => {

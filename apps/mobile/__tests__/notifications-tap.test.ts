@@ -1,7 +1,9 @@
 /* eslint-disable import/first */
 const mockSessionRead = jest.fn();
+const mockMeetRead = jest.fn();
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'), getCompetitionSession: (...args: unknown[]) => mockSessionRead(...args),
+  getMeet: (...args: unknown[]) => mockMeetRead(...args),
 }));
 import { GroupApiError } from '@/src/groups/api';
 import { clearRecentLogs, getRecentLogs } from '@/src/logging/buffer';
@@ -14,14 +16,15 @@ import { fakeNotificationNative, notificationBinding, notificationEnvelopeFixtur
   notificationSession, notificationUser } from './helpers/notification-native';
 
 let native: ReturnType<typeof fakeNotificationNative>;
-const onOpen = jest.fn(); const onUnavailable = jest.fn();
-const process = (ready = true) => processPendingNotificationTap({ ready, userId: notificationUser, onOpen, onUnavailable });
+const onOpen = jest.fn(); const onUnavailable = jest.fn(); const onOpenMeet = jest.fn();
+const process = (ready = true) => processPendingNotificationTap({ ready, userId: notificationUser, onOpen, onOpenMeet, onUnavailable });
 beforeEach(() => {
   native = fakeNotificationNative(); __setNotificationNativeAdapterForTests(native); __resetNotificationsForTests();
   setNotificationAccount({ userId: notificationUser, authSessionId: notificationSession }, 'token');
   native.activateBinding({ installationId: '77777777-7777-4777-8777-777777777777', userId: notificationUser,
     authSessionId: notificationSession, bindingId: notificationBinding, environment: 'preview', encryptionKey: 'key' });
-  mockSessionRead.mockReset(); mockSessionRead.mockResolvedValue({}); onOpen.mockReset(); onUnavailable.mockReset();
+  mockSessionRead.mockReset(); mockSessionRead.mockResolvedValue({}); mockMeetRead.mockReset(); mockMeetRead.mockResolvedValue({});
+  onOpen.mockReset(); onUnavailable.mockReset(); onOpenMeet.mockReset();
 });
 test.each([null, { ...notificationEnvelopeFixture, url: 'https://bad' }, { ...notificationEnvelopeFixture, v: 2 },
   { ...notificationEnvelopeFixture, nonce: 'bad' }, { route: notificationProjectionFixture().route }])('rejects malformed/clear routing input %j', value => {
@@ -194,4 +197,55 @@ test('emits diagnostic logs on decode failure and successful tap open', async ()
     envelopeBindingId: notificationEnvelopeFixture.bindingId,
     hasDecryptedValue: false,
   });
+});
+
+const MEET = '88888888-8888-4888-8888-888888888888';
+const meetProjection = (kind: 'meet_start' | 'meet_end' = 'meet_end') => {
+  const base = notificationProjectionFixture();
+  return { ...base, kind, identity: 'Friends', heading: kind === 'meet_end' ? 'Bench day: results so far' : 'Bench day is on at Iron Temple',
+    detail: kind === 'meet_end' ? 'Bench · Max reps: Ana, Bo\nSquat · Best 1RM: Cy' : '', bestCount: 0, rankCount: 0,
+    route: { ...base.route, sessionId: MEET } };
+};
+test.each(['meet_start', 'meet_end'] as const)('a %s push is valid only with bounded text, no counts and a meet id route', kind => {
+  expect(isNotificationProjection(meetProjection(kind))).toBe(true);
+  expect(isNotificationProjection({ ...meetProjection(kind), bestCount: 1 })).toBe(false);
+  expect(isNotificationProjection({ ...meetProjection(kind), heading: '' })).toBe(false);
+  expect(isNotificationProjection({ ...meetProjection(kind), heading: 'Bench\nday' })).toBe(false);
+  expect(isNotificationProjection({ ...meetProjection(kind), heading: 'x'.repeat(161) })).toBe(false);
+  expect(isNotificationProjection({ ...meetProjection(kind), detail: undefined })).toBe(false);
+  expect(isNotificationProjection({ ...meetProjection(kind), route: { ...meetProjection(kind).route, sessionId: 'not-a-meet' } })).toBe(false);
+});
+test('a meet start carries no standings; the end allows a line break and a 400 character bound', () => {
+  expect(isNotificationProjection({ ...meetProjection('meet_start'), detail: 'Ana' })).toBe(false);
+  expect(isNotificationProjection({ ...meetProjection(), detail: 'a'.repeat(400) })).toBe(true);
+  expect(isNotificationProjection({ ...meetProjection(), detail: 'a'.repeat(401) })).toBe(false);
+  expect(isNotificationProjection({ ...meetProjection(), detail: 'Bad\u0007' })).toBe(false);
+  expect(isNotificationProjection({ ...notificationProjectionFixture(), detail: 'Ana' })).toBe(false);
+});
+test('a meet tap proves membership with the meet read and opens the meet, not a workout', async () => {
+  clearRecentLogs();
+  native.decrypt = jest.fn(() => meetProjection());
+  receiveNotificationTap(notificationEnvelopeFixture); await process();
+  expect(mockMeetRead).toHaveBeenCalledWith(notificationProjectionFixture().route.groupId, MEET);
+  expect(mockSessionRead).not.toHaveBeenCalled();
+  expect(onOpenMeet).toHaveBeenCalledWith({ groupId: notificationProjectionFixture().route.groupId, meetId: MEET });
+  expect(onOpen).not.toHaveBeenCalled();
+  const opened = getRecentLogs().find(log => log.event === 'notifications.tap_opened');
+  expect(opened?.context).toMatchObject({ meetId: MEET });
+  expect(opened?.context).not.toHaveProperty('sessionId');
+});
+test('a meet tap reports the meet as unavailable when offline or no longer reachable', async () => {
+  native.decrypt = jest.fn(() => meetProjection('meet_start'));
+  receiveNotificationTap(notificationEnvelopeFixture);
+  mockMeetRead.mockRejectedValueOnce(new GroupApiError('NETWORK', 'offline'));
+  await process(); expect(onUnavailable).toHaveBeenLastCalledWith('offline', 'meet');
+  mockMeetRead.mockRejectedValueOnce(new GroupApiError('NOT_FOUND', 'missing'));
+  await process(); expect(onUnavailable).toHaveBeenLastCalledWith('unavailable', 'meet');
+  expect(onOpenMeet).not.toHaveBeenCalled();
+});
+test('a meet tap with no meet route handler is consumed as unavailable without a read', async () => {
+  native.decrypt = jest.fn(() => meetProjection());
+  receiveNotificationTap(notificationEnvelopeFixture);
+  await processPendingNotificationTap({ ready: true, userId: notificationUser, onOpen, onUnavailable });
+  expect(mockMeetRead).not.toHaveBeenCalled(); expect(onUnavailable).toHaveBeenCalledWith('unavailable', 'meet');
 });

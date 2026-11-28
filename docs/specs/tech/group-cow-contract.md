@@ -113,6 +113,10 @@ retry resolves that identity before recalculating next week, including after
 cancellation, rollover or a zone change. Edit/cancel retain the last successful
 mutation identity and expected revision. Retries cannot undo a superseding
 admin write. The same lock checks both local-week identity and UTC overlap.
+A member's connected AI may also schedule an empty next-week CoW
+([[agents.group-predictions]]), without the manager check and with its user as
+creator; if changing that, load
+[group-predictions-agent-contract.md](group-predictions-agent-contract.md).
 Each local midnight is converted separately by `group_cow_bounds`.
 
 `supabase/migrations/20261029205006_group_cow_intake.sql` owns capture. Source

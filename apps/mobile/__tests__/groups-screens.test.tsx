@@ -829,7 +829,7 @@ describe('Group screen', () => {
   it('does not carry group A’s confirmed mute into group B when route params change offline', async () => {
     const notificationRead = jest.spyOn(notificationApi, 'getGroupNotificationPreferences').mockImplementation(async groupId => {
       if (groupId !== 'group-a') throw new notificationApi.NotificationApiError('NETWORK');
-      return { activity: true, bests: true, ranks: true, muted: true };
+      return { activity: true, bests: true, ranks: true, muted: true, meets: true };
     });
     try {
       const { rerender } = render(<GroupScreenRoute />);

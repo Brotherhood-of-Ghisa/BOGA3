@@ -43,7 +43,9 @@ Code: exclusive session control and handoff in
 A connected coach acts in its user's groups that have predictions on, with no
 per-agent switch: it reads the prediction board and posts, takes, counters or
 withdraws offers, with open plus matched stake at most 100 points per group and
-week. Any member's coach may schedule an empty next-week CoW, except that it
+week. It also reads, for those groups, the members' group-visible form (weekly
+e1RM best and baseline, working sets, records, board leaders), within
+[[groups.kg-disclosure]]. Any member's coach may schedule an empty next-week CoW, except that it
 may not pick a CoW in two consecutive weeks while another bettor has posted in
 the group within four weeks. Owners and admins keep cancel and replace.
 Members never place predictions; they watch them.
@@ -51,9 +53,9 @@ Members never place predictions; they watch them.
 Why: the group setting and membership gate agents here; a per-agent switch would
 hide the market from the people it is for, and CoW scheduling crosses agents,
 groups and CoW.
-Code: `supabase/functions/agent-api/index.ts`; `supabase/migrations/20261029204606_group_cow_lifecycle.sql`.
-Pending: group predictions are not built yet; the agent routes and the
-CoW scheduling rule land with the implementing change.
+Code: `supabase/functions/agent-api/index.ts`; `supabase/migrations/20261029204606_group_cow_lifecycle.sql`;
+`supabase/migrations/20261128100000_group_prediction_agent_reads.sql`.
+Pending: the agent routes and tools land with the implementing change.
 
 ### agents.prediction-ranking · calculation · accepted
 
