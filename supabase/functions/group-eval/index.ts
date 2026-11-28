@@ -25,6 +25,7 @@ import { CoWEvaluationError, evaluateCoWGraph, type CoWEvaluationGraph } from '.
 const CLAIM_LIMIT = 20;
 const MAX_CLAIM_ROUNDS = 10;
 const RULES_REQUEUE_LIMIT = 50;
+const MEET_ADVANCE_LIMIT = 50;
 const SQLSTATE_PATTERN = /^[0-9A-Z]{5}$/;
 // Recorded as the job's sqlstate when the failure is not a database error.
 const NON_DB_ERROR = 'EVALX';
@@ -154,6 +155,9 @@ const processMetricJob = async (db: SupabaseClient, job: MetricJob): Promise<Met
 };
 
 type CoWJob = { cow_id: string; generation: number; claim_id: string };
+// One `group_meet_eval_advance` call: the meet it advanced (if any) and what fired.
+type MeetStep = { advanced: boolean; done?: ('on' | 'results' | 'snapshot' | 'deferred')[]; failed?: boolean };
+type MeetAdvance = { on: number; results: number; snapshots: number; deferred: number; failed: number };
 type CoWJobResult = CoWJob & { outcome: 'completed' | 'requeued' | 'failed'; sqlstate: string | null };
 const processCoWJob = async (db: SupabaseClient, job: CoWJob): Promise<CoWJobResult> => {
   const claim = { p_cow_id: job.cow_id, p_generation: job.generation, p_claim_id: job.claim_id };
@@ -223,20 +227,36 @@ export const handleRequest = async (request: Request): Promise<Response> => {
       if (claimed.length === 0) break;
       for (const job of claimed) cowJobs.push(await processCoWJob(db, job));
     }
+    // Meet transitions (start and end stream items, the cutoff snapshot) run
+    // last, so the snapshot reads scores this run has just published. One meet
+    // per call, so each commits on its own; a failed or deferred meet backs off.
+    const meets: MeetAdvance = { on: 0, results: 0, snapshots: 0, deferred: 0, failed: 0 };
+    for (let call = 0; call < MEET_ADVANCE_LIMIT; call += 1) {
+      const step = await rpc<MeetStep>(db, 'group_meet_eval_advance', {});
+      if (!step.advanced) break;
+      const done = step.done ?? [];
+      meets.on += done.includes('on') ? 1 : 0;
+      meets.results += done.includes('results') ? 1 : 0;
+      meets.snapshots += done.includes('snapshot') ? 1 : 0;
+      meets.deferred += done.includes('deferred') ? 1 : 0;
+      meets.failed += step.failed ? 1 : 0;
+    }
     const count = (outcome: JobResult['outcome']) =>
       [...jobs, ...metricJobs, ...cowJobs].filter(job => job.outcome === outcome).length;
+    const meetTransitions = meets.on + meets.results + meets.snapshots;
     const work = {
       rules_requeued: rulesRequeued,
       claimed: jobs.length + metricJobs.length + cowJobs.length,
       metric_claimed: metricJobs.length,
       cow_claimed: cowJobs.length,
+      meet_transitions: meetTransitions,
       completed: count('completed'),
       requeued: count('requeued'),
-      failed: count('failed'),
+      failed: count('failed') + meets.failed,
     };
     // A sweep-started run that did anything records how much; its drain stands
     // even if the record fails.
-    if (fromSweep && work.rules_requeued + work.claimed > 0) {
+    if (fromSweep && work.rules_requeued + work.claimed + work.meet_transitions > 0) {
       await rpc(db, 'sweep_record_work', { p_event: 'group.eval_sweep_work', p_work: work })
         .catch(() => console.error('group-eval: sweep work record failed'));
     }
@@ -246,6 +266,7 @@ export const handleRequest = async (request: Request): Promise<Response> => {
       jobs,
       metric_jobs: metricJobs,
       cow_jobs: cowJobs,
+      meets,
     });
   } catch (error) {
     const sqlstate = error instanceof RpcError ? error.sqlstate : NON_DB_ERROR;

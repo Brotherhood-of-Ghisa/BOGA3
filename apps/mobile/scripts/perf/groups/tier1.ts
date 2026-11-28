@@ -56,6 +56,8 @@ const mergeSummary = (into: Omit<DrainSummary, 'failures'>, from: DrainSummary):
   into.metricFailed += from.metricFailed;
   into.graphBytes += from.graphBytes;
   into.setsScored += from.setsScored;
+  into.meetTransitions += from.meetTransitions;
+  into.meetFailed += from.meetFailed;
 };
 
 export class Tier1Run {
@@ -114,7 +116,7 @@ export class Tier1Run {
     const result: StepResult = {
       label, total: sumCounters([]), calls: [], edgeRuns: { groupEval: 0, notificationWorker: 0 },
       groupEval: { claimed: 0, metricClaimed: 0, completed: 0, requeued: 0, failed: 0, metricRequeued: 0, metricFailed: 0,
-        graphBytes: 0, setsScored: 0 },
+        graphBytes: 0, setsScored: 0, meetTransitions: 0, meetFailed: 0 },
       evaluations: 0, rejectedPublishes: 0, notificationOutcomes: {}, failures: [], cascadeCapped: false,
     };
     await start();

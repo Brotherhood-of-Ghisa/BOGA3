@@ -136,7 +136,7 @@ it, per group:
 | Case | Decision |
 | --- | --- |
 | Group bodyweight calculations off | kg shows |
-| A kg score on a group exercise that now counts bodyweight (board, history, CoW) | Hidden |
+| A kg score on a group exercise that now counts bodyweight (board, history, CoW, meet) | Hidden |
 | Live links to the group's exercises | kg hidden when one of them has a positive bodyweight contribution |
 | No live link | kg hidden when the member's own exercise has a positive contribution |
 | No exercise definition | kg shows |

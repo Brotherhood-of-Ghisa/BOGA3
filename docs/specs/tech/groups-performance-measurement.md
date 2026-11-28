@@ -98,6 +98,9 @@ transaction, plus planted cases the reads must handle:
   the weeks parity compares;
 - last week's finished CoW and this week's live one, their sources
   backdated to when each set was logged;
+- a week-long meet for every week of history, every shared session joined:
+  the latest ending an hour ago, its results live, and the rest final with
+  their snapshots and trophies, so the meet reads face a history of meets;
 - a local notification installation per member, so the cascade sends.
 
 The point fails if a planted case is missing after steady state. Reads run

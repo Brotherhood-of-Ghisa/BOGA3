@@ -187,7 +187,11 @@ begin
       return;
     end if;
     select r into _ranking from jsonb_array_elements(_cow.final_rankings) r where r ->> 'metric' = p_market.metric;
-    if _ranking is null or jsonb_array_length(_ranking -> 'entries') = 0 then return; end if;
+    -- Nobody ranked, or this member's figure unavailable: the result is unknown.
+    if _ranking is null or jsonb_array_length(_ranking -> 'entries') = 0
+       or (_ranking -> 'unavailableMemberIds') ? p_market.member_user_id::text then
+      return;
+    end if;
     result_value := (select (e ->> 'rank')::numeric from jsonb_array_elements(_ranking -> 'entries') e
       where e ->> 'memberId' = p_market.member_user_id::text);
     result_unit := case when result_value is not null then 'place' end;
@@ -228,11 +232,14 @@ language sql stable set search_path = app_public, pg_temp as $$
 $$;
 
 -- Why a closed board cannot settle yet: a matched cow_top market's CoW is not
--- final, or another matched market's figures have evaluation pending.
+-- final (unless a cancel already voids the week's cow_top markets), or another
+-- matched market's figures have evaluation pending.
 create function app_public.group_prediction_settle_waits(p_board app_public.group_prediction_boards) returns boolean
 language sql stable set search_path = app_public, pg_temp as $$
   select (exists (select 1 from app_public.group_cows c where c.group_id = p_board.group_id
         and c.week_start = p_board.week_start and c.cancelled_at is null and c.finalized_at is null)
+      and not exists (select 1 from app_public.group_cows c where c.group_id = p_board.group_id
+        and c.week_start = p_board.week_start and c.cancelled_at is not null)
       and exists (select 1 from app_public.group_prediction_markets m
         join app_public.group_prediction_matches x on x.market_id = m.id
        where m.group_id = p_board.group_id and m.week_start = p_board.week_start and m.template = 'cow_top'))
@@ -425,20 +432,18 @@ end;
 $$;
 
 -- The hourly group-eval sweep closes and settles prediction boards first, in
--- SQL, then kicks the evaluator as before.
-create or replace function app_public.group_eval_sweep() returns boolean
-language plpgsql security definer set search_path=app_public,pg_temp as $$
+-- SQL, then kicks the evaluator as before. Patched in place, so every arm of
+-- the current body (CoW, queues, meets, rules drain) is kept as it is.
+do $sweep$
+declare definition text := pg_get_functiondef('app_public.group_eval_sweep()'::regprocedure); revised text;
 begin
-  perform app_public.group_prediction_sweep();
-  if not exists(select 1 from app_public.group_cows where cancelled_at is null and finalized_at is null
-    and starts_at<=now() and available_at<=now() and (lease_until is null or lease_until<now()))
-    and not exists(select 1 from app_public.group_eval_queue where available_at<=now() and (claimed_until is null or claimed_until<now()))
-    and not exists(select 1 from app_public.group_metric_eval_queue where available_at<=now() and (claimed_until is null or claimed_until<now()))
-    and not exists(select 1 from app_public.group_eval_rules_state s where
-      (select min(f.rules_version) from app_public.group_set_facts f)<s.rules_version
-      and exists(select 1 from app_public.group_eval_rules_stale(s.rules_version,1))) then return false; end if;
-  perform app_public.group_eval_kick('sweep'); return true;
-end $$;
+  revised := replace(definition, E'AS $function$\nbegin\n',
+    E'AS $function$\nbegin\n  perform app_public.group_prediction_sweep();\n');
+  if revised = definition or position('group_prediction_sweep' in definition) > 0 then
+    raise exception 'group_eval_sweep prediction patch anchor missing';
+  end if;
+  execute revised;
+end $sweep$;
 
 -- A post or withdrawal that waited on the lock while the board closed sees
 -- the close: its clock was read before the wait.

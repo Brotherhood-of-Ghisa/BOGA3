@@ -374,6 +374,8 @@ pair "${NOW}" "${W}" cow_top "{\"member_user_id\":\"${ALEX_UID}\",\"metric\":\"i
 M_COW_UNSELECTED="${MARKET}"
 pair "${NOW}" "${W}" cow_top "{\"member_user_id\":\"${ALEX_UID}\",\"metric\":\"volume\"}" B1 A2 50 1 1
 M_COW_UNRANKED="${MARKET}"
+pair "${NOW}" "${W}" cow_top "{\"member_user_id\":\"${CASEY_UID}\",\"metric\":\"e1rm\"}" A2 B1 50 1 1
+M_COW_MEMBER_UNAVAILABLE="${MARKET}"
 # A partly matched offer (10 yes, 5 matched) and offers that never match.
 post_at "${NOW}" A2 "${W}" sets_line "{\"member_user_id\":\"${CASEY_UID}\",\"line\":5}" yes 50 10
 PARTIAL="${OFFER}"
@@ -400,7 +402,7 @@ seed_cow "${COW_W}" "${W}" "array['e1rm','volume']" "" ""
 # Nothing closes or settles before its time.
 expect_sql "no close before the start" "select app_public.group_prediction_close_at($(week_clock "${W}" '-1 second'), '${GROUP}', '${W}');" f
 expect_sql "no settlement before the end" "select app_public.group_prediction_settle_at($(week_clock "${W}" '7 days -1 second'), '${GROUP}', '${W}');" f
-pass "board: 14 matched markets (every template, yes/no/void cases), a partial fill, unmatched offers, a non-final CoW"
+pass "board: 16 fully matched markets (every template, yes/no/void cases), a partial fill, unmatched offers, a non-final CoW"
 
 # --- close -------------------------------------------------------------------------
 
@@ -471,11 +473,11 @@ pass "week: Alex 110x5 and Blair 120x5 (lead change) scored; a late pre-week ses
 
 [[ "$(settle_at "$(week_clock "${W}" '7 days 1 hour')" "${W}")" == f ]] || fail "settlement must wait for the CoW"
 expect_sql "a waiting board stores nothing" "select count(*) from app_public.group_prediction_markets where group_id = '${GROUP}' and outcome is not null;" 0
-# The CoW is final: Blair #1 on e1RM, Alex #2; nobody ranked on Volume.
+# The CoW is final: Blair #1 on e1RM, Alex #2, Casey unavailable; nobody ranked on Volume.
 run_psql "begin; set local session_replication_role = replica;
   update app_public.group_cows set finalized_at = clock_timestamp(), final_outcome = 'ready',
     final_rankings = jsonb_build_array(
-      jsonb_build_object('metric', 'e1rm', 'unit', 'kg', 'unavailableMemberIds', '[]'::jsonb, 'entries', jsonb_build_array(
+      jsonb_build_object('metric', 'e1rm', 'unit', 'kg', 'unavailableMemberIds', jsonb_build_array('${CASEY_UID}'), 'entries', jsonb_build_array(
         jsonb_build_object('memberId', '${BLAIR_UID}', 'value', 140, 'receivedAtUs', 1, 'rank', 1),
         jsonb_build_object('memberId', '${ALEX_UID}', 'value', 128, 'receivedAtUs', 1, 'rank', 2))),
       jsonb_build_object('metric', 'volume', 'unit', 'kg_reps', 'unavailableMemberIds', '[]'::jsonb, 'entries', '[]'::jsonb))
@@ -503,16 +505,17 @@ expect_outcome "CoW yes (Blair #1)" "${M_COW_YES}" "yes:1:place"
 expect_outcome "CoW no (Alex #2)" "${M_COW_NO}" "no:2:place"
 expect_outcome "CoW void: metric not selected" "${M_COW_UNSELECTED}" "void:-:-"
 expect_outcome "CoW void: nobody ranked" "${M_COW_UNRANKED}" "void:-:-"
+expect_outcome "CoW void: the member's figure unavailable" "${M_COW_MEMBER_UNAVAILABLE}" "void:-:-"
 expect_outcome "the partial fill's market (Casey: no sessions)" "${M_PARTIAL}" "no:0:sets"
 expect_sql "unmatched markets get no outcome" "select count(*) from app_public.group_prediction_markets m where m.group_id = '${GROUP}'
   and m.outcome is not null and not exists (select 1 from app_public.group_prediction_matches x where x.market_id = m.id);" 0
 pass "settlement: yes and no per template; e1RM and cow_top void cases; cow_top waits for the final CoW"
 
 # Hand-counted (stakes in points): A1 +4 -3 +4 -5 -4 -2 +1 +1; A2 +5 +3 +4 +1 -5;
-# B1 -4 -5 -4 +5 -1 +2 -1 -1 +5; C1 never matched.
+# B1 -4 -5 -4 +5 -1 +2 -1 -1 +5; C1 never matched (voids add no points).
 [[ "$(result_line "${W}" A1)" == "-400/11/4/4/3" ]] || fail "A1's week: $(result_line "${W}" A1)"
-[[ "$(result_line "${W}" A2)" == "800/8/4/1/3" ]] || fail "A2's week: $(result_line "${W}" A2)"
-[[ "$(result_line "${W}" B1)" == "-400/13/3/6/4" ]] || fail "B1's week: $(result_line "${W}" B1)"
+[[ "$(result_line "${W}" A2)" == "800/9/4/1/4" ]] || fail "A2's week: $(result_line "${W}" A2)"
+[[ "$(result_line "${W}" B1)" == "-400/14/3/6/5" ]] || fail "B1's week: $(result_line "${W}" B1)"
 [[ "$(result_line "${W}" C1)" == "0/0/0/0/0" ]] || fail "C1's week: $(result_line "${W}" C1)"
 expect_sql "a board's profits sum to zero" "select sum(profit_cents) from app_public.group_prediction_results
   where group_id = '${GROUP}' and week_start = '${W}';" 0
@@ -569,11 +572,9 @@ M_COW_BEFORE_CANCEL="${MARKET}"
 seed_cow "$(new_uuid)" "${W28}" "array['e1rm']" ", cancelled_at" ", lower(r) - interval '12 hours'"
 pair "$(week_clock "${W28}" '-6 hours')" "${W28}" cow_top "{\"member_user_id\":\"${BLAIR_UID}\",\"metric\":\"e1rm\"}" A2 B1 50 1 1
 M_COW_AFTER_REPLACE="${MARKET}"
-seed_cow "$(new_uuid)" "${W28}" "array['e1rm']" ", finalized_at, final_outcome, final_rankings" \
-  ", clock_timestamp(), 'ready', jsonb_build_array(jsonb_build_object('metric', 'e1rm', 'unit', 'kg',
-    'unavailableMemberIds', '[]'::jsonb, 'entries', jsonb_build_array(jsonb_build_object('memberId', '${BLAIR_UID}',
-    'value', 140, 'receivedAtUs', 1, 'rank', 1))))"
-[[ "$(settle_at "$(week_clock "${W28}" '7 days 1 hour')" "${W28}")" == t ]] || fail "settle ${W28}"
+# The replacement is not final; the cancel already voids, so nothing waits.
+seed_cow "$(new_uuid)" "${W28}" "array['e1rm']" "" ""
+[[ "$(settle_at "$(week_clock "${W28}" '7 days 1 hour')" "${W28}")" == t ]] || fail "settle ${W28} without waiting"
 expect_outcome "CoW void: matched before a cancel, even with a replacement" "${M_COW_BEFORE_CANCEL}" "void:-:-"
 expect_outcome "CoW void: matched after the replacement" "${M_COW_AFTER_REPLACE}" "void:-:-"
 [[ "$(result_line "${W7}" A1)" == "-300/3/0/2/1" ]] || fail "A1's second week: $(result_line "${W7}" A1)"

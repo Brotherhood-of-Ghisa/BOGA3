@@ -223,9 +223,23 @@ MEET_RPCS="'group_meet_create','group_meet_update','group_meet_cancel','group_me
     and 'search_path=app_public, pg_temp' = any(p.proconfig)
     and has_function_privilege('anon', p.oid, 'EXECUTE') and has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == 11 ]] ||
   fail "every meet RPC must be SECURITY DEFINER, search_path-pinned and executable by anon+authenticated"
+# Results, Refresh and the leaderboard are client RPCs too; the worker's
+# transition entry point is the service role's alone.
+MEET_RESULT_RPCS="'group_meet_results','group_meet_refresh_results','group_meet_leaderboard','group_meet_trophies'"
+[[ "$(sql_value "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'app_public' and p.proname in (${MEET_RESULT_RPCS}) and p.prosecdef
+    and 'search_path=app_public, pg_temp' = any(p.proconfig)
+    and has_function_privilege('anon', p.oid, 'EXECUTE') and has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == 4 ]] ||
+  fail "every meet results RPC must be SECURITY DEFINER, search_path-pinned and executable by anon+authenticated"
+[[ "$(sql_value "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'app_public' and p.proname = 'group_meet_eval_advance' and p.prosecdef
+    and 'search_path=app_public, pg_temp' = any(p.proconfig) and has_function_privilege('service_role', p.oid, 'EXECUTE')
+    and not has_function_privilege('anon', p.oid, 'EXECUTE') and not has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == 1 ]] ||
+  fail "the meet transition entry point must be the service role's alone"
 [[ "$(sql_value "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   cross join unnest(array['anon','authenticated','service_role']) r(role)
-  where n.nspname = 'app_public' and p.proname like 'group\_meet\_%' and p.proname not in (${MEET_RPCS})
+  where n.nspname = 'app_public' and p.proname like 'group\_meet\_%'
+    and p.proname not in (${MEET_RPCS}, ${MEET_RESULT_RPCS}, 'group_meet_eval_advance')
     and (has_function_privilege(r.role, p.oid, 'EXECUTE') or not 'search_path=app_public, pg_temp' = any(p.proconfig));")" == 0 ]] ||
   fail "a meet helper is client-executable or has no pinned search_path"
 for name in group_meets group_meet_challenges group_meet_roster; do
@@ -255,7 +269,11 @@ for call in \
   "group_meet_challenge_update|$(b_ch_edit "${GROUP}" "${MEET}" "${CH_PROBE}" 1 "${BENCH}" volume)" \
   "group_meet_challenge_remove|$(b_ch_remove "${GROUP}" "${MEET}" "${CH_PROBE}" 1)" \
   "group_meet_join|$(b_ref "${GROUP}" "${MEET}")" \
-  "group_meet_leave|$(b_ref "${GROUP}" "${MEET}")"; do
+  "group_meet_leave|$(b_ref "${GROUP}" "${MEET}")" \
+  "group_meet_results|$(b_ref "${GROUP}" "${MEET}")" \
+  "group_meet_refresh_results|$(b_ref "${GROUP}" "${MEET}")" \
+  "group_meet_leaderboard|$(jq -nc --arg g "${GROUP}" '{p_group_id:$g}')" \
+  "group_meet_trophies|$(jq -nc --arg g "${GROUP}" --arg u "${OWNER_UID}" '{p_group_id:$g, p_member_user_id:$u}')"; do
   name="${call%%|*}"; args="${call#*|}"
   rpc "${ANON_KEY}" "${name}" "${args}"; expect_error AUTH_REQUIRED "anonymous ${name}"
   rpc "$(mint_token "${OWNER_TOKEN}" meet-probe)" "${name}" "${args}"; expect_error AGENT_FORBIDDEN "OAuth ${name}"
@@ -583,8 +601,10 @@ run_psql "begin;
 [[ "$(meet_events "${MEET}" scheduled)" == 1 ]] || fail "a transition item is written at most once"
 rpc "${MEMBER_TOKEN}" group_competition_stream_v7 "$(jq -nc --arg g "${GROUP}" '{p_group_id:$g, p_limit:50}')"
 expect_ok "v7 stream"
+# The worker may add `on` and `results` items to the past meets at any run
+# (groups-meet-scoring.sh proves those); this count is of the writes above.
 expect_json "v7 lists every meet item with the item shape" \
-  '([.items[] | select(.kind == "meet")] | length) == 10
+  '([.items[] | select(.kind == "meet" and (.event | IN("on", "results") | not))] | length) == 10
    and all(.items[] | select(.kind == "meet"); (keys | sort) == (["kind","key","sort_at_ms","event","meet","change","challenge","previous","actor"] | sort))
    and ([.items[] | select(.kind == "meet" and .event == "cancelled")] | length) == 1'
 expect_json "a cancelled item names its actor" --arg u "${ADMIN_UID}" \

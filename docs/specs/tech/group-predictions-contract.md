@@ -139,8 +139,10 @@ current member when posting is refused.
   for the week. Link, unlink and void lead changes never count, nor does the
   first #1 on an empty board: a member could cause those by editing.
 - **cow_top** reads the week's final CoW. Any cancel of that week's CoW
-  voids its `cow_top` markets, even when a replacement is scheduled. Rank 1
-  is the first entry of that metric's final ranking.
+  voids its `cow_top` markets, even when a replacement is scheduled, and the
+  board does not wait for the replacement. Yes when the member's entry in
+  that metric's final ranking has rank 1; void when the member's figure is
+  unavailable there.
 - **Statements** are generated from template parameters and avoid gendered
   pronouns.
 
