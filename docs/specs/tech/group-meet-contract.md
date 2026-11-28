@@ -195,9 +195,8 @@ The stream opts into v7 with a new cache suffix, discarding older cursors.
 Roster rows decode `joined`, nullable `joined_at_ms` and `linked`: the going
 list shows every roster row, joined or link-only.
 
-Results reads are online-only and never cached: full standings are not
-(`useMeetResults`, one page of `useGroupOnlinePages`), as is a member's
-trophies page. The leaderboard is one row per trophy holder and is cache-first
+The results and trophies reads are online-only and never cached (full
+standings are not); the leaderboard is one row per trophy holder, cache-first
 under its own versioned key, evicted with the group. The meet page's caption
 comes from the results read's own state, never the clock. `Refresh results`
 (owners and admins, offered from the cutoff) uses `useGroupAction`; a
