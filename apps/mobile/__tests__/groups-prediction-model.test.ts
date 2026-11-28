@@ -205,7 +205,7 @@ describe('points and profits', () => {
     expect(formatPredictionPoints(1.665)).toBe('1.67');
     expect(formatPredictionPoints(-0.001)).toBe('0.00');
     expect(formatPredictionProfit(6)).toBe('+6.00');
-    expect(formatPredictionProfit(-7.66)).toBe('-7.66');
+    expect(formatPredictionProfit(-7.66)).toBe('−7.66');
     expect(formatPredictionProfit(0)).toBe('0.00');
     expect(formatPredictionProfit(0.004)).toBe('0.00');
     expect([6, -7.66, 0, 0.004, -0.004].map(predictionProfitTone)).toEqual(['gain', 'loss', 'even', 'even', 'even']);
@@ -297,9 +297,9 @@ describe('ranking view', () => {
         { opponent: bettorFixture('blair'), matched: 2, wins: 1, losses: 1, voids: 0, profit: 3 }],
       recent: [{ week_start: '2026-11-16', profit: 2, matched: 1, wins: 1, losses: 0, voids: 0 }, { week_start: '2026-11-23', profit: -7.66, matched: 2, wins: 0, losses: 2, voids: 0 }] };
     const [view] = buildPredictionRanking(rankingFixture({ rows: [row] }), 'u-alex').rows;
-    expect(view).toMatchObject({ rank: 1, weekProfitLabel: '-7.66', weekTone: 'loss', allTimeProfitLabel: '+6.00', allTimeTone: 'gain', bettor: { own: true } });
-    expect(view.headToHead.map(h => [h.opponent.name, h.profitLabel, h.tone, h.opponent.former])).toEqual([['Blair · Claude', '+3.00', 'gain', false], ['Cleo · Codex', '-1.66', 'loss', true]]);
-    expect(view.recent.map(r => [r.weekStart, r.profitLabel])).toEqual([['2026-11-23', '-7.66'], ['2026-11-16', '+2.00']]);
+    expect(view).toMatchObject({ rank: 1, weekProfitLabel: '−7.66', weekTone: 'loss', allTimeProfitLabel: '+6.00', allTimeTone: 'gain', bettor: { own: true } });
+    expect(view.headToHead.map(h => [h.opponent.name, h.profitLabel, h.tone, h.opponent.former])).toEqual([['Blair · Claude', '+3.00', 'gain', false], ['Cleo · Codex', '−1.66', 'loss', true]]);
+    expect(view.recent.map(r => [r.weekStart, r.profitLabel])).toEqual([['2026-11-23', '−7.66'], ['2026-11-16', '+2.00']]);
   });
   it('has no rows before a week settles', () => expect(buildPredictionRanking(rankingFixture({ week_start: null, rows: [] }), 'u-alex')).toEqual({ weekStart: null, rows: [] }));
 });
@@ -311,6 +311,6 @@ describe('history view', () => {
     expect(view).toMatchObject({ weekStart: '2026-11-23', startsAtMs: week.starts_at_ms, endsAtMs: week.ends_at_ms });
     expect(view.markets[0].facts).toMatchObject({ marketId: 'mk-old', outcome: 'no', resultValue: 0, resultUnit: 'records' });
     expect(view.markets[0].bets[0]).toMatchObject({ winner: 'no', moved: 6, own: true });
-    expect(view.results.map(r => [r.bettor.name, r.profitLabel, r.tone, r.bettor.own])).toEqual([['Blair · Claude', '+6.00', 'gain', true], ['Alex · Claude', '-6.00', 'loss', false]]);
+    expect(view.results.map(r => [r.bettor.name, r.profitLabel, r.tone, r.bettor.own])).toEqual([['Blair · Claude', '+6.00', 'gain', true], ['Alex · Claude', '−6.00', 'loss', false]]);
   });
 });

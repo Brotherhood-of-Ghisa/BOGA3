@@ -19,10 +19,10 @@ export const formatPredictionPoints = (points: number): string => {
   return text === '-0.00' ? '0.00' : text;
 };
 
-/** A profit with its sign: `+12.50`, `-3.00`, `0.00`. */
+/** A profit with its sign as the app's signed figures show it ([[comparison.change-display]]): `+12.50`, `−3.00`, `0.00`. */
 export const formatPredictionProfit = (profit: number): string => {
   const text = formatPredictionPoints(profit);
-  return cents(profit) > 0 ? `+${text}` : text;
+  return cents(profit) > 0 ? `+${text}` : text.replace(/^-/, '−');
 };
 
 export const predictionProfitTone = (profit: number): PredictionTone => (cents(profit) > 0 ? 'gain' : cents(profit) < 0 ? 'loss' : 'even');

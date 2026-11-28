@@ -347,8 +347,8 @@ it('decodes the real prediction readers through the typed client: setting, board
   expect(await as(member, () => getPredictionRanking(groupId))).toEqual({ group_id: groupId, week_start: null, rows: [] });
   expect(await as(member, () => listPredictionHistory(groupId))).toEqual({ group_id: groupId, weeks: [], next_cursor: null });
   const week = psql("select (app_public.group_cow_week('UTC', clock_timestamp()) + 7)::text;");
-  const post = (user: string, client: string, side: string, price: number, stake: number, extra: string) => `select app_public.agent_group_prediction_post_at(
-    clock_timestamp(), '${user}', '${client}', '${groupId}', '${week}', 'records_line', '{"line":3}', '${side}', ${price}, ${stake}, ${extra});`;
+  const post = (user: string, client: string, side: string, price: number, stake: number, extra: string, line = 3) => `select app_public.agent_group_prediction_post_at(
+    clock_timestamp(), '${user}', '${client}', '${groupId}', '${week}', 'records_line', '{"line":${line}}', '${side}', ${price}, ${stake}, ${extra});`;
   psql(`update app_public.group_memberships set joined_at = joined_at - interval '1 day' where group_id = '${groupId}';
     ${post(owner.userId, 'live-a', 'yes', 60, 10, "70, 'Quiet week', null")}
     ${post(member.userId, 'live-b', 'no', 50, 4, "null, 'Busy week', null")}`);
@@ -361,6 +361,14 @@ it('decodes the real prediction readers through the typed client: setting, board
   expect(thread.offers.map(o => o.note)).toEqual(['Quiet week', 'Busy week']);
   expect(thread.matches).toMatchObject([{ price: 60, yes_stake: 6, no_stake: 4, via: 'cross', winner: null }]);
   expect(JSON.stringify([board, thread])).not.toContain('walk_away');
+  // A resting offer that expires at the close and one that is withdrawn: the guards see both states on real payloads.
+  psql(post(member.userId, 'live-b', 'yes', 40, 2, 'null, null, null', 7));
+  const withdrawnOffer = psql(`select (${post(owner.userId, 'live-a', 'no', 80, 3, "null, 'Changed my mind', null", 9).replace(/;$/, '')})->'offer'->>'offer_id';`);
+  psql(`select app_public.agent_group_prediction_withdraw_at(clock_timestamp(), '${owner.userId}', 'live-a', '${groupId}', '${withdrawnOffer}');`);
+  const marketOf = (line: number) => psql(`select id from app_public.group_prediction_markets where group_id = '${groupId}' and week_start = '${week}' and line = ${line};`);
+  const resting = await as(member, () => getPredictionBoard(groupId));
+  expect(resting.next_week!.markets.map(m => [m.market.parameters.line, m.open_offers])).toEqual([[3, 1], [7, 1]]);
+  expect((await as(member, () => getPredictionThread(groupId, marketOf(9)))).offers).toMatchObject([{ state: 'withdrawn', released: 3, note: 'Changed my mind' }]);
   await expect(as(member, () => getPredictionThread(groupId, randomUUID()))).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'market not found' });
   // Settle the week with a moved clock: the figures are read from the group's sessions (none here).
   expect(psql(`delete from app_public.group_eval_queue where group_id = '${groupId}';
@@ -369,6 +377,10 @@ it('decodes the real prediction readers through the typed client: setting, board
   expect(ranking.week_start).toBe(week);
   expect(ranking.rows.map(r => [r.bettor.member.user_id, r.week_profit, r.all_time_profit, r.matched])).toEqual([[member.userId, 6, 6, 1], [owner.userId, -6, -6, 1]]);
   expect(ranking.rows[0].head_to_head).toMatchObject([{ opponent: { member: { user_id: owner.userId } }, wins: 1, profit: 6 }]);
+  const settled = await as(member, () => getPredictionThread(groupId, row.market.market_id));
+  expect(settled).toMatchObject({ week: { state: 'settled' }, market: { outcome: 'no', result_value: 0, result_unit: 'records' }, matches: [{ winner: 'no' }] });
+  expect((await as(member, () => getPredictionThread(groupId, marketOf(7)))).offers).toMatchObject([{ state: 'expired', released: 2, live: false }]);
+  expect((await as(member, () => getPredictionBoard(groupId))).next_week!.markets.map(m => m.market.parameters.line)).toEqual([3]);
   const history = await as(member, () => listPredictionHistory(groupId));
   expect(history.weeks.map(w => w.week_start)).toEqual([week]);
   expect(history.weeks[0].markets[0]).toMatchObject({ market: { outcome: 'no', result_value: 0, result_unit: 'records' }, bets: [{ winner: 'no' }] });

@@ -55,6 +55,18 @@ Code: `supabase/functions/agent-api/index.ts`; `supabase/migrations/202610292046
 Pending: group predictions are not built yet; the agent routes and the
 CoW scheduling rule land with the implementing change.
 
+### agents.prediction-ranking · calculation · accepted
+
+Members see the AIs of a group ranked by the latest settled week's profit, then
+all-time profit, then matched bets. AIs with equal standings share a place and
+the next place is skipped. Each AI's detail shows its head-to-head record
+against every other AI and its last five settled weeks. Profits are signed
+play points ([[comparison.change-display]]).
+
+Why: the weekly reset is the game's unit; all-time profit and bets break ties.
+Code: `apps/mobile/src/groups/prediction-view-model.ts`;
+`supabase/migrations/20261128100000_group_prediction_readers.sql`.
+
 ### agents.health-activities · definition · accepted
 
 A connected coach reads the workouts the person's phone imports from their
