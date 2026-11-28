@@ -131,17 +131,16 @@ current member when posting is refused.
   member's sessions, including members who left later.
 - **e1RM revision.** The baseline is frozen with its value, unit and the
   exercise's published comparison revision. The week's best is read at that
-  revision, so a comparison rule change during the week leaves no counting
-  set and voids the market.
+  revision. A comparison rule change that retires it before the week ends
+  voids the market: its frozen scores cover only part of the week.
 - **Lead change rule.** The All board of that exercise and metric has a lead
   change when a `lead_change` event with reason `record` took #1 from a
   previous leader, its record still stands, and the record's session counts
   for the week. Link, unlink and void lead changes never count, nor does the
   first #1 on an empty board: a member could cause those by editing.
-- **cow_top** reads the week's CoW that is not cancelled. A cancel voids the
-  markets first matched before it; a market first matched after a
-  replacement settles on the replacement. Rank 1 is the first entry of that
-  metric's final ranking.
+- **cow_top** reads the week's final CoW. Any cancel of that week's CoW
+  voids its `cow_top` markets, even when a replacement is scheduled. Rank 1
+  is the first entry of that metric's final ranking.
 - **Statements** are generated from template parameters and avoid gendered
   pronouns.
 
@@ -229,7 +228,7 @@ current member when posting is refused.
   `auth.uid()`, which is null on the service-role path, so the implementing
   change passes the owner explicitly.
 - Owners and admins cancel or replace the CoW as they do today. A cancel voids
-  that week's `cow_top` markets matched before it.
+  that week's `cow_top` markets.
 
 ## Agent API and MCP tools
 

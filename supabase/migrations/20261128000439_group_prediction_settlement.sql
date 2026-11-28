@@ -151,6 +151,12 @@ begin
   outcome := 'void';
   if p_market.template = 'e1rm_line' then
     if p_market.baseline_value is null then return; end if;
+    -- A comparison rule change during the week retires the baseline's
+    -- revision: its frozen scores cover only part of the week.
+    if exists (select 1 from app_public.group_rule_revisions r where r.group_exercise_id = p_market.group_exercise_id
+        and r.revision = p_market.baseline_rules_revision and r.retired_at < p_board.ends_at) then
+      return;
+    end if;
     select b.value, b.unit into _best from app_public.group_prediction_best_e1rm(p_market.group_id,
       p_market.group_exercise_id, p_market.baseline_rules_revision, p_market.member_user_id, _from, _to) b;
     if _best.value is null or _best.unit is distinct from p_market.baseline_unit then return; end if;
@@ -170,12 +176,10 @@ begin
     result_unit := 'lead_changes';
     outcome := case when result_value > 0 then 'yes' else 'no' end;
   elsif p_market.template = 'cow_top' then
-    -- A cancel voids the markets matched before it; one first matched after a
-    -- replacement settles on the replacement.
+    -- A cancel voids the week's cow_top markets, even when a replacement was
+    -- scheduled.
     if exists (select 1 from app_public.group_cows c where c.group_id = p_market.group_id
-        and c.week_start = p_market.week_start and c.cancelled_at is not null
-        and c.cancelled_at >= (select min(x.created_at) from app_public.group_prediction_matches x
-          where x.market_id = p_market.id)) then
+        and c.week_start = p_market.week_start and c.cancelled_at is not null) then
       return;
     end if;
     _cow := app_public.group_prediction_week_cow(p_market.group_id, p_market.week_start);
@@ -351,7 +355,7 @@ end $$;
 create function app_public.group_prediction_sweep_at(p_now timestamptz) returns jsonb
 language plpgsql volatile set search_path = app_public, pg_temp as $$
 declare _b app_public.group_prediction_boards; _closed integer := 0; _settled integer := 0; _waiting integer := 0;
-  _failed integer := 0; _state text; _work jsonb;
+  _failed integer := 0; _state text; _work jsonb; _did_close boolean; _did_settle boolean;
 begin
   for _b in select b.* from app_public.group_prediction_boards b
      where (b.closed_at is null and b.starts_at <= p_now) or (b.settled_at is null and b.ends_at <= p_now)
@@ -365,15 +369,19 @@ begin
       continue;
     end if;
     begin
-      if _b.closed_at is null and app_public.group_prediction_close_at(p_now, _b.group_id, _b.week_start) then
-        _closed := _closed + 1;
+      _did_close := false;
+      _did_settle := false;
+      if _b.closed_at is null then
+        _did_close := app_public.group_prediction_close_at(p_now, _b.group_id, _b.week_start);
       end if;
       if _b.ends_at <= p_now then
-        if app_public.group_prediction_settle_at(p_now, _b.group_id, _b.week_start) then
-          _settled := _settled + 1;
-        else
-          _waiting := _waiting + 1;
-        end if;
+        _did_settle := app_public.group_prediction_settle_at(p_now, _b.group_id, _b.week_start);
+      end if;
+      -- Counted only once the board's subtransaction holds.
+      _closed := _closed + _did_close::integer;
+      _settled := _settled + _did_settle::integer;
+      if _b.ends_at <= p_now and not _did_settle then
+        _waiting := _waiting + 1;
       end if;
     exception when others then
       get stacked diagnostics _state = returned_sqlstate;

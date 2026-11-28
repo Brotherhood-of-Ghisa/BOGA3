@@ -17,10 +17,11 @@
 #     withdrawal whose clock predates the start is refused once the board has
 #     closed; a session logged after close does not move a frozen baseline;
 #   - settlement: one yes and one no per template, and every void case
-#     (e1RM: no baseline, no counting set; cow_top: metric not selected,
-#     nobody ranked, no CoW, cancelled, unavailable, matched before a cancel
-#     that was replaced) while a match after the replacement settles; cow_top
-#     waits for a final CoW; settlement never runs before the week ends;
+#     (e1RM: no baseline, no counting set, a mid-week comparison rules
+#     change; cow_top: metric not selected, nobody ranked, no CoW, cancelled,
+#     cancelled and replaced, unavailable); the first #1 on an empty board is
+#     no lead change; cow_top waits for a final CoW; settlement never runs
+#     before the week ends; target jobs and rules drains also hold a board;
 #   - points: each match moves exactly the loser's stake to the winner, a void
 #     moves nothing, a board's profits sum to zero; results rows (matched,
 #     wins, losses, voids, profit) per AI, including an AI that never matched;
@@ -279,12 +280,15 @@ exercise() {
 }
 BENCH="$(exercise "Settle Bench")"
 ROW="$(exercise "Settle Row")"
+SQUAT="$(exercise "Settle Squat")"
 
 T="gps-${RUN_TAG}"
 CUAM="$(now_ms)"
 def_link "${ALEX_TOKEN}" "${T}-a-bench" "${BENCH}"
 def_link "${BLAIR_TOKEN}" "${T}-b-bench" "${BENCH}"
 def_link "${CASEY_TOKEN}" "${T}-c-bench" "${BENCH}"
+def_link "${ALEX_TOKEN}" "${T}-a-squat" "${SQUAT}"
+def_link "${BLAIR_TOKEN}" "${T}-b-row" "${ROW}"
 drain "setup"
 
 add_bettor A1 "${ALEX_UID}" "Claude"
@@ -306,6 +310,7 @@ WS_MS="$(sql_value "select app_public.group_prediction_ms(lower(app_public.group
 NOW_MS="$(now_ms)"
 sess "${ALEX_TOKEN}" "${T}-a0" $(( NOW_MS + 1000 )) "${T}-a-bench" a0:100:5:rir_1
 sess "${CASEY_TOKEN}" "${T}-c0" $(( NOW_MS + 2000 )) "${T}-c-bench" c0:80:5:rir_1
+sess "${ALEX_TOKEN}" "${T}-a0s" $(( NOW_MS + 2500 )) "${T}-a-squat" a0s:100:5:rir_1
 drain2 "baselines"
 A_BASE="$(sql_value "select trim_scale(value) from app_public.group_metric_set_scores where member_user_id = '${ALEX_UID}'
   and set_id = '${T}-a0' and metric = 'e1rm' and counting;")"
@@ -347,6 +352,8 @@ pair "${NOW}" "${W}" e1rm_line "{\"member_user_id\":\"${BLAIR_UID}\",\"group_exe
 M_E1RM_NO_BASE="${MARKET}"
 pair "${NOW}" "${W}" e1rm_line "{\"member_user_id\":\"${CASEY_UID}\",\"group_exercise_id\":\"${BENCH}\",\"line\":100}" A2 B1 50 2 2
 M_E1RM_NO_SET="${MARKET}"
+pair "${NOW}" "${W}" e1rm_line "{\"member_user_id\":\"${ALEX_UID}\",\"group_exercise_id\":\"${SQUAT}\",\"line\":80}" A1 B1 50 1 1
+M_E1RM_RULES="${MARKET}"
 pair "${NOW}" "${W}" sets_line "{\"member_user_id\":\"${BLAIR_UID}\",\"line\":5}" A2 A1 70 7 3
 M_SETS_YES="${MARKET}"
 pair "${NOW}" "${W}" sets_line "{\"member_user_id\":\"${ALEX_UID}\",\"line\":10}" B1 A1 50 4 4
@@ -433,7 +440,19 @@ pass "close: open remainders expire (partial too), baselines freeze, a second cl
 # working set. Then Blair: 120x5 takes #1 from Alex (a lead change), and four
 # more working sets. Casey and Row: nothing.
 sess "${ALEX_TOKEN}" "${T}-a1" $(( WS_MS + 86400000 )) "${T}-a-bench" a1w:60:5:warm_up a1:110:5:rir_1 a1b:100:5:rir_1
+# Alex's Squat 90x5 (not a record) is scored, then the Squat comparison
+# rules change mid-week: the baseline's revision retires.
+sess "${ALEX_TOKEN}" "${T}-a1s" $(( WS_MS + 86400000 + 7200000 )) "${T}-a-squat" a1s:90:5:rir_1
 drain2 "Alex's week"
+rpc "${OWNER_TOKEN}" group_competition_exercise_update "$(jq -nc --arg g "${GROUP}" --arg x "${SQUAT}" \
+  --argjson r "$(sql_value "select rules_revision from app_public.group_exercises where id = '${SQUAT}';")" \
+  '{p_group_id:$g, p_exercise_id:$x, p_expected_revision:$r, p_name:"Settle Squat", p_load_input_mode:"total_load",
+    p_bodyweight_contribution:0.5, p_default_metric:"e1rm"}')"
+expect_ok "a mid-week Squat rules change"
+drain2 "the Squat rules change"
+expect_sql "the baseline's revision is retired and its week score kept" "select count(*) from app_public.group_metric_set_scores s
+  join app_public.group_prediction_markets m on m.id = '${M_E1RM_RULES}' and s.rules_revision = m.baseline_rules_revision
+  where s.group_exercise_id = '${SQUAT}' and s.set_id = '${T}-a1s' and s.metric = 'e1rm' and s.counting;" 1
 sess "${BLAIR_TOKEN}" "${T}-b1" $(( WS_MS + 2 * 86400000 )) "${T}-b-bench" \
   b1:120:5:rir_1 b1b:100:5:rir_1 b1c:100:5:rir_1 b1d:100:5:rir_1 b1e:100:5:rir_1
 drain2 "Blair's week"
@@ -474,7 +493,8 @@ expect_outcome "e1RM no (115%)" "${M_E1RM_NO}" "no:${A_WEEK}:kg"
 expect_outcome "e1RM void: no baseline" "${M_E1RM_NO_BASE}" "void:-:-"
 expect_outcome "e1RM void: no counting set in the week" "${M_E1RM_NO_SET}" "void:-:-"
 expect_outcome "sets yes (Blair 5 working sets)" "${M_SETS_YES}" "yes:5:sets"
-expect_outcome "sets no (Alex 2 working sets; the warm-up never counts)" "${M_SETS_NO}" "no:2:sets"
+expect_outcome "e1RM void: the comparison rules changed during the week" "${M_E1RM_RULES}" "void:-:-"
+expect_outcome "sets no (Alex 3 working sets; the warm-up never counts)" "${M_SETS_NO}" "no:3:sets"
 expect_outcome "records yes (4 boards taken)" "${M_REC_YES}" "yes:4:records"
 expect_outcome "records no (line 5)" "${M_REC_NO}" "no:4:records"
 expect_outcome "lead change yes (Bench 1RM: Alex → Blair)" "${M_LEAD_YES}" "yes:1:lead_changes"
@@ -490,9 +510,9 @@ pass "settlement: yes and no per template; e1RM and cow_top void cases; cow_top 
 
 # Hand-counted (stakes in points): A1 +4 -3 +4 -5 -4 -2 +1 +1; A2 +5 +3 +4 +1 -5;
 # B1 -4 -5 -4 +5 -1 +2 -1 -1 +5; C1 never matched.
-[[ "$(result_line "${W}" A1)" == "-400/10/4/4/2" ]] || fail "A1's week: $(result_line "${W}" A1)"
+[[ "$(result_line "${W}" A1)" == "-400/11/4/4/3" ]] || fail "A1's week: $(result_line "${W}" A1)"
 [[ "$(result_line "${W}" A2)" == "800/8/4/1/3" ]] || fail "A2's week: $(result_line "${W}" A2)"
-[[ "$(result_line "${W}" B1)" == "-400/12/3/6/3" ]] || fail "B1's week: $(result_line "${W}" B1)"
+[[ "$(result_line "${W}" B1)" == "-400/13/3/6/4" ]] || fail "B1's week: $(result_line "${W}" B1)"
 [[ "$(result_line "${W}" C1)" == "0/0/0/0/0" ]] || fail "C1's week: $(result_line "${W}" C1)"
 expect_sql "a board's profits sum to zero" "select sum(profit_cents) from app_public.group_prediction_results
   where group_id = '${GROUP}' and week_start = '${W}';" 0
@@ -518,6 +538,15 @@ pair "$(DAY_BEFORE "${W7}")" "${W7}" cow_top "{\"member_user_id\":\"${ALEX_UID}\
 M_COW_NONE="${MARKET}"
 pair "$(DAY_BEFORE "${W7}")" "${W7}" sets_line "{\"member_user_id\":\"${ALEX_UID}\",\"line\":5}" A1 B1 50 2 2
 M_W7_SETS="${MARKET}"
+# Blair's first Row set takes #1 on an empty board: not a lead change.
+pair "$(DAY_BEFORE "${W7}")" "${W7}" lead_change "{\"group_exercise_id\":\"${ROW}\",\"metric\":\"e1rm\"}" A1 B1 50 1 1
+M_LEAD_FIRST="${MARKET}"
+WS7_MS="$(sql_value "select app_public.group_prediction_ms(lower(app_public.group_cow_bounds('UTC', '${W7}')));")"
+sess "${BLAIR_TOKEN}" "${T}-b7" $(( WS7_MS + 86400000 )) "${T}-b-row" b7:50:5:rir_1
+drain2 "Blair's first Row set"
+expect_sql "it wrote a lead change with no previous leader" "select count(*) from app_public.group_events
+  where group_id = '${GROUP}' and kind = 'lead_change' and group_exercise_id = '${ROW}' and not certified
+    and jsonb_typeof(payload -> 'previous') = 'null';" 2
 pair "$(DAY_BEFORE "${W14}")" "${W14}" cow_top "{\"member_user_id\":\"${ALEX_UID}\",\"metric\":\"e1rm\"}" A1 B1 50 1 1
 M_COW_CANCELLED="${MARKET}"
 pair "$(DAY_BEFORE "${W21}")" "${W21}" cow_top "{\"member_user_id\":\"${ALEX_UID}\",\"metric\":\"e1rm\"}" A1 B1 50 1 1
@@ -530,11 +559,11 @@ for week in "${W7}" "${W14}" "${W21}"; do
 done
 expect_outcome "CoW void: no CoW that week" "${M_COW_NONE}" "void:-:-"
 expect_outcome "sets no (Alex has no sessions that week)" "${M_W7_SETS}" "no:0:sets"
+expect_outcome "lead change no: the first #1 on an empty board" "${M_LEAD_FIRST}" "no:0:lead_changes"
 expect_outcome "CoW void: cancelled" "${M_COW_CANCELLED}" "void:-:-"
 expect_outcome "CoW void: unavailable" "${M_COW_UNAVAILABLE}" "void:-:-"
-# A CoW cancelled 12 hours before its week and replaced: the market matched
-# before the cancel voids; one first matched after it settles on the
-# replacement (Blair #1).
+# A CoW cancelled 12 hours before its week and replaced: every cow_top market
+# of the week voids, matched before the cancel or after the replacement.
 pair "$(DAY_BEFORE "${W28}")" "${W28}" cow_top "{\"member_user_id\":\"${ALEX_UID}\",\"metric\":\"e1rm\"}" A2 B1 50 1 1
 M_COW_BEFORE_CANCEL="${MARKET}"
 seed_cow "$(new_uuid)" "${W28}" "array['e1rm']" ", cancelled_at" ", lower(r) - interval '12 hours'"
@@ -546,22 +575,22 @@ seed_cow "$(new_uuid)" "${W28}" "array['e1rm']" ", finalized_at, final_outcome, 
     'value', 140, 'receivedAtUs', 1, 'rank', 1))))"
 [[ "$(settle_at "$(week_clock "${W28}" '7 days 1 hour')" "${W28}")" == t ]] || fail "settle ${W28}"
 expect_outcome "CoW void: matched before a cancel, even with a replacement" "${M_COW_BEFORE_CANCEL}" "void:-:-"
-expect_outcome "CoW yes: first matched after the replacement" "${M_COW_AFTER_REPLACE}" "yes:1:place"
-[[ "$(result_line "${W7}" A1)" == "-200/2/0/1/1" ]] || fail "A1's second week: $(result_line "${W7}" A1)"
+expect_outcome "CoW void: matched after the replacement" "${M_COW_AFTER_REPLACE}" "void:-:-"
+[[ "$(result_line "${W7}" A1)" == "-300/3/0/2/1" ]] || fail "A1's second week: $(result_line "${W7}" A1)"
 expect_sql "settling closes a board first" "select count(*) from app_public.group_prediction_boards
   where group_id = '${GROUP}' and week_start in ('${W7}', '${W14}', '${W21}') and closed_at is not null and settled_at >= closed_at;" 3
-pass "cow_top voids: no CoW, cancelled (also when replaced after the match), unavailable; a replacement settles later matches"
+pass "voids: no CoW, cancelled (also when replaced), unavailable; a first #1 is no lead change; boards settle without waiting"
 
 # --- ranking derivations ------------------------------------------------------------
 
 expect_sql "all-time: the sum of A1's weeks" "select profit_cents || '/' || matched || '/' || wins || '/' || losses || '/' || voids || '/' || weeks
-  from app_public.group_prediction_all_time('${GROUP}') where bettor_id = '$(bettor_id A1)';" "-600/14/4/5/5/4"
+  from app_public.group_prediction_all_time('${GROUP}') where bettor_id = '$(bettor_id A1)';" "-700/16/4/6/6/4"
 expect_sql "all-time equals the results summed" "select count(*) from app_public.group_prediction_all_time('${GROUP}') a
   where a.profit_cents <> (select sum(r.profit_cents) from app_public.group_prediction_results r
     where r.group_id = '${GROUP}' and r.bettor_id = a.bettor_id);" 0
 expect_sql "head-to-head A1 v B1" "select matched || '/' || wins || '/' || losses || '/' || voids || '/' || profit_cents
   from app_public.group_prediction_head_to_head('${GROUP}') where bettor_id = '$(bettor_id A1)' and opponent_id = '$(bettor_id B1)';" \
-  "11/4/3/4/100"
+  "13/4/4/5/0"
 expect_sql "head-to-head is symmetric" "select count(*) from app_public.group_prediction_head_to_head('${GROUP}') a
   left join app_public.group_prediction_head_to_head('${GROUP}') b on b.bettor_id = a.opponent_id and b.opponent_id = a.bettor_id
   where b.bettor_id is null or b.matched <> a.matched or b.wins <> a.losses or b.voids <> a.voids or b.profit_cents <> -a.profit_cents;" 0
@@ -592,6 +621,23 @@ expect_sql_error "A settled prediction is final" "a settled market refuses an up
 expect_sql_error "A settled prediction is final" "a results row refuses an update" \
   "update app_public.group_prediction_results set profit_cents = 0 where group_id = '${GROUP}' and week_start = '${W}';"
 pass "finality: re-running close/settle/sweep or editing settled sessions changes nothing; settled rows refuse updates"
+
+# The other readiness arms: a target job and a rules drain hold the group.
+PENDING="select app_public.group_prediction_eval_pending('${GROUP}', ${WS_MS} + 60 * 86400000::bigint);"
+expect_sql "nothing pending after the drains" "${PENDING}" f
+run_psql "insert into app_public.group_eval_queue(kind, member_user_id, group_id, group_exercise_id, causes)
+  values ('target', '${ALEX_UID}', '${GROUP}', '${BENCH}', '{link}');" >/dev/null
+expect_sql "a target job is pending work" "${PENDING}" t
+run_psql "delete from app_public.group_eval_queue where kind = 'target' and group_id = '${GROUP}';" >/dev/null
+run_psql "begin; set local session_replication_role = replica;
+  update app_public.group_set_facts set rules_version = rules_version - 1 where member_user_id = '${ALEX_UID}' and set_id = '${T}-a0';
+  commit;" >/dev/null
+expect_sql "facts awaiting a rules drain are pending work" "${PENDING}" t
+run_psql "begin; set local session_replication_role = replica;
+  update app_public.group_set_facts set rules_version = rules_version + 1 where member_user_id = '${ALEX_UID}' and set_id = '${T}-a0';
+  commit;" >/dev/null
+expect_sql "and clear once drained" "${PENDING}" f
+pass "readiness: target jobs and rules drains hold the group's boards too"
 
 # --- the hourly sweep ---------------------------------------------------------------
 
