@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
@@ -8,11 +8,15 @@ import { FormError } from '@/components/ui/form-section';
 import { Icon } from '@/components/ui/icon';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
+import { Tag } from '@/components/ui/tag';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
+import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { useSessionChallengeExercises } from '@/src/groups/use-session-meets';
 import type { CompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 
+import { SessionMeetRows } from './session-meet-rows';
 import { ViewSessionOptionsSheet } from './view-session-sheets';
 import { ViewSessionTopBar } from './view-session-top-bar';
 
@@ -27,6 +31,9 @@ export type ViewSessionSummary = {
 };
 
 export type ViewSessionSection = 'summary' | 'sets';
+
+// The finished session a meet row and `Challenge` tags are read for.
+export type ViewSessionMeetSession = { sessionId: string; startedAt: Date; completedAt: Date };
 
 type ViewSessionScreenProps = {
   section: ViewSessionSection;
@@ -43,6 +50,8 @@ type ViewSessionScreenProps = {
   onOpenActive?: () => void;
   busy?: boolean;
   isResuming?: boolean;
+  // Absent for a session that cannot join meets (deleted, or not loaded).
+  meetSession?: ViewSessionMeetSession;
 };
 
 const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set' : 'sets'}`;
@@ -66,8 +75,15 @@ export function ViewSessionScreen({
   onOpenActive,
   busy = false,
   isResuming = false,
+  meetSession,
 }: ViewSessionScreenProps) {
   const styles = useStyles();
+  const userId = useGroupLinkingUserId();
+  const definitionIds = useMemo(
+    () => [...new Set(model.cards.flatMap((card) => (card.exerciseDefinitionId ? [card.exerciseDefinitionId] : [])))],
+    [model.cards]
+  );
+  const challenged = useSessionChallengeExercises(userId, meetSession?.sessionId ?? null, definitionIds);
   const text = useUiText();
   const tone = useUiTextTone();
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
@@ -111,6 +127,12 @@ export function ViewSessionScreen({
           testID="completed-session-detail-summary"
           times={{ start: summary.start, duration: summary.duration, testID: 'completed-session-detail-times' }}
         />
+        {meetSession ? (
+          <SessionMeetRows
+            sessionId={meetSession.sessionId}
+            times={{ status: 'completed', startedAt: meetSession.startedAt, completedAt: meetSession.completedAt }}
+          />
+        ) : null}
         <SegmentedControl
           accessibilityLabel="Session review section"
           options={[{ value: 'summary', label: 'Summary' }, { value: 'sets', label: 'Sets' }]}
@@ -125,8 +147,12 @@ export function ViewSessionScreen({
         ) : (
           model.cards.map((card) => (
             <ExerciseSetsCard
+              accessory={challenged.has(card.exerciseDefinitionId ?? '') ? (
+                <Tag label="Challenge" testID={`completed-session-detail-exercise-${card.id}-challenge`} />
+              ) : undefined}
               accessibilityLabel={[
                 card.name,
+                challenged.has(card.exerciseDefinitionId ?? '') ? 'Challenge' : null,
                 formatSetCount(card.setCount),
                 ...card.record.map((line) => line.spoken),
               ]
