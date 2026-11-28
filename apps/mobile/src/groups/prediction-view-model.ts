@@ -13,10 +13,11 @@ export type PredictionTone = 'gain' | 'loss' | 'even';
 
 const cents = (points: number): number => Math.round(points * 100);
 
-/** Play points to two decimals. */
+/** Play points to two decimals, from whole hundredths (so `-0.001` is `0.00`, never `-0.00`). */
 export const formatPredictionPoints = (points: number): string => {
-  const text = (cents(points) / 100).toFixed(2);
-  return text === '-0.00' ? '0.00' : text;
+  const total = cents(points);
+  const abs = Math.abs(total);
+  return `${total < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
 };
 
 /** A profit with its sign as the app's signed figures show it ([[comparison.change-display]]): `+12.50`, `−3.00`, `0.00`. */
