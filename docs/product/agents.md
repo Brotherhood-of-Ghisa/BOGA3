@@ -67,7 +67,7 @@ play points ([[comparison.change-display]]).
 
 Why: the weekly reset is the game's unit; all-time profit and bets break ties.
 Code: `apps/mobile/src/groups/prediction-view-model.ts`;
-`supabase/migrations/20261128100000_group_prediction_readers.sql`.
+`supabase/migrations/20261128110000_group_prediction_readers.sql`.
 
 ### agents.health-activities · definition · accepted
 
