@@ -20,10 +20,16 @@
 //   output.groupsCardKey             "<user_d>:<session>" (stream card testIDs)
 //   output.groupsFirstSetId          first set of the live session (friend view)
 //   output.groupsBoardExerciseId     the active custom group exercise user_d links to
+//   output.groupsMeetId              the meet the device scheduled
+//   output.groupsDeviceUserId        user_c's id (the device's going row)
+//
+// The meet steps also act as the device's own user (fixture user_c) from a
+// second device: `meet-edit-elsewhere` passes DEVICE_EMAIL / DEVICE_PASSWORD
+// and keeps that token for `meet-live`.
 //
 // Any unexpected response throws, which fails the Maestro step.
 
-/* global STEP, SUPABASE_URL, SUPABASE_ANON_KEY, EMAIL, PASSWORD, CODE, LABEL, http, json, output */
+/* global STEP, SUPABASE_URL, SUPABASE_ANON_KEY, EMAIL, PASSWORD, DEVICE_EMAIL, DEVICE_PASSWORD, CODE, LABEL, http, json, output */
 
 var TAG = '[groups-counterparty]';
 var DURATION_SEC = 45 * 60;
@@ -55,10 +61,10 @@ function post(path, token, body, extraHeaders) {
   return { status: response.status, body: parse(response), raw: response.body };
 }
 
-function signIn() {
-  var result = post('/auth/v1/token?grant_type=password', null, { email: EMAIL, password: PASSWORD });
+function signIn(email, password) {
+  var result = post('/auth/v1/token?grant_type=password', null, { email: email, password: password });
   if (result.status !== 200 || !result.body || !result.body.access_token) {
-    fail('password sign-in for ' + EMAIL + ' failed: HTTP ' + result.status + ' ' + result.raw);
+    fail('password sign-in for ' + email + ' failed: HTTP ' + result.status + ' ' + result.raw);
   }
   return { token: result.body.access_token, userId: result.body.user.id };
 }
@@ -158,11 +164,45 @@ function benchSet1(weight, cuam) {
   return setEntity(liveSet(1), output.groupsSessionId + '-bench', 0, weight, '5', cuam);
 }
 
+var MEET_TITLE = 'Saturday lifting at the riverside gym';
+var MEET_FIELDS = ['title', 'starts_at_ms', 'ends_at_ms', 'venue_name', 'address', 'latitude', 'longitude', 'entry_note'];
+
+// group_meet_update as the device's user, from the meet as it stands now with
+// `changes` applied; the expected version is the stored one, so it wins.
+function updateMeetElsewhere(changes) {
+  var current = rpcOk(output.groupsDeviceToken, 'group_meet_get', { p_group_id: output.groupsGroupId, p_meet_id: output.groupsMeetId }).meet;
+  var args = { p_group_id: output.groupsGroupId, p_meet_id: output.groupsMeetId, p_expected_version: current.version };
+  MEET_FIELDS.forEach(function (key) {
+    args['p_' + key] = key in changes ? changes[key] : current[key];
+  });
+  var written = rpcOk(output.groupsDeviceToken, 'group_meet_update', args).meet;
+  if (written.version !== current.version + 1) {
+    fail('expected version ' + (current.version + 1) + ', got ' + JSON.stringify(written));
+  }
+  return written;
+}
+
+// The device-scheduled meet's results; waits until `ready` accepts them.
+function waitForMeetResults(ready, what) {
+  var deadline = Date.now() + POLL_DEADLINE_MS;
+  var polls = 0;
+  var results;
+  for (;;) {
+    polls += 1;
+    results = rpcOk(output.groupsToken, 'group_meet_results', { p_group_id: output.groupsGroupId, p_meet_id: output.groupsMeetId });
+    if (ready(results)) return { results: results, polls: polls };
+    if (Date.now() > deadline) {
+      fail('no ' + what + ' after ' + polls + ' polls: ' + JSON.stringify(results));
+    }
+    pause(POLL_INTERVAL_MS);
+  }
+}
+
 var steps = {
   'sign-in': function () {
     output.groupsSupabaseUrl = SUPABASE_URL;
     output.groupsAnonKey = SUPABASE_ANON_KEY;
-    var session = signIn();
+    var session = signIn(EMAIL, PASSWORD);
     output.groupsToken = session.token;
     output.groupsCounterpartyUserId = session.userId;
     console.log(TAG + ' signed in as ' + EMAIL + ' (' + session.userId + ')');
@@ -320,6 +360,76 @@ var steps = {
     console.log(
       TAG + ' GROUPS_E2E_LATENCY board sync_push->board row: ' + (Date.now() - output.groupsPushedAtMs) + ' ms (' + polls + ' polls)',
     );
+  },
+
+  // A second device of the device's own user (user_c) changes the venue while
+  // the device has the edit form open, so the device's save is a stale write.
+  'meet-edit-elsewhere': function () {
+    var device = signIn(DEVICE_EMAIL, DEVICE_PASSWORD);
+    output.groupsDeviceToken = device.token;
+    output.groupsDeviceUserId = device.userId;
+    var list = rpcOk(output.groupsDeviceToken, 'group_meet_list', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 20 });
+    var meets = (list.upcoming || []).filter(function (meet) {
+      return meet.title === MEET_TITLE;
+    });
+    if (meets.length !== 1) {
+      fail('expected one upcoming "' + MEET_TITLE + '", got ' + JSON.stringify(list));
+    }
+    output.groupsMeetId = meets[0].meet_id;
+    var written = updateMeetElsewhere({ venue_name: 'Riverside annex' });
+    console.log(TAG + ' edited meet ' + output.groupsMeetId + ' elsewhere (version ' + written.version + ')');
+  },
+
+  // The test clock: the second device moves the meet's start just before the
+  // counterparty's session started (an owner may move a meet that has not
+  // started into the past), so the meet is Live and that session overlaps it.
+  // The real edit RPC with seeded times: no test-only server path. The join
+  // time is the server's, so the start is past on both clocks whatever the
+  // host/VM skew.
+  'meet-live': function () {
+    var startsAt = Math.min(Date.now(), output.groupsSessionStartedAt, output.groupsJoinedAtMs) - 60 * 1000;
+    var written = updateMeetElsewhere({ starts_at_ms: startsAt, ends_at_ms: Date.now() + 2 * 3600 * 1000 });
+    if (written.state !== 'live') {
+      fail('expected a live meet, got ' + JSON.stringify(written));
+    }
+    console.log(TAG + ' meet ' + output.groupsMeetId + ' is live from ' + startsAt);
+  },
+
+  // user_d joins its completed session to the meet with the Sync v2 link, as
+  // its recorder would (no online join), then waits until the live results
+  // rank that session's Sled Push set on the meet's one challenge.
+  'meet-link': function () {
+    var cuam = nextClientUpdatedAt();
+    var meetId = output.groupsMeetId.toLowerCase();
+    push([
+      entity('session_meet_links', meetId + ':' + output.groupsSessionId, cuam, {
+        session_id: output.groupsSessionId,
+        meet_id: meetId,
+        created_at: cuam,
+        updated_at: cuam,
+        deleted_at: null,
+      }),
+    ]);
+    var waited = waitForMeetResults(function (results) {
+      return results.challenges.length === 1 && results.challenges[0].standings.some(function (row) {
+        return row.member.user_id === output.groupsCounterpartyUserId;
+      });
+    }, 'live standings row for the counterparty');
+    var results = waited.results;
+    var standings = results.challenges[0].standings;
+    if (results.results.state !== 'live' || standings.length !== 1 || standings[0].place !== 1 ||
+        results.sessions.length !== 1 || results.sessions[0].session_id !== output.groupsSessionId) {
+      fail('unexpected live results: ' + JSON.stringify(results));
+    }
+    // The roster union: on the roster by the counting link alone.
+    var roster = rpcOk(output.groupsToken, 'group_meet_get', { p_group_id: output.groupsGroupId, p_meet_id: output.groupsMeetId }).roster;
+    var mine = roster.filter(function (row) {
+      return row.member.user_id === output.groupsCounterpartyUserId;
+    });
+    if (mine.length !== 1 || mine[0].joined !== false || mine[0].linked !== true) {
+      fail('expected the counterparty on the roster by its link only, got ' + JSON.stringify(roster));
+    }
+    console.log(TAG + ' GROUPS_E2E_LATENCY meet sync_push->standings row: ' + (Date.now() - output.groupsPushedAtMs) + ' ms (' + waited.polls + ' polls)');
   },
 };
 

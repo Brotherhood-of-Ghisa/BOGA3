@@ -348,3 +348,5 @@ Rules:
    in Maestro's `output` and throws on any unexpected response, failing the step.
 3. The lane resets both users' server state with the service role before the
    run, so the flow is hermetic without a Supabase reset.
+4. A script may also act as the flow's own device user from a second device,
+   signing in with the device user's variables passed the same way.
