@@ -29,6 +29,9 @@ final class BogaNotificationContent: UIViewController, UNNotificationContentExte
     header.isLayoutMarginsRelativeArrangement = true
     header.layoutMargins = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
     stack.addArrangedSubview(header)
+    if let detail = projection.detail, !detail.isEmpty {
+      addDetail(stack, text: detail, theme: theme)
+    }
     if projection.bestCount > 0 {
       addRow(stack, count: projection.bestCount, text: "new group best\(projection.bestCount == 1 ? "" : "s")", theme: theme, record: true)
     }
@@ -37,6 +40,21 @@ final class BogaNotificationContent: UIViewController, UNNotificationContentExte
     }
     view.backgroundColor = colour(theme, "paper")
     attach(stack)
+  }
+
+  /// A meet-end push's standings so far, one line per challenge.
+  private func addDetail(_ stack: UIStackView, text: String, theme: [String: String]) {
+    let rule = UIView()
+    rule.backgroundColor = colour(theme, "rule")
+    rule.heightAnchor.constraint(equalToConstant: 1).isActive = true
+    stack.addArrangedSubview(rule)
+    let body = label(text, family: "Source Sans 3", weight: .semibold, size: 18, colour: colour(theme, "ink"))
+    let row = UIStackView(arrangedSubviews: [body])
+    row.isLayoutMarginsRelativeArrangement = true
+    row.layoutMargins = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+    row.isAccessibilityElement = true
+    row.accessibilityLabel = text
+    stack.addArrangedSubview(row)
   }
 
   private func addRow(_ stack: UIStackView, count: Int, text: String, theme: [String: String], record: Bool) {

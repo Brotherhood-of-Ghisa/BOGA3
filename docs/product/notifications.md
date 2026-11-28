@@ -12,9 +12,9 @@ and `supabase/migrations/20261014115352_notification_delivery.sql`.
 
 ### notifications.defaults · definition · accepted
 
-After opt-in, Activity, Group exercise bests and Leaderboard changes are all
-enabled by default. Each category can be disabled and a group muted; app
-preferences never bypass the iOS notification permission.
+After opt-in, Activity, Group exercise bests, Leaderboard changes and each
+group's Meets are all enabled by default. Each category can be disabled and a
+group muted; app preferences never bypass the iOS notification permission.
 
 Code: `apps/mobile/src/notifications/lifecycle.ts`; `supabase/migrations/20261014115352_notification_delivery.sql`.
 
@@ -61,18 +61,19 @@ Code: `supabase/migrations/20261014115352_notification_delivery.sql`.
 
 A meet sends one push at its `starts_at` ("<meet> is on at <venue>") and one at
 its `ends_at` (results, standings so far) to current members, subject to each
-member's per-group Meets preference. A cancelled meet sends nothing. Results
-becoming final sends no second push.
+member's per-group Meets preference. A cancelled meet sends nothing, and a
+start is not sent once the meet has ended. Results becoming final sends no
+second push. The results push names the top three of each challenge (at most
+three challenges, then `+N more`), with no figures, or `No results yet`.
 
 Why: one start and one end push keep meets from flooding a group's members.
-Code: `supabase/migrations/20261014115352_notification_delivery.sql`.
-Pending: meet notifications are not built yet.
+Code: `supabase/migrations/20261128090000_notification_meets.sql`; `apps/mobile/components/notifications/group-mute-row.tsx`.
 
-### notifications.meets-default · definition · open
+### notifications.meets-default · definition · accepted
 
-Whether the per-group Meets preference is on by default, and whether muting a
-group silences its meet pushes, is undecided. The card building meet
-notifications decides it and names the choice in its PR's `Product facts:` line.
+A group's Meets preference is on by default, and muting a group silences its
+meet pushes with its other notifications. Turning Meets off silences only
+meets, leaving the group's other notifications alone.
 
-Why: the plan left the default open; a builder must not pick it silently.
-Code: `supabase/migrations/20261014115352_notification_delivery.sql`.
+Why: a meet is a rare, scheduled event the member joined the group for.
+Code: `supabase/migrations/20261128090000_notification_meets.sql`.

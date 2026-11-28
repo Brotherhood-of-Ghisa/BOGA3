@@ -1,11 +1,12 @@
 /* eslint-disable import/first */
 
-import type { NotificationTarget } from '@/src/notifications/types';
+import type { NotificationMeetTarget, NotificationTarget } from '@/src/notifications/types';
 
 type TapRequest = {
   userId: string | null; ready: boolean;
   onOpen: (target: NotificationTarget) => void;
-  onUnavailable: (reason: 'offline' | 'unavailable') => void;
+  onOpenMeet: (target: NotificationMeetTarget) => void;
+  onUnavailable: (reason: 'offline' | 'unavailable', subject?: 'session' | 'meet') => void;
 };
 const mockProcess = jest.fn<Promise<void>, [TapRequest]>(() => Promise.resolve());
 const mockStop = jest.fn();
@@ -179,4 +180,36 @@ it('logs unhandled error and shows unavailable when processing rejects', async (
     event: 'notifications.tap_unhandled_error',
     message: 'crash in tap',
   }));
+});
+
+const meetTarget = { groupId: 'group', meetId: '88888888-8888-4888-8888-888888888888' };
+
+it('opens a meet tap on the meet page and does not stack its current route', () => {
+  const view = render(<NotificationTapBridge />);
+  act(() => currentRequest().onOpenMeet(meetTarget));
+  expect(mockPush).toHaveBeenCalledTimes(1);
+  const href = mockPush.mock.calls[0][0];
+  mockPathname = typeof href === 'string' ? href : href.pathname;
+  view.rerender(<NotificationTapBridge />);
+  act(() => currentRequest().onOpenMeet(meetTarget));
+  expect(mockPush).toHaveBeenCalledTimes(1);
+});
+
+it('words an offline meet tap as a meet, and retries it', async () => {
+  render(<NotificationTapBridge />);
+  act(() => currentRequest().onUnavailable('offline', 'meet'));
+  expect(screen.getByText('Connect to open this meet.')).toBeTruthy();
+  expect(screen.queryByText('Connect to open this workout.')).toBeNull();
+  const calls = mockProcess.mock.calls.length;
+  fireEvent.press(screen.getByTestId('notification-retry'));
+  await waitFor(() => expect(mockProcess.mock.calls.length).toBeGreaterThan(calls));
+});
+
+it('words an unavailable meet tap as a meet, and the next session failure goes back to the workout words', () => {
+  render(<NotificationTapBridge />);
+  act(() => currentRequest().onUnavailable('unavailable', 'meet'));
+  expect(screen.getByText('This meet is no longer available')).toBeTruthy();
+  expect(mockPush).not.toHaveBeenCalled();
+  act(() => currentRequest().onUnavailable('unavailable'));
+  expect(screen.getByText('This session is no longer available')).toBeTruthy();
 });

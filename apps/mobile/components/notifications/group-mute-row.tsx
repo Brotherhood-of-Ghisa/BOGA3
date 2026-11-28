@@ -4,9 +4,14 @@ import { View } from 'react-native';
 import { ActionButton, ListRow, Notice, SwitchRow, uiBorder, uiSpace } from '@/components/ui';
 import { makeStyles } from '@/components/ui/theme-context';
 import {
-  getGroupNotificationPreferences, NotificationApiError, setGroupNotificationMuted,
+  getGroupNotificationPreferences, NotificationApiError, setGroupNotificationMeets, setGroupNotificationMuted,
   type NotificationPreferences,
 } from '@/src/notifications';
+
+type Setting = 'muted' | 'meets';
+const WRITERS: Record<Setting, (groupId: string, value: boolean) => Promise<NotificationPreferences>> = {
+  muted: setGroupNotificationMuted, meets: setGroupNotificationMeets,
+};
 
 export function GroupNotificationMuteRow({ groupId, offline }: { groupId: string; offline: boolean }) {
   const styles = useStyles();
@@ -15,7 +20,7 @@ export function GroupNotificationMuteRow({ groupId, offline }: { groupId: string
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [readRevision, setReadRevision] = useState(0);
-  const retryMuted = useRef<boolean | null>(null);
+  const retryWrite = useRef<{ setting: Setting; value: boolean } | null>(null);
   const requests = useRef({ active: true, readGeneration: 0, mutating: false });
 
   const fail = useCallback((cause: unknown) => {
@@ -42,17 +47,17 @@ export function GroupNotificationMuteRow({ groupId, offline }: { groupId: string
     return () => { lifetime.readGeneration++; };
   }, [groupId, offline, readRevision, fail]);
 
-  const mute = async (value: boolean) => {
+  const write = async (setting: Setting, value: boolean) => {
     const lifetime = requests.current;
     if (busy || offline || lifetime.mutating) return;
     lifetime.mutating = true;
     lifetime.readGeneration++;
-    retryMuted.current = value;
+    retryWrite.current = { setting, value };
     setBusy(true);
     setError(null);
     try {
-      const confirmed = await setGroupNotificationMuted(groupId, value);
-      if (lifetime.active) { setPreferences(confirmed); retryMuted.current = null; }
+      const confirmed = await WRITERS[setting](groupId, value);
+      if (lifetime.active) { setPreferences(confirmed); retryWrite.current = null; }
     } catch (cause) { if (lifetime.active) fail(cause); }
     finally { lifetime.mutating = false; if (lifetime.active) setBusy(false); }
   };
@@ -60,8 +65,12 @@ export function GroupNotificationMuteRow({ groupId, offline }: { groupId: string
   return (
     <View style={styles.row} testID="group-notifications">
       {preferences && !unavailable ? (
-        <SwitchRow disabled={busy || offline} label="Mute notifications" onValueChange={value => { void mute(value); }}
-          testID="group-notifications-muted" value={preferences.muted} />
+        <>
+          <SwitchRow disabled={busy || offline} label="Mute notifications" onValueChange={value => { void write('muted', value); }}
+            testID="group-notifications-muted" value={preferences.muted} />
+          <SwitchRow disabled={busy || offline} label="Meets" onValueChange={value => { void write('meets', value); }}
+            testID="group-notifications-meets" value={preferences.meets} />
+        </>
       ) : (
         <ListRow density="list" description={unavailable ? 'Unavailable' : offline ? 'Offline' : 'Loading…'}
           divider={false} label="Notifications" testID="group-notifications-status" />
@@ -72,8 +81,8 @@ export function GroupNotificationMuteRow({ groupId, offline }: { groupId: string
             <ActionButton disabled={busy} label="Retry" onPress={() => {
               setBusy(true);
               setError(null);
-              if (retryMuted.current === null) setReadRevision(value => value + 1);
-              else void mute(retryMuted.current);
+              if (retryWrite.current === null) setReadRevision(value => value + 1);
+              else void write(retryWrite.current.setting, retryWrite.current.value);
             }} testID="group-notifications-retry" variant="text" />
           )} icon="warning" live message={error} testID="group-notifications-error" tone="danger" />
         </View>

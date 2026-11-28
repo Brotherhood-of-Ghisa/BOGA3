@@ -28,12 +28,15 @@ struct BogaNotificationProjection: Codable {
   let bestCount: Int
   let rankCount: Int
   let route: Route
+  /// The standings so far, on a meet-end push only; empty on a meet start; absent on a workout push.
+  let detail: String?
 
   var dictionary: [String: Any] {
     (try? JSONSerialization.jsonObject(with: JSONEncoder().encode(self))) as? [String: Any] ?? [:]
   }
 
   var summary: String {
+    if let detail, !detail.isEmpty { return detail }
     var rows = [String]()
     if bestCount > 0 { rows.append("\(bestCount) new group best\(bestCount == 1 ? "" : "s")") }
     if rankCount > 0 { rows.append("\(rankCount) leaderboard change\(rankCount == 1 ? "" : "s")") }
@@ -48,6 +51,16 @@ enum BogaNotificationError: Error {
 
 enum BogaNotificationCrypto {
   static let headings = ["Started a workout", "Finished a workout", "Workout achievements", "Group exercise bests", "Leaderboard changes"]
+
+  static let workoutKinds = ["start", "completion"]
+  static let meetKinds = ["meet_start", "meet_end"]
+
+  /// A meet push's heading and standings are the server's current names: bounded, never control characters
+  /// (a line break is allowed in the standings).
+  static func validMeetText(_ value: String, max: Int, allowEmpty: Bool, allowNewline: Bool = false) -> Bool {
+    (allowEmpty || !value.isEmpty) && value.unicodeScalars.count <= max &&
+      !value.unicodeScalars.contains(where: { ($0.value < 32 && !(allowNewline && $0.value == 10)) || (127...159).contains($0.value) })
+  }
 
   static func validHeading(_ value: String) -> Bool {
     if headings.contains(value) { return true }
@@ -81,13 +94,15 @@ enum BogaNotificationCrypto {
       let box = try AES.GCM.SealedBox(nonce: nonce, ciphertext: ciphertext.dropLast(16), tag: ciphertext.suffix(16))
       let aad = Data("boga-notification-v1:\(binding.bindingId)".utf8)
       let clear = try AES.GCM.open(box, using: SymmetricKey(data: key), authenticating: aad)
-      let allowed: Set<String> = ["v", "bindingId", "recipientUserId", "expiresAt", "notificationId", "kind", "identity", "heading", "bestCount", "rankCount", "route"]
-      guard let object = try JSONSerialization.jsonObject(with: clear) as? [String: Any], Set(object.keys) == allowed,
+      var allowed: Set<String> = ["v", "bindingId", "recipientUserId", "expiresAt", "notificationId", "kind", "identity", "heading", "bestCount", "rankCount", "route"]
+      guard let object = try JSONSerialization.jsonObject(with: clear) as? [String: Any] else { return nil }
+      if let kind = object["kind"] as? String, meetKinds.contains(kind) { allowed.insert("detail") }
+      guard Set(object.keys) == allowed,
             let route = object["route"] as? [String: Any], Set(route.keys) == Set(["groupId", "memberId", "sessionId"]) else { return nil }
       let result = try JSONDecoder().decode(BogaNotificationProjection.self, from: clear)
       guard result.v == 1, result.bindingId == binding.bindingId,
             result.recipientUserId == binding.userId, result.expiresAt.isFinite, result.expiresAt > now,
-            ["start", "completion"].contains(result.kind), validHeading(result.heading),
+            validSubject(result),
             result.bestCount >= 0, result.bestCount <= Int32.max,
             result.rankCount >= 0, result.rankCount <= Int32.max,
             !result.identity.isEmpty, result.identity.utf8.count <= 1024,
@@ -99,6 +114,16 @@ enum BogaNotificationCrypto {
             result.kind != "start" || (result.bestCount == 0 && result.rankCount == 0) else { return nil }
       return result
     } catch { return nil }
+  }
+
+  /// The kind-specific part of a projection: a workout push keeps its fixed headings and no detail; a meet push
+  /// carries free-text heading and standings, no counts, and the meet's id as its route's session.
+  static func validSubject(_ result: BogaNotificationProjection) -> Bool {
+    if workoutKinds.contains(result.kind) { return result.detail == nil && validHeading(result.heading) }
+    guard meetKinds.contains(result.kind), let detail = result.detail else { return false }
+    return validMeetText(result.heading, max: 160, allowEmpty: false) &&
+      validMeetText(detail, max: 400, allowEmpty: true, allowNewline: true) && (result.kind == "meet_end" || detail.isEmpty) &&
+      result.bestCount == 0 && result.rankCount == 0 && UUID(uuidString: result.route.sessionId) != nil
   }
 
   static func envelope(from userInfo: [AnyHashable: Any]) -> [String: Any]? {
