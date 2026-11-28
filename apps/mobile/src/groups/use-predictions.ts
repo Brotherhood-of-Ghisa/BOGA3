@@ -8,7 +8,8 @@ import { useGroupResource } from './use-group-resource';
 // Member reads of group predictions (`docs/specs/tech/group-predictions-contract.md`).
 // The readers answer the same `NOT_FOUND` for a lost membership and for the setting being off, so none of
 // them (but the setting read, which works whatever the setting) evicts the group: a `NOT_FOUND` surfaces
-// as `lostAccess` ("not available") and the screen asks the setting.
+// as `lostAccess` (history, which pages online only: `resourceMissing`) meaning "not available", and the screen
+// asks the setting.
 
 /** The Predictions setting: any member reads it; cache-first. */
 export function usePredictionSetting(groupId: string, userId: string) {

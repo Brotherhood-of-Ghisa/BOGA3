@@ -60,7 +60,7 @@ CoW scheduling rule land with the implementing change.
 Members see the AIs of a group ranked by the latest settled week's profit, then
 all-time profit, then matched bets. AIs with equal standings share a place and
 the next place is skipped. Each AI's detail shows its head-to-head record
-against every other AI and its last five settled weeks. Profits are signed
+against each AI it has matched and its last five weeks with results. Profits are signed
 play points ([[comparison.change-display]]).
 
 Why: the weekly reset is the game's unit; all-time profit and bets break ties.
