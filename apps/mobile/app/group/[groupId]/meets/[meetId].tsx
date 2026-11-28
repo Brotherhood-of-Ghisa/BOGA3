@@ -95,7 +95,7 @@ function MeetPage({ groupId, meetId, userId }: { groupId: string; meetId: string
     {leaveNote ? <GroupWriteNotice testID="meet-leave-note" tone="success" message={leaveNote} /> : null}
     {mustRefresh ? <ActionButton label="Check status" variant="outline" disabled={resource.offline} onPress={() => { void resource.refresh().then(() => setMustRefresh(false)); }} /> : null}
     <Card><Text allowFontScaling={false} style={text.label}>Going</Text>
-      {roster.map(row => <Text allowFontScaling={false} key={row.member.user_id} style={text.body}>{`${row.member.username ?? 'Member'}${row.current_member ? '' : ' · Former member'}`}</Text>)}
+      {roster.map(row => <Text allowFontScaling={false} key={row.member.user_id} style={text.body} testID={`meet-going-${row.member.user_id}`}>{`${row.member.username ?? 'Member'}${row.current_member ? '' : ' · Former member'}`}</Text>)}
       {!roster.length ? <Text allowFontScaling={false} style={text.body}>No one yet</Text> : null}
     </Card>
     <MeetChallenges data={resource.data} userId={userId} onChanged={async () => { await Promise.all([resource.refresh(), standings.refresh()]); }} results={results} />
