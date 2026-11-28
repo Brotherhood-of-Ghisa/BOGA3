@@ -7,10 +7,10 @@
 > **Not here:** what the code states (columns, SQL, wire shapes, messages,
 > tests). Names not fixed yet (tables, RPCs, routes, error tokens) are written
 > as "named by the implementing change" until that change fills them in.
-> **Status:** the setting, offers, matching, counters, withdrawal and the
-> stake limit are built (names below). Close, settlement, reads, routes,
-> idempotency receipts and screens are not yet; their names are still to be
-> filled in.
+> **Status:** the setting, offers, matching, counters, withdrawal, the stake
+> limit, close, settlement, weekly results and the reset are built (names
+> below). Reads, routes, idempotency receipts and screens are not yet; their
+> names are still to be filled in.
 > **Load when:** changing group predictions, the prediction agent routes or
 > tools, the predictions setting, the AI-scheduled CoW rule, or the Predictions
 > screens.
@@ -69,7 +69,22 @@ play-points game between the connected AIs of a group's members.
 - The hourly `group-eval` sweep closes a board: it expires open offers and
   freezes each member's e1RM baselines. After the week ends it settles. Lag of
   up to an hour is accepted.
-- Settlement of a `cow_top` market waits until the week's CoW is final.
+- **The sweep** (`group_eval_sweep()` calls `group_prediction_sweep()` first,
+  all in SQL) picks every board due to close (start passed) or settle (end
+  passed), oldest first. Instead of a lease it takes the group's prediction
+  lock with a try-lock: a busy group waits for the next sweep. Each board
+  runs in its own subtransaction; a failure is logged
+  (`group.prediction_sweep_failed`, with group, week and sqlstate) and
+  retried next hour without stopping the others. A sweep that did work logs
+  `group.prediction_sweep_work`; an idle one writes nothing.
+- Close and settle (`group_prediction_close_at`, `group_prediction_settle_at`)
+  each run once per board (`closed_at`, `settled_at`). Settling an unclosed
+  board closes it first. A post or withdrawal that waited on the lock while
+  its board closed is `CONFLICT`.
+- Settlement of a `cow_top` market waits until the week's CoW is final. While
+  a matched `cow_top` market's CoW is pending, the whole board waits. The CoW
+  becomes final in the evaluator run a sweep starts, so such a board settles
+  one sweep later. A CoW that never becomes final holds its board.
 - A board's bounds are frozen when its first offer is posted, so a later zone
   change cannot move or reopen it. Which week is open follows the current
   zone.
@@ -101,6 +116,21 @@ current member when posting is refused.
   scoring kernel.
 - **Exercise types:** `e1rm_line` takes repetition exercises only. Hold
   exercises are refused.
+- **Session scope.** Every figure counts the member's completed, live sessions
+  shared into the group whose live start falls in the week (the baseline:
+  before the week), like the week summary. `records_line` counts every
+  member's sessions, including members who left later.
+- **e1RM revision.** The baseline is frozen with its value, unit and the
+  exercise's published comparison revision. The week's best is read at that
+  revision, so a comparison rule change during the week leaves no counting
+  set and voids the market.
+- **Lead change rule.** The All board of that exercise and metric has a lead
+  change when a `lead_change` event with reason `record` took #1 from a
+  previous leader, its record still stands, and the record's session counts
+  for the week. Link, unlink and void lead changes never count, nor does the
+  first #1 on an empty board: a member could cause those by editing.
+- **cow_top** reads the week's CoW that is not cancelled (a replacement
+  counts). Rank 1 is the first entry of that metric's final ranking.
 - **Statements** are generated from template parameters and avoid gendered
   pronouns.
 
@@ -157,12 +187,22 @@ current member when posting is refused.
   "Offers, matching and counters").
 - **Finality:** results are final once written. Later edits to sessions never
   resettle a market.
-- **Stored** per AI, group and week: profit, matched bets, wins, losses and
-  voids.
+- **Settled once.** Only matched markets get an outcome (`yes`, `no` or
+  `void`) with the figure it was settled on (`result_value` and
+  `result_unit`: the week's best e1RM in the baseline's unit, `sets`,
+  `records`, `lead_changes`, or the member's CoW `place`). A settled board,
+  a settled market and a results row refuse updates.
+- **Stored** per AI, group and week (`group_prediction_results`, one row per
+  AI that posted on the board, matched or not): profit in hundredths,
+  matched bets, wins, losses and voids. A board's profits sum to zero.
 - **Ranking** shows week profit, all-time profit (the sum of weeks), matched
-  bets, and a head-to-head record for each pair of AIs.
-- **Reset:** a service-only RPC deletes one group's prediction data for the
-  post-test reset. The implementing change documents it in `RUNBOOK.md`.
+  bets, and a head-to-head record for each pair of AIs. Readers derive them
+  with `group_prediction_all_time` (per AI) and
+  `group_prediction_head_to_head` (per ordered pair, from settled matches).
+- **Reset:** `group_predictions_reset(p_group_id)`, service role or operator
+  SQL only, deletes one group's boards with their markets, offers, matches
+  and results. It keeps the setting and the bettors. `RUNBOOK.md` has the
+  post-test steps.
 
 ## AI-scheduled CoW
 
@@ -225,7 +265,9 @@ Members read; nothing here writes.
 
 - **Setting, offers, matching, counters, stake limit:**
   `supabase/tests/groups-predictions.sh`, a body of the `groups-contract`
-  lane. Settlement: named by its change.
+  lane. Close, settlement, results, the sweep and the reset:
+  `supabase/tests/groups-predictions-settlement.sh`, a body of the
+  `groups-competitions` lane.
 - **Agent routes and tools:** the agent API tests and the MCP smoke lane.
 - **Group isolation:** the group authorization lanes, with negative tests for
   non-members, the setting off, and agent tokens.
