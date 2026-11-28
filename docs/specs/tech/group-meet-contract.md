@@ -6,8 +6,8 @@
 > **Not here:** product rules (they live in [[meets.linking]], [[meets.results]]
 > and [[notifications.meets]]), and what the code states (columns, SQL, wire
 > shapes, messages, tests). **Status:** storage, challenges, the roster, the
-> session link, the stream kind, scoring, the snapshot, refresh and the meets
-> leaderboard are built; the other sections are filled by the cards that build
+> session link, the stream kind, scoring, the snapshot, refresh, the meets
+> leaderboard and the results screens are built; the other sections are filled by the cards that build
 > them. **Load when:** changing meets, meet challenges, the
 > meet session link, or `supabase/functions/group-eval/` meet scoring.
 
@@ -208,6 +208,14 @@ The stream opts into v7 with a new cache suffix, discarding older cursors.
 
 Roster rows decode `joined`, nullable `joined_at_ms` and `linked`: the going
 list shows every roster row, joined or link-only.
+
+The results and trophies reads are online-only and never cached (full
+standings are not); the leaderboard is one row per trophy holder, cache-first
+under its own versioned key, evicted with the group. The meet page's caption
+comes from the results read's own state, never the clock. `Refresh results`
+(owners and admins, offered from the cutoff) uses `useGroupAction`; a
+`CONFLICT` while the evaluator is behind is shown, not retried. Today's meet
+card ([[meets.today-card]]) reads the cached meet list.
 
 Meet/challenge/roster writes use `useGroupAction`, refused offline and never
 queued. Editors retain input across refresh and conflict; explicit status

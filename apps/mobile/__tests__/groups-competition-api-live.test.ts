@@ -14,7 +14,7 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
   if (!mockActiveClient) throw new Error('No live client');
   return mockActiveClient;
 } }));
-import { createMeet, updateMeet, cancelMeet, getMeet, listMeets, saveMeetChallenge, removeMeetChallenge, setMeetJoined, archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
+import { getMeetLeaderboard, getMeetResults, listMeetTrophies, refreshMeetResults, createMeet, updateMeet, cancelMeet, getMeet, listMeets, saveMeetChallenge, removeMeetChallenge, setMeetJoined, archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
   getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,getCompetitionRecordsHistory,
   getCompetitionPeriodTotals,getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
   joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup,createCoW,getCoWCalendar,getCoWResults,getCoWSummary,getPreviousCoWSummary } from '@/src/groups/api';
@@ -315,6 +315,11 @@ it('decodes real meet scheduling, roster, challenges and v7 stream through the t
   expect(challenge.challenge.author?.user_id).toBe(member.userId);
   await expect(as(owner, () => saveMeetChallenge({ ...input, challengeId: randomUUID() }))).rejects.toMatchObject({ code: 'DUPLICATE' });
   const edited = await as(member, () => saveMeetChallenge({ ...input, metric: 'reps', version: challenge.challenge.version }));
+  const scheduled = await as(member, () => getMeetResults(groupId, meetId));
+  expect(scheduled.results.state).toBe('scheduled'); expect(scheduled.challenges.map(c => [c.challenge.challenge_id, c.standings])).toEqual([[challengeId, []]]);
+  expect((await as(member, () => getMeetLeaderboard(groupId))).rows).toEqual([]);
+  expect(await as(member, () => listMeetTrophies(groupId, member.userId))).toEqual({ trophies: [], next_cursor: null });
+  await expect(as(member, () => refreshMeetResults(groupId, meetId))).rejects.toMatchObject({ code: 'FORBIDDEN' });
   await as(owner, () => removeMeetChallenge(groupId, meetId, challengeId, edited.challenge.version));
   await as(member, () => setMeetJoined(groupId, meetId, false));
   expect((await as(member, () => listMeets(groupId))).upcoming.map(m => m.meet_id)).toContain(meetId);
@@ -322,4 +327,5 @@ it('decodes real meet scheduling, roster, challenges and v7 stream through the t
   const stream = await as(member, () => getCompetitionStream(groupId));
   expect(stream.items.filter(item => item.kind === 'meet').map(item => item.event)).toEqual(['cancelled', 'scheduled']);
   expect((await as(member, () => getMeet(groupId, meetId))).meet.state).toBe('cancelled');
+  expect((await as(member, () => getMeetResults(groupId, meetId))).results.state).toBe('cancelled');
 }, 60000);
