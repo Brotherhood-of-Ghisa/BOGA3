@@ -435,6 +435,12 @@ run_psql "begin;
   rollback;" >/dev/null
 pass "the producer wakes the delivery worker once"
 
+# The preview's text cleanup covers the C1 range the device validators reject.
+run_psql "update app_public.group_meets set title = E'Bench\\u0085day' where id = '${MEET3}';" >/dev/null
+run_psql "select app_public.notification_projection(n.id)->>'heading' from app_public.notification_intents n
+  where n.meet_id = '${MEET3}' and n.recipient_user_id = '${B_UID}';" | grep -qx 'Bench day is on at New Gym' ||
+  fail "a control character in a meet title becomes a space in the preview"
+
 # A failed enqueue is logged and never blocks the transition.
 MEET6="$(new_meet "$((NOW - 2 * HOUR))" "$((NOW + HOUR))" "")"
 run_psql "alter table app_public.notification_intents add constraint nm_fault check (meet_id is distinct from '${MEET6}') not valid;" >/dev/null

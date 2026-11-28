@@ -194,7 +194,7 @@ unsent installation deliveries. Each intent captures eligible installation bindi
 re-registration never replays historical deliveries.
 
 Meet pushes ([[notifications.meets]]) use the same pipeline with one intent per
-recipient/meet/start-or-end and no lifter or generation; their rules are in
+recipient/meet/start-or-end, no lifter and a fixed generation; their rules are in
 `group-meet-contract.md`, "Notifications".
 
 Four jobs run concurrently per fresh claim, with at most five claim rounds

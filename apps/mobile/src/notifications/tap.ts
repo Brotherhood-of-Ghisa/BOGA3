@@ -146,7 +146,8 @@ const recordTapOpened = (identity: string, projection: NotificationProjection, o
   void logEvent({
     level: 'info',
     event: 'notifications.tap_opened',
-    context: { groupId: projection.route.groupId, sessionId: projection.route.sessionId, notificationId: projection.notificationId },
+    context: { groupId: projection.route.groupId, notificationId: projection.notificationId,
+      ...(isMeetKind(projection.kind) ? { meetId: projection.route.sessionId } : { sessionId: projection.route.sessionId }) },
   });
   open();
 };

@@ -101,8 +101,11 @@ begin
   end if;
   return _count;
 exception when others then
-  perform app_public.group_eval_log_failure('group.meet_notification_failed',null,
-    jsonb_build_object('meet_id',p_meet.id,'group_id',p_meet.group_id,'kind',p_kind,'sqlstate',sqlstate));
+  begin
+    perform app_public.group_eval_log_failure('group.meet_notification_failed',null,
+      jsonb_build_object('meet_id',p_meet.id,'group_id',p_meet.group_id,'kind',p_kind,'sqlstate',sqlstate));
+  exception when others then null;
+  end;
   return 0;
 end $$;
 
@@ -140,18 +143,18 @@ end $migration$;
 alter function app_public.notification_projection(bigint) rename to notification_projection_workout;
 
 create function app_public.notification_meet_standings(p_meet app_public.group_meets) returns text
-language plpgsql stable security definer set search_path=app_public,pg_temp as $$
+language plpgsql security definer set search_path=app_public,pg_temp as $$
 declare _final boolean := exists(select 1 from group_meet_snapshots s where s.meet_id=p_meet.id);
   _c record; _line text; _lines text[] := '{}'; _more integer := 0;
 begin
-  for _c in select c.id,c.metric,regexp_replace(coalesce(ge.name,'Exercise unavailable'),'[[:cntrl:]]+',' ','g') as exercise
+  for _c in select c.id,c.metric,regexp_replace(coalesce(ge.name,'Exercise unavailable'),'[\u0001-\u001f\u007f-\u009f]+',' ','g') as exercise
       from group_meet_challenges c left join group_exercises ge on ge.id=c.group_exercise_id
       where c.meet_id=p_meet.id and c.removed_at is null order by c.created_at,c.id loop
     select left(_c.exercise,60)||' · '||case _c.metric when 'e1rm' then 'Best 1RM' when 'weight' then 'Best weight'
         when 'reps' then 'Max reps' when 'volume' then 'Volume' else 'Hold seconds' end||': '||
       string_agg(top.name,', ' order by top.place,top.name)||
       case when max(top.total)>3 then ' +'||(max(top.total)-3) else '' end into _line
-    from (select r.place,left(regexp_replace(coalesce(nullif(btrim(p.username),''),'Member'),'[[:cntrl:]]+',' ','g'),40) as name,
+    from (select r.place,left(regexp_replace(coalesce(nullif(btrim(p.username),''),'Member'),'[\u0001-\u001f\u007f-\u009f]+',' ','g'),40) as name,
         count(*) over () as total,row_number() over (order by r.place,coalesce(nullif(btrim(p.username),''),'Member') collate "C",r.member_user_id) as rn
       from group_meet_rankings(p_meet,clock_timestamp(),_final,_c.id) r
       left join user_profiles p on p.id=r.member_user_id where r.place<=3) top where top.rn<=3;
@@ -177,9 +180,9 @@ begin
   if not exists(select 1 from group_memberships gm where gm.group_id=m.group_id and gm.user_id=n.recipient_user_id and gm.ended_at is null)
     or exists(select 1 from notification_group_preferences p
       where p.user_id=n.recipient_user_id and p.group_id=m.group_id and (p.muted or not p.meets)) then return null; end if;
-  label := left(regexp_replace(coalesce(m.title,'Meet'),'[[:cntrl:]]+',' ','g'),60);
+  label := left(regexp_replace(coalesce(m.title,'Meet'),'[\u0001-\u001f\u007f-\u009f]+',' ','g'),60);
   heading := case n.kind
-    when 'meet_start' then label||' is on at '||left(regexp_replace(m.venue_name,'[[:cntrl:]]+',' ','g'),60)
+    when 'meet_start' then label||' is on at '||left(regexp_replace(m.venue_name,'[\u0001-\u001f\u007f-\u009f]+',' ','g'),60)
     else label||': results so far' end;
   return jsonb_build_object('v',1,'recipientUserId',n.recipient_user_id,'expiresAt',floor(extract(epoch from n.expires_at)*1000),
     'notificationId',n.id::text,'kind',n.kind,'identity',left(group_name,100),'heading',heading,
